@@ -14,6 +14,8 @@ class Contract extends Model
         'reference',
         'policy_number',
         'organization_id',
+        'created_by_id',
+        'updated_by_id',
         'client_id',
         'vehicle_id',
         'company_id',
@@ -121,6 +123,16 @@ class Contract extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_id');
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by_id');
     }
 
     public function client(): BelongsTo

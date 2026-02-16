@@ -185,6 +185,18 @@ function markAttestationIssued(contract) {
                             Contrat de base ({{ formatDate(parentContract.start_date) }} → {{ formatDate(parentContract.end_date) }})
                         </Link>
                     </template>
+                    <template v-if="contract.created_by || contract.updated_by">
+                        <span class="text-slate-400">|</span>
+                        <span class="text-sm text-slate-600">
+                            <template v-if="contract.created_by">
+                                Créé par <strong>{{ contract.created_by.name }}</strong>
+                            </template>
+                            <template v-if="contract.created_by && contract.updated_by"> · </template>
+                            <template v-if="contract.updated_by">
+                                Modifié par <strong>{{ contract.updated_by.name }}</strong>
+                            </template>
+                        </span>
+                    </template>
                 </div>
                 <div
                     v-if="childContracts.length > 0"

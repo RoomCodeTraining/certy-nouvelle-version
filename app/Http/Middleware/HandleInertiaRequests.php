@@ -35,6 +35,7 @@ class HandleInertiaRequests extends Middleware
                         'id' => $user->id,
                         'name' => $user->name,
                         'email' => $user->email,
+                        'is_root' => $user->isRoot(),
                         'onboarding_completed' => $user->hasCompletedOnboarding(),
                         'current_organization' => $user->currentOrganization()?->only(['id', 'name', 'slug']),
                     ];

@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Models\Contract;
+use App\Models\User;
 use App\Services\ContractPricingService;
 
 class UpdateContractAction
@@ -11,8 +12,11 @@ class UpdateContractAction
         protected ContractPricingService $pricingService
     ) {}
 
-    public function execute(Contract $contract, array $validated): Contract
+    public function execute(Contract $contract, array $validated, ?User $user = null): Contract
     {
+        if ($user !== null && \Illuminate\Support\Facades\Schema::hasColumn($contract->getTable(), 'updated_by_id')) {
+            $validated['updated_by_id'] = $user->id;
+        }
         if (array_key_exists('reduction_amount', $validated)) {
             $validated['reduction_amount'] = (int) ($validated['reduction_amount'] ?? 0);
         }

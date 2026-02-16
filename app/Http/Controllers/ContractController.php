@@ -85,6 +85,10 @@ class ContractController extends Controller
         if (Schema::hasColumn('contracts', 'parent_id')) {
             $with[] = 'parent:id';
         }
+        if (Schema::hasColumn('contracts', 'created_by_id')) {
+            $with[] = 'createdBy:id,name';
+            $with[] = 'updatedBy:id,name';
+        }
         $query = Contract::accessibleBy($user)->with($with);
 
         if ($request->filled('search')) {
@@ -124,37 +128,111 @@ class ContractController extends Controller
         ];
 
         $hasPolicyNumber = Schema::hasColumn('contracts', 'policy_number');
+        $hasAttestation = Schema::hasColumn('contracts', 'attestation_issued_at');
         $filename = 'contrats-' . now()->format('Y-m-d-His') . '.csv';
 
-        return new StreamedResponse(function () use ($contracts, $contractTypeLabels, $statusLabels, $hasPolicyNumber) {
+        $headers = [
+            'Date création',
+            'Référence',
+        ];
+        if ($hasPolicyNumber) {
+            $headers[] = 'N° police';
+        }
+        $headers = array_merge($headers, [
+            'Affaire',
+            'Statut',
+            'Client',
+            'Véhicule',
+            'Type contrat',
+            'Compagnie',
+            'Date début',
+            'Date fin',
+            'Prime de base (FCFA)',
+            'RC (FCFA)',
+            'Défense recours (FCFA)',
+            'Transport de personnes (FCFA)',
+            'Accessoires (FCFA)',
+            'Taxes (FCFA)',
+            'CEDEAO (FCFA)',
+            'FGA (FCFA)',
+            'Accessoire compagnie (FCFA)',
+            'Accessoire agence (FCFA)',
+            'Prime TTC (FCFA)',
+            'Commission (FCFA)',
+            'Réduction BNS (%)',
+            'Réduction BNS (FCFA)',
+            'Réduction sur commission (%)',
+            'Réduction sur commission (FCFA)',
+            'Réduction profession (%)',
+            'Réduction profession (FCFA)',
+            'Réduction (FCFA)',
+            'Total réductions (FCFA)',
+            'Montant total (FCFA)',
+        ]);
+        if ($hasAttestation) {
+            $headers = array_merge($headers, ['Attestation émise le', 'N° attestation', 'Lien attestation']);
+        }
+        $hasCreatedBy = Schema::hasColumn('contracts', 'created_by_id');
+        if ($hasCreatedBy) {
+            $headers = array_merge($headers, ['Créé par', 'Modifié par']);
+        }
+
+        return new StreamedResponse(function () use ($contracts, $contractTypeLabels, $statusLabels, $headers, $hasPolicyNumber, $hasAttestation, $hasCreatedBy) {
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM for Excel
-
-            $headers = ['Date création', 'Référence', 'Affaire', 'Client', 'Véhicule', 'Type', 'Compagnie', 'Date début', 'Date fin', 'Montant (FCFA)', 'Statut'];
-            if ($hasPolicyNumber) {
-                array_splice($headers, 2, 0, ['N° police']);
-            }
             fputcsv($out, $headers, ';');
 
             foreach ($contracts as $c) {
                 $vehicleLabel = $c->vehicle
                     ? trim(($c->vehicle->brand?->name ?? '').' '.($c->vehicle->model?->name ?? '').' '.($c->vehicle->registration_number ?? '')) ?: ($c->vehicle->registration_number ?? '')
                     : '';
+
                 $row = [
                     $c->created_at?->format('d/m/Y H:i') ?? '',
                     $c->reference ?? '',
+                ];
+                if ($hasPolicyNumber) {
+                    $row[] = $c->policy_number ?? '';
+                }
+                $row = array_merge($row, [
                     $c->parent_id ? 'Renouvellement' : 'Nouvelle affaire',
+                    $statusLabels[$c->status] ?? $c->status,
                     $c->client?->full_name ?? '',
                     $vehicleLabel,
                     $contractTypeLabels[$c->contract_type] ?? $c->contract_type,
                     $c->company?->name ?? '',
                     $c->start_date?->format('d/m/Y') ?? '',
                     $c->end_date?->format('d/m/Y') ?? '',
-                    $c->total_amount ?? '',
-                    $statusLabels[$c->status] ?? $c->status,
-                ];
-                if ($hasPolicyNumber) {
-                    array_splice($row, 2, 0, [$c->policy_number ?? '']);
+                    (string) ($c->base_amount ?? ''),
+                    (string) ($c->rc_amount ?? ''),
+                    (string) ($c->defence_appeal_amount ?? ''),
+                    (string) ($c->person_transport_amount ?? ''),
+                    (string) ($c->accessory_amount ?? ''),
+                    (string) ($c->taxes_amount ?? ''),
+                    (string) ($c->cedeao_amount ?? ''),
+                    (string) ($c->fga_amount ?? ''),
+                    (string) ($c->company_accessory ?? ''),
+                    (string) ($c->agency_accessory ?? ''),
+                    (string) ($c->prime_ttc ?? ''),
+                    (string) ($c->commission_amount ?? ''),
+                    (string) ($c->reduction_bns ?? ''),
+                    (string) ($c->reduction_bns_amount ?? ''),
+                    (string) ($c->reduction_on_commission ?? ''),
+                    (string) ($c->reduction_on_commission_amount ?? ''),
+                    (string) ($c->reduction_on_profession_percent ?? ''),
+                    (string) ($c->reduction_on_profession_amount_stored ?? ''),
+                    (string) ($c->reduction_amount ?? ''),
+                    (string) ($c->total_reduction_amount ?? ''),
+                    (string) ($c->total_amount ?? ''),
+                ]);
+                if ($hasAttestation) {
+                    $row[] = $c->attestation_issued_at?->format('d/m/Y H:i') ?? '';
+                    $row[] = $c->attestation_number ?? '';
+                    $row[] = $c->attestation_link ?? '';
+                }
+                if ($hasCreatedBy) {
+                    $row[] = $c->createdBy?->name ?? '';
+                    $row[] = $c->updatedBy?->name ?? '';
                 }
                 fputcsv($out, $row, ';');
             }
@@ -162,6 +240,8 @@ class ContractController extends Controller
         }, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'Pragma' => 'no-cache',
         ]);
     }
 
@@ -280,6 +360,10 @@ class ContractController extends Controller
             $relations[] = 'parent:id,start_date,end_date,status';
             $relations[] = 'children:id,parent_id,start_date,end_date,status,total_amount';
         }
+        if (Schema::hasColumn('contracts', 'created_by_id')) {
+            $relations[] = 'createdBy:id,name';
+            $relations[] = 'updatedBy:id,name';
+        }
         $contract->load($relations);
 
         $hasAttestation = $contract->attestation_issued_at !== null || $contract->attestation_number !== null;
@@ -342,7 +426,7 @@ class ContractController extends Controller
             return redirect()->route('contracts.show', $contract)->with('error', 'Un contrat validé ne peut pas être modifié.');
         }
         $this->authorizeClientVehicle($request, $request->validated('client_id'), $request->validated('vehicle_id'));
-        $action->execute($contract, $request->validated());
+        $action->execute($contract, $request->validated(), $request->user());
         return redirect()->route('contracts.show', $contract)->with('success', 'Contrat mis à jour.');
     }
 
@@ -356,7 +440,11 @@ class ContractController extends Controller
             return redirect()->route('contracts.show', $contract)
                 ->with('error', 'Seul un contrat en brouillon peut être validé.');
         }
-        $contract->update(['status' => Contract::STATUS_VALIDATED]);
+        $update = ['status' => Contract::STATUS_VALIDATED];
+        if (Schema::hasColumn('contracts', 'updated_by_id')) {
+            $update['updated_by_id'] = $request->user()->id;
+        }
+        $contract->update($update);
         Event::dispatch(new \App\Events\ContractValidated($contract, $request->user()));
 
         return redirect()->route('contracts.show', $contract)
@@ -369,7 +457,11 @@ class ContractController extends Controller
         if (! in_array($contract->status, [Contract::STATUS_DRAFT, Contract::STATUS_VALIDATED, Contract::STATUS_ACTIVE], true)) {
             return redirect()->route('contracts.show', $contract)->with('error', 'Ce contrat ne peut pas être annulé.');
         }
-        $contract->update(['status' => Contract::STATUS_CANCELLED]);
+        $update = ['status' => Contract::STATUS_CANCELLED];
+        if (Schema::hasColumn('contracts', 'updated_by_id')) {
+            $update['updated_by_id'] = $request->user()->id;
+        }
+        $contract->update($update);
 
         return redirect()->route('contracts.show', $contract)->with('success', 'Contrat annulé.');
     }

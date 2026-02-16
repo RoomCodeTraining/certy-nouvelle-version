@@ -25,6 +25,8 @@ class StoreContractAction
         }
         $organization = $user->currentOrganization();
         $validated['organization_id'] = $organization->id;
+        $validated['created_by_id'] = $user->id;
+        $validated['updated_by_id'] = $user->id;
         $validated['status'] = $validated['status'] ?? Contract::STATUS_DRAFT;
         $validated['reduction_amount'] = (int) ($validated['reduction_amount'] ?? 0);
         $validated['reduction_bns'] = (float) ($validated['reduction_bns'] ?? 0);

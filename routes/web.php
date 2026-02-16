@@ -29,11 +29,13 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, '__invoke'])->name('dashboard');
     Route::get('/api/statistics', [\App\Http\Controllers\Api\StatisticsController::class, '__invoke'])->name('api.statistics');
-    Route::get('/settings/profile', [ProfileController::class, 'edit'])->name('settings.profile');
-    Route::put('/settings/profile', [ProfileController::class, 'update']);
-    Route::get('/settings/config', [OrganizationCompanyConfigController::class, 'index'])->name('settings.config');
-    Route::post('/settings/config', [OrganizationCompanyConfigController::class, 'update'])->name('settings.config.update');
-    Route::delete('/settings/config/{config}', [OrganizationCompanyConfigController::class, 'destroy'])->name('settings.config.destroy');
+    Route::middleware('root')->group(function () {
+        Route::get('/settings/profile', [ProfileController::class, 'edit'])->name('settings.profile');
+        Route::put('/settings/profile', [ProfileController::class, 'update']);
+        Route::get('/settings/config', [OrganizationCompanyConfigController::class, 'index'])->name('settings.config');
+        Route::post('/settings/config', [OrganizationCompanyConfigController::class, 'update'])->name('settings.config.update');
+        Route::delete('/settings/config/{config}', [OrganizationCompanyConfigController::class, 'destroy'])->name('settings.config.destroy');
+    });
 
     // CRUD Clients
     Route::resource('clients', ClientController::class);
@@ -65,15 +67,17 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     Route::post('/contracts/{contract}/mark-attestation-issued', [ContractController::class, 'markAttestationIssued'])->name('contracts.mark-attestation-issued');
     Route::post('/contracts/{contract}/generate-attestation', [ContractController::class, 'generateAttestation'])->name('contracts.generate-attestation');
 
-    // Bordereaux (compagnie + période du -> au)
-    Route::get('/bordereaux', [BordereauController::class, 'index'])->name('bordereaux.index');
-    Route::get('/bordereaux/create', [BordereauController::class, 'create'])->name('bordereaux.create');
-    Route::post('/bordereaux', [BordereauController::class, 'store'])->name('bordereaux.store');
-    Route::get('/bordereaux/{bordereau}', [BordereauController::class, 'show'])->name('bordereaux.show');
-    Route::post('/bordereaux/{bordereau}/validate', [BordereauController::class, 'validate'])->name('bordereaux.validate');
-    Route::delete('/bordereaux/{bordereau}', [BordereauController::class, 'destroy'])->name('bordereaux.destroy');
-    Route::get('/bordereaux/{bordereau}/pdf', [BordereauController::class, 'pdf'])->name('bordereaux.pdf');
-    Route::get('/bordereaux/{bordereau}/excel', [BordereauController::class, 'excel'])->name('bordereaux.excel');
+    // Bordereaux (compagnie + période du -> au) — réservé aux utilisateurs root
+    Route::middleware('root')->group(function () {
+        Route::get('/bordereaux', [BordereauController::class, 'index'])->name('bordereaux.index');
+        Route::get('/bordereaux/create', [BordereauController::class, 'create'])->name('bordereaux.create');
+        Route::post('/bordereaux', [BordereauController::class, 'store'])->name('bordereaux.store');
+        Route::get('/bordereaux/{bordereau}', [BordereauController::class, 'show'])->name('bordereaux.show');
+        Route::post('/bordereaux/{bordereau}/validate', [BordereauController::class, 'validate'])->name('bordereaux.validate');
+        Route::delete('/bordereaux/{bordereau}', [BordereauController::class, 'destroy'])->name('bordereaux.destroy');
+        Route::get('/bordereaux/{bordereau}/pdf', [BordereauController::class, 'pdf'])->name('bordereaux.pdf');
+        Route::get('/bordereaux/{bordereau}/excel', [BordereauController::class, 'excel'])->name('bordereaux.excel');
+    });
 
     // Référentiel : Marques et Modèles véhicules
     Route::get('/referential/brands', [VehicleBrandController::class, 'index'])->name('referential.brands.index');
@@ -94,23 +98,25 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     Route::get('/digital/attestations', [DigitalController::class, 'attestations'])->name('digital.attestations');
     Route::get('/digital/attestations/{reference}/download', [DigitalController::class, 'downloadAttestation'])->name('digital.attestations.download');
     Route::get('/digital/attestations/{reference}/view', [DigitalController::class, 'viewAttestation'])->name('digital.attestations.view');
-    Route::get('/digital/rattachements', [DigitalController::class, 'rattachements'])->name('digital.rattachements');
-    Route::get('/digital/stock', [DigitalController::class, 'stock'])->name('digital.stock');
-    Route::get('/digital/stock/create', [DigitalController::class, 'createTransaction'])->name('digital.stock.create');
-    Route::post('/digital/transactions', [DigitalController::class, 'storeTransactionRequest'])->name('digital.transactions.store');
-    Route::post('/digital/transactions/{reference}/cancel', [DigitalController::class, 'cancelTransaction'])->name('digital.transactions.cancel');
-    Route::get('/digital/utilisateurs', [DigitalController::class, 'utilisateurs'])->name('digital.utilisateurs');
-    Route::get('/digital/utilisateurs/create', [DigitalController::class, 'createUtilisateur'])->name('digital.utilisateurs.create');
-    Route::post('/digital/utilisateurs', [DigitalController::class, 'storeUtilisateur'])->name('digital.utilisateurs.store');
-    Route::get('/digital/utilisateurs/{id}/edit', [DigitalController::class, 'editUtilisateur'])->name('digital.utilisateurs.edit');
-    Route::put('/digital/utilisateurs/{id}', [DigitalController::class, 'updateUtilisateur'])->name('digital.utilisateurs.update');
-    Route::post('/digital/utilisateurs/{id}/enable', [DigitalController::class, 'enableUtilisateur'])->name('digital.utilisateurs.enable');
-    Route::post('/digital/utilisateurs/{id}/disable', [DigitalController::class, 'disableUtilisateur'])->name('digital.utilisateurs.disable');
-    Route::get('/digital/bureaux', [DigitalController::class, 'bureaux'])->name('digital.bureaux');
-    Route::get('/digital/bureaux/create', [DigitalController::class, 'createBureau'])->name('digital.bureaux.create');
-    Route::post('/digital/bureaux', [DigitalController::class, 'storeBureau'])->name('digital.bureaux.store');
-    Route::get('/digital/bureaux/{id}/edit', [DigitalController::class, 'editBureau'])->name('digital.bureaux.edit');
-    Route::put('/digital/bureaux/{id}', [DigitalController::class, 'updateBureau'])->name('digital.bureaux.update');
-    Route::post('/digital/bureaux/{id}/enable', [DigitalController::class, 'enableBureau'])->name('digital.bureaux.enable');
-    Route::post('/digital/bureaux/{id}/disable', [DigitalController::class, 'disableBureau'])->name('digital.bureaux.disable');
+    Route::middleware('root')->group(function () {
+        Route::get('/digital/rattachements', [DigitalController::class, 'rattachements'])->name('digital.rattachements');
+        Route::get('/digital/stock', [DigitalController::class, 'stock'])->name('digital.stock');
+        Route::get('/digital/stock/create', [DigitalController::class, 'createTransaction'])->name('digital.stock.create');
+        Route::post('/digital/transactions', [DigitalController::class, 'storeTransactionRequest'])->name('digital.transactions.store');
+        Route::post('/digital/transactions/{reference}/cancel', [DigitalController::class, 'cancelTransaction'])->name('digital.transactions.cancel');
+        Route::get('/digital/bureaux', [DigitalController::class, 'bureaux'])->name('digital.bureaux');
+        Route::get('/digital/bureaux/create', [DigitalController::class, 'createBureau'])->name('digital.bureaux.create');
+        Route::post('/digital/bureaux', [DigitalController::class, 'storeBureau'])->name('digital.bureaux.store');
+        Route::get('/digital/bureaux/{id}/edit', [DigitalController::class, 'editBureau'])->name('digital.bureaux.edit');
+        Route::put('/digital/bureaux/{id}', [DigitalController::class, 'updateBureau'])->name('digital.bureaux.update');
+        Route::post('/digital/bureaux/{id}/enable', [DigitalController::class, 'enableBureau'])->name('digital.bureaux.enable');
+        Route::post('/digital/bureaux/{id}/disable', [DigitalController::class, 'disableBureau'])->name('digital.bureaux.disable');
+        Route::get('/digital/utilisateurs', [DigitalController::class, 'utilisateurs'])->name('digital.utilisateurs');
+        Route::get('/digital/utilisateurs/create', [DigitalController::class, 'createUtilisateur'])->name('digital.utilisateurs.create');
+        Route::post('/digital/utilisateurs', [DigitalController::class, 'storeUtilisateur'])->name('digital.utilisateurs.store');
+        Route::get('/digital/utilisateurs/{id}/edit', [DigitalController::class, 'editUtilisateur'])->name('digital.utilisateurs.edit');
+        Route::put('/digital/utilisateurs/{id}', [DigitalController::class, 'updateUtilisateur'])->name('digital.utilisateurs.update');
+        Route::post('/digital/utilisateurs/{id}/enable', [DigitalController::class, 'enableUtilisateur'])->name('digital.utilisateurs.enable');
+        Route::post('/digital/utilisateurs/{id}/disable', [DigitalController::class, 'disableUtilisateur'])->name('digital.utilisateurs.disable');
+    });
 });

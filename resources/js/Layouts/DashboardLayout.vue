@@ -54,7 +54,7 @@ onMounted(() => {
     if (settingsItems.some((item) => page.url.startsWith(item.href))) {
         settingsOpen.value = true;
     }
-    if (digitalItems.some((item) => page.url.startsWith(item.href))) {
+    if (digitalItems.value.some((item) => page.url.startsWith(item.href))) {
         digitalOpen.value = true;
     }
     if (referentialItems.some((item) => page.url.startsWith(item.href))) {
@@ -71,22 +71,36 @@ function onLogoError() {
     logoError.value = true;
 }
 
-const navItems = [
-    { href: '/dashboard', label: 'Tableau de bord', icon: 'home' },
-    { href: '/clients', label: 'Clients', icon: 'folder' },
-    { href: '/vehicles', label: 'Véhicules', icon: 'sparkles' },
-    { href: '/contracts', label: 'Contrats', icon: 'credit' },
-    { href: '/bordereaux', label: 'Bordereaux', icon: 'credit' },
-];
+const isRoot = computed(() => !!auth?.user?.is_root);
+
+const navItems = computed(() => {
+    const items = [
+        { href: '/dashboard', label: 'Tableau de bord', icon: 'home' },
+        { href: '/clients', label: 'Clients', icon: 'folder' },
+        { href: '/vehicles', label: 'Véhicules', icon: 'sparkles' },
+        { href: '/contracts', label: 'Contrats', icon: 'credit' },
+    ];
+    if (isRoot.value) {
+        items.push({ href: '/bordereaux', label: 'Bordereaux', icon: 'credit' });
+    }
+    return items;
+});
 
 const digitalOpen = ref(false);
-const digitalItems = [
-    { href: '/digital/attestations', label: 'Attestations', icon: 'credit' },
-    { href: '/digital/bureaux', label: 'Bureaux', icon: 'building' },
-    { href: '/digital/rattachements', label: 'Rattachements', icon: 'building' },
-    { href: '/digital/stock', label: 'Stock', icon: 'info' },
-    { href: '/digital/utilisateurs', label: 'Utilisateurs', icon: 'users' },
-];
+const digitalItems = computed(() => {
+    const items = [
+        { href: '/digital/attestations', label: 'Attestations', icon: 'credit' },
+    ];
+    if (isRoot.value) {
+        items.push(
+            { href: '/digital/bureaux', label: 'Bureaux', icon: 'building' },
+            { href: '/digital/rattachements', label: 'Rattachements', icon: 'building' },
+            { href: '/digital/stock', label: 'Stock', icon: 'info' },
+            { href: '/digital/utilisateurs', label: 'Utilisateurs', icon: 'users' },
+        );
+    }
+    return items;
+});
 
 const referentialOpen = ref(false);
 const referentialItems = [
@@ -99,7 +113,7 @@ const settingsItems = [
     { href: '/settings/config', label: 'Config courtier', icon: 'cog' },
 ];
 
-const isDigitalActive = () => digitalItems.some((item) => page.url.startsWith(item.href));
+const isDigitalActive = () => digitalItems.value.some((item) => page.url.startsWith(item.href));
 const isReferentialActive = () => referentialItems.some((item) => page.url.startsWith(item.href));
 const isSettingsActive = () => settingsItems.some((item) => page.url.startsWith(item.href));
 
@@ -273,8 +287,8 @@ const iconPaths = {
                             </div>
                         </Transition>
                     </div>
-                    <!-- Paramètres (dépliable) -->
-                    <div class="pt-1">
+                    <!-- Paramètres (dépliable) — réservé aux utilisateurs root -->
+                    <div v-if="isRoot" class="pt-1">
                         <button
                             type="button"
                             class="flex items-center gap-2.5 px-3 py-2.5 text-sm w-full text-left rounded-lg transition-colors"
@@ -356,7 +370,7 @@ const iconPaths = {
                                     <p class="text-sm font-medium text-slate-900 truncate">{{ auth?.user?.name }}</p>
                                     <p class="text-xs text-slate-500 truncate">{{ auth?.user?.current_organization?.name || '—' }}</p>
                                 </div>
-                                <Link href="/settings/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" @click="sidebarUserMenuOpen = false">Profil</Link>
+                                <Link v-if="isRoot" href="/settings/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" @click="sidebarUserMenuOpen = false">Profil</Link>
                                 <button
                                     @click="sidebarUserMenuOpen = false; router.post('/logout')"
                                     class="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 text-left"
@@ -445,7 +459,7 @@ const iconPaths = {
                                 <p class="text-xs text-slate-500">Connecté en tant que</p>
                                 <p class="text-sm font-medium text-slate-900 truncate">{{ auth?.user?.name }}</p>
                             </div>
-                            <Link href="/settings/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" @click="userMenuOpen = false">
+                            <Link v-if="isRoot" href="/settings/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" @click="userMenuOpen = false">
                                 <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
@@ -553,7 +567,7 @@ const iconPaths = {
                                     {{ r.label }}
                                 </Link>
                             </div>
-                            <div class="pt-2 space-y-0.5">
+                            <div v-if="isRoot" class="pt-2 space-y-0.5">
                                 <p class="px-3 py-1.5 text-xs font-medium text-slate-400 uppercase tracking-wider">Paramètres</p>
                                 <Link
                                     v-for="s in settingsItems"
@@ -650,7 +664,7 @@ const iconPaths = {
                                     <p class="text-xs text-slate-500">Connecté en tant que</p>
                                     <p class="text-sm font-medium text-slate-900 truncate">{{ auth?.user?.name }}</p>
                                 </div>
-                                <Link href="/settings/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" @click="userMenuOpen = false">
+                                <Link v-if="isRoot" href="/settings/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" @click="userMenuOpen = false">
                                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                     </svg>

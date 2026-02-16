@@ -139,14 +139,15 @@ function cancel(contract, label) {
         <template #header>
             <PageHeader :breadcrumbs="breadcrumbs" title="Contrats">
                 <template #actions>
-                    <Link
+                    <a
                         :href="exportExcelUrl"
                         class="inline-flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] sm:min-h-0 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50"
                         target="_blank"
                         rel="noopener noreferrer"
+                        download
                     >
                         Exporter Excel
-                    </Link>
+                    </a>
                     <Link
                         :href="route('contracts.create')"
                         class="inline-flex items-center justify-center w-full sm:w-auto min-h-[44px] sm:min-h-0 px-4 py-3 sm:py-2 bg-slate-900 text-white text-sm font-medium rounded-xl sm:rounded-lg hover:bg-slate-800"

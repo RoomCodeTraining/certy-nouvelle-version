@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
             'ensure.organization' => \App\Http\Middleware\EnsureUserHasOrganization::class,
+            'root' => \App\Http\Middleware\EnsureUserIsRoot::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
