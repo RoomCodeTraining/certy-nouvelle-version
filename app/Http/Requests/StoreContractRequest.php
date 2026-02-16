@@ -11,6 +11,13 @@ class StoreContractRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('parent_id') && $this->input('parent_id') === '') {
+            $this->merge(['parent_id' => null]);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -18,6 +25,7 @@ class StoreContractRequest extends FormRequest
             'vehicle_id' => ['required', 'exists:vehicles,id'],
             'company_id' => ['required', 'exists:companies,id'],
             'contract_type' => ['required', 'string', 'in:VP,TPC,TPM,TWO_WHEELER'],
+            'parent_id' => ['nullable', 'integer', 'exists:contracts,id'],
             'status' => ['nullable', 'string', 'in:draft,validated,active,cancelled,expired'],
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],

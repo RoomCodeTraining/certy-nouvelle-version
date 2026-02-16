@@ -33,6 +33,7 @@ class VehicleController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('registration_number', 'like', '%'.$search.'%')
+                    ->orWhere('reference', 'like', '%'.$search.'%')
                     ->orWhereHas('client', fn ($c) => $c->where('full_name', 'like', '%'.$search.'%'))
                     ->orWhereHas('brand', fn ($b) => $b->where('name', 'like', '%'.$search.'%'))
                     ->orWhereHas('model', fn ($m) => $m->where('name', 'like', '%'.$search.'%'));

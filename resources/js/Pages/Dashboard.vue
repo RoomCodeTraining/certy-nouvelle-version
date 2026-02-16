@@ -131,6 +131,7 @@ function statusBadgeClass(status) {
                         <thead class="bg-slate-50 border-b border-slate-200">
                             <tr>
                                 <th class="text-left py-3 px-4 font-medium text-slate-600">Date</th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600">Référence</th>
                                 <th class="text-left py-3 px-4 font-medium text-slate-600">Client</th>
                                 <th class="text-left py-3 px-4 font-medium text-slate-600">Véhicule</th>
                                 <th class="text-left py-3 px-4 font-medium text-slate-600">Montant</th>
@@ -145,6 +146,7 @@ function statusBadgeClass(status) {
                                 class="border-b border-slate-100 hover:bg-slate-50/50"
                             >
                                 <td class="py-3 px-4 text-slate-700">{{ formatDate(row.created_at) }}</td>
+                                <td class="py-3 px-4 font-mono text-slate-900">{{ row.reference ?? '—' }}</td>
                                 <td class="py-3 px-4 text-slate-900">{{ row.client }}</td>
                                 <td class="py-3 px-4 text-slate-700">{{ row.vehicle }}</td>
                                 <td class="py-3 px-4 text-slate-900">
@@ -171,7 +173,7 @@ function statusBadgeClass(status) {
                                 </td>
                             </tr>
                             <tr v-if="props.recentContracts.length === 0">
-                                <td colspan="6" class="py-8 px-4 text-center text-slate-500">
+                                <td colspan="7" class="py-8 px-4 text-center text-slate-500">
                                     Aucun contrat. <Link :href="route('contracts.create')" class="text-sky-600 hover:underline">Créer un contrat</Link>
                                 </td>
                             </tr>

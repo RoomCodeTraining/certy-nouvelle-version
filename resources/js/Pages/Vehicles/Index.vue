@@ -23,6 +23,7 @@ const breadcrumbs = [
 
 const columns = [
     { key: 'created_at', label: 'Date de création', getValue: (row) => formatDate(row.created_at) },
+    { key: 'reference', label: 'Référence', getValue: (row) => row.reference ?? '—' },
     {
         key: 'registration_number',
         label: 'Immatriculation',
@@ -83,7 +84,7 @@ function destroy(vehicle, label) {
                 type="search"
                 name="search"
                 :value="filters?.search"
-                placeholder="Rechercher (immat, client, marque, modèle)..."
+                placeholder="Rechercher (réf., immat, client, marque, modèle)..."
                 class="rounded-lg border border-slate-200 px-3 py-2 text-sm w-full sm:w-72 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none"
             />
             <input type="hidden" name="per_page" :value="vehicles?.per_page ?? 25" />

@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Client extends Model
 {
     protected $fillable = [
+        'reference',
         'organization_id',
         'owner_id',
         'full_name',
@@ -23,6 +25,23 @@ class Client extends Model
 
     public const TYPE_TAPP = 'TAPP';
     public const TYPE_TAPM = 'TAPM';
+
+    /** Préfixe et longueur après le tiret : 11 caractères alphanumériques majuscules (ex. CL-A7K9M2X4B1Q). */
+    public const REFERENCE_PREFIX = 'CL-';
+
+    public const REFERENCE_SUFFIX_LENGTH = 11;
+
+    /**
+     * Génère une référence unique : CL- + 11 caractères alphanumériques majuscules.
+     */
+    public static function generateUniqueReference(): string
+    {
+        do {
+            $ref = self::REFERENCE_PREFIX . strtoupper(Str::random(self::REFERENCE_SUFFIX_LENGTH));
+        } while (self::query()->where('reference', $ref)->exists());
+
+        return $ref;
+    }
 
     /**
      * Périmètre d'accès : root = tous les clients de l'organisation, non-root = clients dont owner_id = user.

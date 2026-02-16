@@ -1,6 +1,5 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
 import DashboardLayout from '@/Layouts/DashboardLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import { route } from '@/route';
@@ -46,6 +45,11 @@ function vehicleLabel(v) {
     const reg = v.registration_number ?? '';
     return [brand, model].filter(Boolean).join(' ') + (reg ? ` — ${reg}` : '');
 }
+
+// Premier contrat du véhicule = Nouvelle affaire ; les suivants = Renouvellement (enfant du contrat de base)
+function dealTypeLabel(c) {
+    return c.parent_id ? 'Renouvellement' : 'Nouvelle affaire';
+}
 </script>
 
 <template>
@@ -75,14 +79,24 @@ function vehicleLabel(v) {
             </PageHeader>
         </template>
 
-        <div class="max-w-5xl mx-auto space-y-8 pb-12">
-            <!-- Coordonnées -->
-            <section class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div class="px-6 py-4 bg-slate-50 border-b border-slate-200">
-                    <h2 class="text-base font-semibold text-slate-900">Coordonnées</h2>
-                </div>
-                <div class="p-6">
-                    <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="flex-1 min-h-0 w-full flex flex-col lg:flex-row gap-6 lg:gap-8 p-4 md:p-6 pb-12">
+            <!-- Colonne gauche : Coordonnées -->
+            <aside class="lg:w-96 xl:w-[28rem] shrink-0">
+                <section class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden sticky lg:top-6">
+                    <div class="px-6 py-4 bg-slate-50 border-b border-slate-200">
+                        <h2 class="text-base font-semibold text-slate-900">Coordonnées</h2>
+                    </div>
+                    <div class="p-6">
+                        <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-5">
+                        <div class="flex gap-3">
+                            <div class="shrink-0 w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+                                <span class="text-xs font-mono font-semibold text-slate-600">Ref</span>
+                            </div>
+                            <div>
+                                <dt class="text-xs font-medium text-slate-500 uppercase tracking-wide">Référence</dt>
+                                <dd class="mt-0.5 text-sm font-mono font-semibold text-slate-900">{{ client?.reference ?? '—' }}</dd>
+                            </div>
+                        </div>
                         <div class="flex gap-3">
                             <div class="shrink-0 w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
                                 <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -240,6 +254,7 @@ function vehicleLabel(v) {
                                 <table class="w-full text-sm">
                                     <thead class="bg-slate-50 border-b border-slate-200">
                                         <tr>
+                                            <th class="text-left py-3 px-4 font-medium text-slate-600">Affaire</th>
                                             <th class="text-left py-3 px-4 font-medium text-slate-600">Type</th>
                                             <th class="text-left py-3 px-4 font-medium text-slate-600">Compagnie</th>
                                             <th class="text-left py-3 px-4 font-medium text-slate-600">Période</th>
@@ -254,6 +269,25 @@ function vehicleLabel(v) {
                                             :key="c.id"
                                             class="border-b border-slate-100 last:border-0 hover:bg-slate-50/50"
                                         >
+                                            <td class="py-3 px-4">
+                                                <span
+                                                    :class="[
+                                                        'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
+                                                        c.parent_id ? 'bg-violet-100 text-violet-800' : 'bg-emerald-100 text-emerald-800',
+                                                    ]"
+                                                >
+                                                    {{ dealTypeLabel(c) }}
+                                                </span>
+                                                <template v-if="c.parent_id">
+                                                    <br />
+                                                    <Link
+                                                        :href="route('contracts.show', c.parent_id)"
+                                                        class="text-xs text-slate-500 hover:text-slate-700 mt-0.5 inline-block"
+                                                    >
+                                                        Contrat de base →
+                                                    </Link>
+                                                </template>
+                                            </td>
                                             <td class="py-3 px-4 text-slate-900">{{ contractTypeLabel(c.contract_type) }}</td>
                                             <td class="py-3 px-4 text-slate-700">{{ c.company?.name ?? '—' }}</td>
                                             <td class="py-3 px-4 text-slate-600">
@@ -297,6 +331,7 @@ function vehicleLabel(v) {
                     Retour à la liste des clients
                 </Link>
             </div>
+            </aside>
         </div>
     </DashboardLayout>
 </template>

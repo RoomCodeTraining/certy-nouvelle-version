@@ -21,6 +21,7 @@ class CreateClientAction
         unset($validated['profession']);
         $validated['organization_id'] = $organization->id;
         $validated['owner_id'] = $user->id;
+        $validated['reference'] = Client::generateUniqueReference();
 
         $client = Client::create($validated);
 

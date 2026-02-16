@@ -8,6 +8,8 @@ use App\Http\Controllers\DigitalController;
 use App\Http\Controllers\RedirectController;
 use App\Http\Controllers\Referential\VehicleBrandController;
 use App\Http\Controllers\Referential\VehicleModelController;
+use App\Http\Controllers\BordereauController;
+use App\Http\Controllers\Settings\OrganizationCompanyConfigController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\VehicleController;
 use Illuminate\Support\Facades\Route;
@@ -29,6 +31,9 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     Route::get('/api/statistics', [\App\Http\Controllers\Api\StatisticsController::class, '__invoke'])->name('api.statistics');
     Route::get('/settings/profile', [ProfileController::class, 'edit'])->name('settings.profile');
     Route::put('/settings/profile', [ProfileController::class, 'update']);
+    Route::get('/settings/config', [OrganizationCompanyConfigController::class, 'index'])->name('settings.config');
+    Route::post('/settings/config', [OrganizationCompanyConfigController::class, 'update'])->name('settings.config.update');
+    Route::delete('/settings/config/{config}', [OrganizationCompanyConfigController::class, 'destroy'])->name('settings.config.destroy');
 
     // CRUD Clients
     Route::resource('clients', ClientController::class);
@@ -50,11 +55,22 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     Route::post('/contracts', [ContractController::class, 'store'])->name('contracts.store');
     Route::get('/contracts/{contract}', [ContractController::class, 'show'])->name('contracts.show');
     Route::get('/contracts/{contract}/pdf', [ContractController::class, 'pdf'])->name('contracts.pdf');
+    Route::get('/contracts/{contract}/renew', [ContractController::class, 'renew'])->name('contracts.renew');
     Route::get('/contracts/{contract}/edit', [ContractController::class, 'edit'])->name('contracts.edit');
     Route::put('/contracts/{contract}', [ContractController::class, 'update'])->name('contracts.update');
     Route::post('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->name('contracts.cancel');
     Route::post('/contracts/{contract}/mark-attestation-issued', [ContractController::class, 'markAttestationIssued'])->name('contracts.mark-attestation-issued');
     Route::post('/contracts/{contract}/generate-attestation', [ContractController::class, 'generateAttestation'])->name('contracts.generate-attestation');
+
+    // Bordereaux (compagnie + période du -> au)
+    Route::get('/bordereaux', [BordereauController::class, 'index'])->name('bordereaux.index');
+    Route::get('/bordereaux/create', [BordereauController::class, 'create'])->name('bordereaux.create');
+    Route::post('/bordereaux', [BordereauController::class, 'store'])->name('bordereaux.store');
+    Route::get('/bordereaux/{bordereau}', [BordereauController::class, 'show'])->name('bordereaux.show');
+    Route::post('/bordereaux/{bordereau}/validate', [BordereauController::class, 'validate'])->name('bordereaux.validate');
+    Route::delete('/bordereaux/{bordereau}', [BordereauController::class, 'destroy'])->name('bordereaux.destroy');
+    Route::get('/bordereaux/{bordereau}/pdf', [BordereauController::class, 'pdf'])->name('bordereaux.pdf');
+    Route::get('/bordereaux/{bordereau}/excel', [BordereauController::class, 'excel'])->name('bordereaux.excel');
 
     // Référentiel : Marques et Modèles véhicules
     Route::get('/referential/brands', [VehicleBrandController::class, 'index'])->name('referential.brands.index');
@@ -74,6 +90,7 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     // Digital (service externe ASACI)
     Route::get('/digital/attestations', [DigitalController::class, 'attestations'])->name('digital.attestations');
     Route::get('/digital/attestations/{reference}/download', [DigitalController::class, 'downloadAttestation'])->name('digital.attestations.download');
+    Route::get('/digital/attestations/{reference}/view', [DigitalController::class, 'viewAttestation'])->name('digital.attestations.view');
     Route::get('/digital/rattachements', [DigitalController::class, 'rattachements'])->name('digital.rattachements');
     Route::get('/digital/stock', [DigitalController::class, 'stock'])->name('digital.stock');
     Route::get('/digital/stock/create', [DigitalController::class, 'createTransaction'])->name('digital.stock.create');

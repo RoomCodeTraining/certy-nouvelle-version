@@ -1,18 +1,20 @@
 <script setup>
 import { useForm, Link, router } from '@inertiajs/vue3';
-import { computed, watch, ref } from 'vue';
+import { computed, watch, ref, onMounted } from 'vue';
 import axios from 'axios';
 import DashboardLayout from '@/Layouts/DashboardLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import SearchableSelect from '@/Components/SearchableSelect.vue';
 import DatePicker from '@/Components/DatePicker.vue';
 import { route } from '@/route';
+import { contractTypeLabel, attestationColorLabel, attestationColorClasses } from '@/utils/contractTypes';
 
 const props = defineProps({
     clients: Array,
     companies: Array,
     contractTypes: Array,
     durationOptions: Array,
+    parentContract: { type: Object, default: null },
 });
 
 const breadcrumbs = [
@@ -48,6 +50,7 @@ const form = useForm({
     vehicle_id: '',
     company_id: '',
     contract_type: 'VP',
+    parent_id: '',
     status: 'draft',
     start_date: '',
     end_date: '',
@@ -81,6 +84,33 @@ function onVehicleChange() {
     const v = vehiclesForClient.value.find(vh => String(vh.id) === String(form.vehicle_id));
     form.contract_type = v?.pricing_type ?? 'VP';
 }
+
+function applyParentContract(parent) {
+    if (!parent || !parent.id) return;
+    form.parent_id = String(parent.id);
+    if (parent.client_id) form.client_id = String(parent.client_id);
+    if (parent.vehicle_id) form.vehicle_id = String(parent.vehicle_id);
+    if (parent.company_id) form.company_id = String(parent.company_id);
+    if (parent.contract_type) form.contract_type = parent.contract_type;
+    if (parent.end_date) {
+        const end = new Date(parent.end_date + 'T12:00:00');
+        end.setDate(end.getDate() + 1);
+        form.start_date = end.toISOString().slice(0, 10);
+    }
+}
+
+// Pré-remplir le formulaire en cas de renouvellement (parentContract fourni)
+// Date d'effet = jour d'expiration de l'ancien contrat + 1 (le lendemain)
+onMounted(() => {
+    applyParentContract(props.parentContract);
+});
+
+// Au cas où parentContract arrive après le mount (hydration Inertia)
+watch(
+    () => props.parentContract,
+    (parent) => applyParentContract(parent),
+    { immediate: true }
+);
 
 function applyDuration() {
     if (!form.start_date || !form.duration) return;
@@ -210,11 +240,20 @@ const inputErrorClass = 'border-red-400 focus:border-red-400 focus:ring-red-400'
 
 function submitValidate() {
     form.status = 'validated';
+    form.transform((data) => ({
+        ...data,
+        // Toujours envoyer parent_id en renouvellement pour que le contrat soit bien lié
+        parent_id: data.parent_id || (props.parentContract?.id ? String(props.parentContract.id) : null),
+    }));
     form.post(route('contracts.store'), { preserveScroll: true });
 }
 
 function submitDraft() {
     form.status = 'draft';
+    form.transform((data) => ({
+        ...data,
+        parent_id: data.parent_id || (props.parentContract?.id ? String(props.parentContract.id) : null),
+    }));
     form.post(route('contracts.store'), { preserveScroll: true });
 }
 </script>
@@ -271,6 +310,14 @@ function submitDraft() {
                         <p v-if="form.errors.vehicle_id" class="mt-1 text-sm text-red-600">{{ form.errors.vehicle_id }}</p>
                         <p v-if="form.client_id && !vehiclesForClient.length" class="mt-1 text-sm text-amber-600">
                             Ce client n'a aucun véhicule. Ajoutez-en un depuis sa fiche.
+                        </p>
+                        <p v-if="form.vehicle_id && form.contract_type" class="mt-2 flex items-center gap-2">
+                            <span class="text-xs text-slate-500">Type : {{ contractTypeLabel(form.contract_type) }} — Attestation :</span>
+                            <span
+                                :class="['inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', attestationColorClasses(form.contract_type)]"
+                            >
+                                {{ attestationColorLabel(form.contract_type) }}
+                            </span>
                         </p>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

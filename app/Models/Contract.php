@@ -6,14 +6,17 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Contract extends Model
 {
     protected $fillable = [
+        'reference',
         'organization_id',
         'client_id',
         'vehicle_id',
         'company_id',
+        'parent_id',
         'contract_type',
         'status',
         'attestation_issued_at',
@@ -89,6 +92,23 @@ class Contract extends Model
     public const STATUS_CANCELLED = 'cancelled';
     public const STATUS_EXPIRED = 'expired';
 
+    /** Préfixe et longueur après le tiret : 11 caractères alphanumériques majuscules (ex. CA-A7K9M2X4B1Q). */
+    public const REFERENCE_PREFIX = 'CA-';
+
+    public const REFERENCE_SUFFIX_LENGTH = 11;
+
+    /**
+     * Génère une référence unique : CA- + 11 caractères alphanumériques majuscules.
+     */
+    public static function generateUniqueReference(): string
+    {
+        do {
+            $ref = self::REFERENCE_PREFIX . strtoupper(Str::random(self::REFERENCE_SUFFIX_LENGTH));
+        } while (self::query()->where('reference', $ref)->exists());
+
+        return $ref;
+    }
+
     /**
      * Périmètre d'accès : contrats dont le client est accessible par l'utilisateur (root = tous via org, non-root = owner_id).
      */
@@ -115,6 +135,24 @@ class Contract extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /** Contrat de base (nouvelle affaire) dont ce contrat est le renouvellement. */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Contract::class, 'parent_id');
+    }
+
+    /** Renouvellements (contrats enfants) de ce contrat. */
+    public function children(): HasMany
+    {
+        return $this->hasMany(Contract::class, 'parent_id');
+    }
+
+    /** True si nouvelle affaire (premier contrat du véhicule), false si renouvellement. */
+    public function isNewBusiness(): bool
+    {
+        return $this->parent_id === null;
     }
 
     public function histories(): HasMany

@@ -294,13 +294,18 @@ class ExternalService
     public function getCertificates(string $token, Request $request)
     {
         $queryParams = [];
-
-        if ($request->has('per_page')) {
-            $queryParams['per_page'] = $request->per_page;
-        }
+        $queryParams['per_page'] = $request->integer('per_page', 10);
 
         if ($request->has('printed_at') && $request->printed_at !== null && $request->printed_at !== '') {
             $queryParams['printed_at'] = $request->printed_at;
+        }
+
+        if ($request->filled('cursor')) {
+            $queryParams['cursor'] = $request->cursor;
+        }
+
+        if ($request->filled('search')) {
+            $queryParams['search'] = $request->search;
         }
 
         $url = $this->baseUrl.'/certificates';
@@ -348,11 +353,19 @@ class ExternalService
         return $response->json();
     }
 
+    /**
+     * Récupère le détail d'un certificat (GET /api/v1/certificates/{reference}).
+     * La réponse contient notamment printed_certificate (URL du PDF ou contenu base64) pour afficher l'attestation.
+     *
+     * @param  string  $reference  Ex. ATD-B0E76B5C26
+     * @return array{data?: array{printed_certificate?: string, reference?: string, ...}, errors?: array}
+     */
     public function getCertificate(string $reference, string $token)
     {
         $response = Http::timeout(self::HTTP_TIMEOUT)->withHeaders([
             'Authorization' => 'Bearer '.$token,
         ])->get($this->baseUrl.'/certificates/'.$reference);
+
 
         if ($response->failed()) {
             return [
@@ -370,7 +383,106 @@ class ExternalService
     }
 
     /**
-     * Télécharge le PDF d'un certificat depuis l'API externe
+     * Récupère le PDF d'affichage d'une attestation via GET /certificates/{reference} puis printed_certificate.
+     * printed_certificate peut être : une URL du PDF (on la récupère avec le token), ou du base64.
+     *
+     * @param  string  $reference  Ex. ATD-B0E76B5C26
+     * @param  string  $token
+     * @return array{body: string, content_type: string}|array{errors: array}
+     */
+    public function getCertificatePrintedPdf(string $reference, string $token): array
+    {
+        $cert = $this->getCertificate($reference, $token);
+        if (isset($cert['errors'])) {
+            // Détail certificat en erreur : tenter quand même l'endpoint download
+            $download = $this->downloadCertificate($reference, $token);
+            if (! is_array($download) || ! isset($download['errors'])) {
+                return [
+                    'body' => $download->body(),
+                    'content_type' => $download->headers()->get('Content-Type') ?? 'application/pdf',
+                ];
+            }
+            return $cert;
+        }
+
+        $data = $cert['data'] ?? $cert;
+        // Chercher printed_certificate au premier niveau ou dans data.attributes (JSON:API)
+        $printed = $data['printed_certificate'] ?? $data['attributes']['printed_certificate'] ?? null;
+
+        // printed_certificate peut être un objet { url, content, data, ... }
+        if (is_array($printed)) {
+            $printed = $printed['url'] ?? $printed['content'] ?? $printed['data'] ?? $printed['base64'] ?? null;
+        }
+        if (empty($printed) || ! is_string($printed)) {
+            $download = $this->downloadCertificate($reference, $token);
+            if (! is_array($download) || ! isset($download['errors'])) {
+                return [
+                    'body' => $download->body(),
+                    'content_type' => $download->headers()->get('Content-Type') ?? 'application/pdf',
+                ];
+            }
+            return [
+                'errors' => [['title' => 'Attestation sans printed_certificate et téléchargement indisponible.', 'detail' => null]],
+            ];
+        }
+
+        $printed = trim($printed);
+
+        // URL du PDF (ex. renvoyée par l'API)
+        if (str_starts_with($printed, 'http://') || str_starts_with($printed, 'https://')) {
+            $response = Http::timeout(self::HTTP_TIMEOUT)->withHeaders([
+                'Authorization' => 'Bearer '.$token,
+            ])->get($printed);
+
+            if ($response->failed()) {
+                return [
+                    'errors' => [
+                        [
+                            'title' => $response->json()['message'] ?? 'Impossible de récupérer le PDF imprimé.',
+                            'detail' => null,
+                        ],
+                    ],
+                ];
+            }
+
+            return [
+                'body' => $response->body(),
+                'content_type' => $response->header('Content-Type') ?: 'application/pdf',
+            ];
+        }
+
+        // Contenu base64 : data URL (data:application/pdf;base64,... ou data:image/jpeg;base64,... etc.)
+        $contentType = 'application/pdf';
+        $base64 = $printed;
+        if (preg_match('#^data:([^;]+);base64,(.+)$#s', $printed, $m)) {
+            $contentType = trim($m[1]);
+            $base64 = $m[2];
+        }
+        $base64 = preg_replace('#\s+#', '', $base64);
+        $decoded = base64_decode($base64, true);
+        if ($decoded === false || $decoded === '') {
+            // Fallback : utiliser l'endpoint download pour récupérer le PDF
+            $download = $this->downloadCertificate($reference, $token);
+            if (is_array($download) && isset($download['errors'])) {
+                return [
+                    'errors' => [['title' => 'printed_certificate invalide et téléchargement indisponible.', 'detail' => null]],
+                ];
+            }
+
+            return [
+                'body' => $download->body(),
+                'content_type' => $download->headers()->get('Content-Type') ?? 'application/pdf',
+            ];
+        }
+
+        return [
+            'body' => $decoded,
+            'content_type' => $contentType,
+        ];
+    }
+
+    /**
+     * Télécharge le PDF d'un certificat depuis l'API externe (GET /certificates/{reference}/download).
      *
      * @param  string  $reference
      * @param  string  $token

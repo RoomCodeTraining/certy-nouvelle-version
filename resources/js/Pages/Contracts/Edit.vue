@@ -5,7 +5,7 @@ import DashboardLayout from '@/Layouts/DashboardLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import SearchableSelect from '@/Components/SearchableSelect.vue';
 import { route } from '@/route';
-import { contractTypeLabel } from '@/utils/contractTypes';
+import { contractTypeLabel, attestationColorLabel, attestationColorClasses } from '@/utils/contractTypes';
 
 const props = defineProps({
     contract: Object,
@@ -124,6 +124,14 @@ const inputErrorClass = 'border-red-400 focus:border-red-400 focus:ring-red-400'
                     :input-class="inputClass"
                     search-placeholder="Rechercher…"
                 />
+                <p class="mt-2 flex items-center gap-2">
+                    <span class="text-xs text-slate-500">Attestation :</span>
+                    <span
+                        :class="['inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', attestationColorClasses(form.contract_type)]"
+                    >
+                        {{ attestationColorLabel(form.contract_type) }}
+                    </span>
+                </p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Statut</label>

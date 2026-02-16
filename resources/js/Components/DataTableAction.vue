@@ -10,7 +10,7 @@ const props = defineProps({
     href: { type: String, default: null },
     /** Visual variant */
     variant: { type: String, default: 'default' }, // default | danger | warning
-    /** Icon name: edit, trash, eye, download, external, x, more */
+    /** Icon name: edit, trash, eye, download, external, x, more, refresh */
     icon: { type: String, default: 'edit' },
     /** When href is set, open in new tab */
     external: { type: Boolean, default: false },
@@ -26,6 +26,7 @@ const iconPaths = {
     external: 'M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14',
     x: 'M6 18L18 6M6 6l12 12',
     more: 'M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z',
+    refresh: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
 };
 
 const path = iconPaths[props.icon] || iconPaths.edit;

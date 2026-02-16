@@ -22,21 +22,26 @@ const breadcrumbs = [
     { label: 'Contrats' },
 ];
 
-function contractNumber(row) {
-    const created = row.created_at ? String(row.created_at).slice(0, 10) : '';
-    const year = created ? created.slice(2, 4) : new Date().getFullYear().toString().slice(-2);
-    const id = row.id != null ? String(row.id).padStart(6, '0') : '—';
-    return `CT${year}${id}`;
+/** Référence contrat : CA- + 11 caractères alphanumériques majuscules. */
+function contractReference(row) {
+    return row.reference ?? '—';
 }
 
 const columns = [
     { key: 'created_at', label: 'Date de création', getValue: (row) => formatDate(row.created_at) },
     {
-        key: 'number',
-        label: 'Numéro',
+        key: 'reference',
+        label: 'Référence',
         type: 'link',
-        getValue: (row) => contractNumber(row),
+        getValue: (row) => contractReference(row),
         href: (row) => route('contracts.show', row.id),
+    },
+    {
+        key: 'deal_type',
+        label: 'Affaire',
+        type: 'badge',
+        getValue: (row) => row.parent_id ? 'Renouvellement' : 'Nouvelle affaire',
+        getBadgeClass: (row) => row.parent_id ? 'bg-violet-100 text-violet-800' : 'bg-emerald-100 text-emerald-800',
     },
     {
         key: 'vehicle',
@@ -127,7 +132,7 @@ function cancel(contract, label) {
                 type="search"
                 name="search"
                 :value="filters?.search"
-                placeholder="Rechercher (type, client, compagnie, immat)..."
+                placeholder="Rechercher (réf., type, client, compagnie, immat)..."
                 class="rounded-lg border border-slate-200 px-3 py-2 text-sm w-full sm:w-72 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none"
             />
             <select name="status" class="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none">
@@ -181,6 +186,11 @@ function cancel(contract, label) {
                         external
                     />
                     <DataTableAction
+                        label="Renouveler"
+                        :to="route('contracts.renew', row.id)"
+                        icon="refresh"
+                    />
+                    <DataTableAction
                         v-if="canEdit(row)"
                         label="Modifier"
                         :to="route('contracts.edit', row.id)"
@@ -191,7 +201,7 @@ function cancel(contract, label) {
                         label="Annuler le contrat"
                         variant="warning"
                         icon="x"
-                        @click="cancel(row, (contractTypeLabel(row.contract_type) + ' ' + row.company?.name))"
+                        @click="cancel(row, (contractReference(row) + ' – ' + (contractTypeLabel(row.contract_type) || '') + ' ' + (row.company?.name || '')))"
                     />
                 </template>
                 <template #empty>

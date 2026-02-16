@@ -25,6 +25,7 @@ export function route(name, ...params) {
         'contracts.store': () => '/contracts',
         'contracts.show': (id) => `/contracts/${id}`,
         'contracts.pdf': (id) => `/contracts/${id}/pdf`,
+        'contracts.renew': (id) => `/contracts/${id}/renew`,
         'contracts.edit': (id) => `/contracts/${id}/edit`,
         'contracts.update': (id) => `/contracts/${id}`,
         'contracts.cancel': (id) => `/contracts/${id}/cancel`,
@@ -45,6 +46,7 @@ export function route(name, ...params) {
         'referential.models.destroy': (id) => `/referential/models/${id}`,
         'digital.attestations': () => '/digital/attestations',
         'digital.attestations.download': (ref) => `/digital/attestations/${ref}/download`,
+        'digital.attestations.view': (ref) => `/digital/attestations/${ref}/view`,
         'digital.rattachements': () => '/digital/rattachements',
         'digital.stock': () => '/digital/stock',
         'digital.stock.create': () => '/digital/stock/create',
@@ -64,6 +66,17 @@ export function route(name, ...params) {
         'digital.bureaux.update': (id) => `/digital/bureaux/${id}`,
         'digital.bureaux.enable': (id) => `/digital/bureaux/${id}/enable`,
         'digital.bureaux.disable': (id) => `/digital/bureaux/${id}/disable`,
+        'settings.config': () => '/settings/config',
+        'settings.config.update': () => '/settings/config',
+        'settings.config.destroy': (id) => `/settings/config/${id}`,
+        'bordereaux.index': () => '/bordereaux',
+        'bordereaux.create': () => '/bordereaux/create',
+        'bordereaux.store': () => '/bordereaux',
+        'bordereaux.show': (id) => `/bordereaux/${id}`,
+        'bordereaux.validate': (id) => `/bordereaux/${id}/validate`,
+        'bordereaux.destroy': (id) => `/bordereaux/${id}`,
+        'bordereaux.pdf': (id) => `/bordereaux/${id}/pdf`,
+        'bordereaux.excel': (id) => `/bordereaux/${id}/excel`,
     };
     const fn = routes[name];
     if (!fn) return '#';

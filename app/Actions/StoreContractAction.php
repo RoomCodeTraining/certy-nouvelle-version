@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\ContractPricingService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Schema;
 
 class StoreContractAction
 {
@@ -31,6 +32,16 @@ class StoreContractAction
         $validated['agency_accessory'] = (int) ($validated['agency_accessory'] ?? 0);
         $validated['commission_amount'] = (int) ($validated['commission_amount'] ?? 0);
         unset($validated['duration'], $validated['accessory_amount_override']);
+        if (Schema::hasColumn('contracts', 'reference')) {
+            $validated['reference'] = Contract::generateUniqueReference();
+        }
+        if (Schema::hasColumn('contracts', 'parent_id')) {
+            $validated['parent_id'] = isset($validated['parent_id']) && $validated['parent_id'] !== '' && $validated['parent_id'] !== null
+                ? (int) $validated['parent_id']
+                : null;
+        } else {
+            unset($validated['parent_id']);
+        }
 
         $contract = Contract::create($validated);
         $this->pricingService->applyToContract($contract);

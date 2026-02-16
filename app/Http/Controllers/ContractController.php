@@ -17,6 +17,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -26,13 +27,17 @@ class ContractController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
-        $query = Contract::accessibleBy($user)
-            ->with(['client:id,full_name', 'vehicle:id,registration_number,vehicle_brand_id,vehicle_model_id', 'vehicle.brand:id,name', 'vehicle.model:id,name', 'company:id,name']);
+        $with = ['client:id,full_name', 'vehicle:id,registration_number,vehicle_brand_id,vehicle_model_id', 'vehicle.brand:id,name', 'vehicle.model:id,name', 'company:id,name'];
+        if (Schema::hasColumn('contracts', 'parent_id')) {
+            $with[] = 'parent:id';
+        }
+        $query = Contract::accessibleBy($user)->with($with);
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('contract_type', 'like', '%'.$search.'%')
+                $q->where('reference', 'like', '%'.$search.'%')
+                    ->orWhere('contract_type', 'like', '%'.$search.'%')
                     ->orWhereHas('client', fn ($c) => $c->where('full_name', 'like', '%'.$search.'%'))
                     ->orWhereHas('company', fn ($co) => $co->where('name', 'like', '%'.$search.'%'))
                     ->orWhereHas('vehicle', fn ($v) => $v->where('registration_number', 'like', '%'.$search.'%'));
@@ -66,12 +71,33 @@ class ContractController extends Controller
             ->get(['id', 'full_name']);
         $companies = Company::where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
+        $parentContract = null;
+        if ($request->filled('parent_id')) {
+            $parent = Contract::find($request->parent_id);
+            if ($parent && Contract::accessibleBy($user)->where('id', $parent->id)->exists()) {
+                $parentContract = $parent->only(['id', 'client_id', 'vehicle_id', 'company_id', 'contract_type', 'end_date']);
+                if (! empty($parentContract['end_date'])) {
+                    $parentContract['end_date'] = $parent->end_date->format('Y-m-d');
+                }
+            }
+        }
+
         return Inertia::render('Contracts/Create', [
             'clients' => $clients,
             'companies' => $companies,
             'contractTypes' => $this->contractTypes(),
             'durationOptions' => $this->durationOptions(),
+            'parentContract' => $parentContract,
         ]);
+    }
+
+    /**
+     * Redirige vers la création d'un contrat en renouvellement (contrat enfant du contrat donné).
+     */
+    public function renew(Request $request, Contract $contract): RedirectResponse
+    {
+        $this->authorizeContract($request, $contract);
+        return redirect()->route('contracts.create', ['parent_id' => $contract->id]);
     }
 
     /**
@@ -134,7 +160,12 @@ class ContractController extends Controller
     public function show(Request $request, Contract $contract): Response|RedirectResponse
     {
         $this->authorizeContract($request, $contract);
-        $contract->load(['client', 'vehicle.brand', 'vehicle.model', 'company']);
+        $relations = ['client', 'vehicle.brand', 'vehicle.model', 'company'];
+        if (Schema::hasColumn('contracts', 'parent_id')) {
+            $relations[] = 'parent:id,start_date,end_date,status';
+            $relations[] = 'children:id,parent_id,start_date,end_date,status,total_amount';
+        }
+        $contract->load($relations);
 
         $hasAttestation = $contract->attestation_issued_at !== null || $contract->attestation_number !== null;
         $canEditAttestation = in_array($contract->status, [Contract::STATUS_VALIDATED, Contract::STATUS_ACTIVE], true) && ! $hasAttestation;
@@ -163,7 +194,7 @@ class ContractController extends Controller
             'company',
         ]);
 
-        $filename = 'contrat-' . $contract->id . '.pdf';
+        $filename = 'contrat-' . ($contract->reference ?? $contract->id) . '.pdf';
         return Pdf::loadView('contracts.pdf', ['contract' => $contract])
             ->stream($filename);
     }

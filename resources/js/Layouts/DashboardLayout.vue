@@ -64,6 +64,7 @@ const navItems = [
     { href: '/clients', label: 'Clients', icon: 'folder' },
     { href: '/vehicles', label: 'Véhicules', icon: 'sparkles' },
     { href: '/contracts', label: 'Contrats', icon: 'credit' },
+    { href: '/bordereaux', label: 'Bordereaux', icon: 'credit' },
 ];
 
 const digitalOpen = ref(false);
@@ -83,6 +84,7 @@ const referentialItems = [
 
 const settingsItems = [
     { href: '/settings/profile', label: 'Profil', icon: 'user' },
+    { href: '/settings/config', label: 'Config courtier', icon: 'cog' },
 ];
 
 const isDigitalActive = () => digitalItems.some((item) => page.url.startsWith(item.href));

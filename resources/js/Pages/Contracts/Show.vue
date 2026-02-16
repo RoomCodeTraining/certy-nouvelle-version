@@ -4,7 +4,7 @@ import { Link, router } from "@inertiajs/vue3";
 import DashboardLayout from "@/Layouts/DashboardLayout.vue";
 import PageHeader from "@/Components/PageHeader.vue";
 import { route } from "@/route";
-import { contractTypeLabel } from "@/utils/contractTypes";
+import { contractTypeLabel, attestationColorLabel, attestationColorClasses } from "@/utils/contractTypes";
 import { formatDate } from "@/utils/formatDate";
 import { useConfirm } from "@/Composables/useConfirm";
 
@@ -14,12 +14,14 @@ const props = defineProps({
     has_attestation: { type: Boolean, default: false },
 });
 
+const contractReference = computed(
+    () => props.contract?.reference ?? "—",
+);
 const _typeLabel = contractTypeLabel(props.contract?.contract_type);
 const _companyName = props.contract?.company?.name ?? "";
-const contractTitle =
-    _typeLabel !== "—" && _companyName
-        ? `${_typeLabel} — ${_companyName}`
-        : _companyName || (_typeLabel !== "—" ? _typeLabel : "Fiche contrat");
+const contractTitle = [contractReference.value, _typeLabel !== "—" ? _typeLabel : "", _companyName]
+    .filter(Boolean)
+    .join(" — ") || "Fiche contrat";
 const breadcrumbs = [
     { label: "Tableau de bord", href: "/dashboard" },
     { label: "Contrats", href: "/contracts" },
@@ -75,6 +77,10 @@ const showPostValidateRecap = computed(() =>
 
 const isActive = computed(() => props.contract?.status === "active");
 
+const isNewBusiness = computed(() => !props.contract?.parent_id);
+const parentContract = computed(() => props.contract?.parent ?? null);
+const childContracts = computed(() => props.contract?.children ?? []);
+
 const { confirm: confirmDialog } = useConfirm();
 function cancel(contract) {
     confirmDialog({
@@ -118,6 +124,12 @@ function markAttestationIssued(contract) {
                     >
                         Modifier
                     </Link>
+                    <Link
+                        :href="route('contracts.renew', contract.id)"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors"
+                    >
+                        Renouveler
+                    </Link>
                     <button
                         v-if="canCancel"
                         type="button"
@@ -131,6 +143,61 @@ function markAttestationIssued(contract) {
         </template>
 
         <div class="space-y-8">
+            <!-- Nouvelle affaire / Renouvellement + lien contrat de base ou liste des renouvellements -->
+            <section
+                class="rounded-2xl border border-slate-200 bg-white p-6"
+            >
+                <div class="flex flex-wrap items-center gap-4">
+                    <span
+                        :class="[
+                            'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium',
+                            isNewBusiness ? 'bg-emerald-100 text-emerald-800' : 'bg-violet-100 text-violet-800',
+                        ]"
+                    >
+                        {{ isNewBusiness ? 'Nouvelle affaire' : 'Renouvellement' }}
+                    </span>
+                    <template v-if="parentContract">
+                        <span class="text-slate-400">|</span>
+                        <Link
+                            :href="route('contracts.show', parentContract.id)"
+                            class="text-sm font-medium text-slate-600 hover:text-slate-900"
+                        >
+                            Contrat de base ({{ formatDate(parentContract.start_date) }} → {{ formatDate(parentContract.end_date) }})
+                        </Link>
+                    </template>
+                </div>
+                <div
+                    v-if="childContracts.length > 0"
+                    class="mt-4 pt-4 border-t border-slate-100"
+                >
+                    <h3 class="text-sm font-medium text-slate-700 mb-2">Renouvellements de ce contrat</h3>
+                    <ul class="space-y-2">
+                        <li
+                            v-for="child in childContracts"
+                            :key="child.id"
+                            class="flex flex-wrap items-center gap-2 text-sm"
+                        >
+                            <Link
+                                :href="route('contracts.show', child.id)"
+                                class="font-medium text-slate-900 hover:underline"
+                            >
+                                {{ formatDate(child.start_date) }} → {{ formatDate(child.end_date) }}
+                            </Link>
+                            <span class="text-slate-500">·</span>
+                            <span class="text-slate-600">{{ child.total_amount != null ? Number(child.total_amount).toLocaleString('fr-FR') + ' F CFA' : '—' }}</span>
+                            <span
+                                :class="[
+                                    'inline-flex px-2 py-0.5 rounded text-xs font-medium',
+                                    child.status === 'active' || child.status === 'validated' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600',
+                                ]"
+                            >
+                                {{ child.status === 'draft' ? 'Brouillon' : child.status === 'active' ? 'Actif' : child.status === 'validated' ? 'Validé' : child.status === 'cancelled' ? 'Annulé' : child.status === 'expired' ? 'Expiré' : child.status }}
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
             <!-- Récap après validation ; pour contrat actif : édition d'attestation si pas encore faite -->
             <section
                 v-if="showPostValidateRecap"
@@ -258,11 +325,25 @@ function markAttestationIssued(contract) {
                             >
                                 Modifier
                             </Link>
+                            <Link
+                                :href="route('contracts.renew', contract.id)"
+                                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors"
+                            >
+                                Renouveler
+                            </Link>
                         </div>
                         <div class="p-6">
                             <dl
                                 class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5 text-sm"
                             >
+                                <div>
+                                    <dt class="text-slate-500 font-medium mb-0.5">
+                                        Référence
+                                    </dt>
+                                    <dd class="text-slate-900 font-mono font-semibold">
+                                        {{ contractReference }}
+                                    </dd>
+                                </div>
                                 <div>
                                     <dt
                                         class="text-slate-500 font-medium mb-0.5"
@@ -275,6 +356,11 @@ function markAttestationIssued(contract) {
                                                 contract.contract_type,
                                             )
                                         }}
+                                        <span
+                                            :class="['ml-2 inline-flex rounded-full border px-2 py-0.5 text-xs font-medium', attestationColorClasses(contract.contract_type)]"
+                                        >
+                                            Attestation {{ attestationColorLabel(contract.contract_type) }}
+                                        </span>
                                     </dd>
                                 </div>
                                 <div>
@@ -307,6 +393,39 @@ function markAttestationIssued(contract) {
                                         {{ formatDate(contract.end_date) }}
                                     </dd>
                                 </div>
+                                <!-- Attestation : numéro et lien téléchargement si présents -->
+                                <template
+                                    v-if="
+                                        contract.attestation_number ||
+                                        contract.attestation_link
+                                    "
+                                >
+                                    <div class="sm:col-span-2 pt-4 mt-4 border-t border-slate-100">
+                                        <dt class="text-slate-500 font-medium mb-2">
+                                            Attestation
+                                        </dt>
+                                        <dd class="flex flex-wrap items-center gap-3">
+                                            <span
+                                                v-if="contract.attestation_number"
+                                                class="font-semibold text-slate-900"
+                                            >
+                                                N° {{ contract.attestation_number }}
+                                            </span>
+                                            <a
+                                                v-if="contract.attestation_link"
+                                                :href="contract.attestation_link"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
+                                            >
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                Télécharger l'attestation (PDF)
+                                            </a>
+                                        </dd>
+                                    </div>
+                                </template>
                             </dl>
                         </div>
                     </section>

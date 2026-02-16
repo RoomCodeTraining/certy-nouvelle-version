@@ -63,6 +63,7 @@ function destroy(vehicle) {
             <div class="rounded-xl border border-slate-200 bg-white p-6">
                 <h3 class="text-sm font-medium text-slate-500 mb-3">Informations</h3>
                 <dl class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                    <div><dt class="text-slate-500">Référence</dt><dd class="font-mono font-semibold text-slate-900">{{ vehicle.reference ?? '—' }}</dd></div>
                     <div><dt class="text-slate-500">Client</dt><dd><Link :href="route('clients.show', vehicle.client?.id)" class="font-medium text-slate-900 hover:underline">{{ vehicle.client?.full_name }}</Link></dd></div>
                     <div><dt class="text-slate-500">Marque / Modèle</dt><dd class="font-medium text-slate-900">{{ [vehicle.brand?.name, vehicle.model?.name].filter(Boolean).join(' ') || '—' }}</dd></div>
                     <div><dt class="text-slate-500">Type</dt><dd class="font-medium text-slate-900">{{ vehicle.pricing_type ? { VP: 'VP (Véhicule Particulier)', TPC: 'Transport pour propre compte', TPM: 'TPM', TWO_WHEELER: 'Deux roues' }[vehicle.pricing_type] || vehicle.pricing_type : '—' }}</dd></div>

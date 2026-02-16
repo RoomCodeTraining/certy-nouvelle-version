@@ -49,8 +49,7 @@ class DigitalController extends Controller
             return $token;
         }
 
-        $perPage = $request->integer('per_page', 15);
-        $printedAt = $request->get('printed_at');
+        $perPage = $request->integer('per_page', 10);
         $data = $this->externalService->getCertificates($token, $request);
 
 
@@ -60,21 +59,21 @@ class DigitalController extends Controller
                 'links' => null,
                 'meta' => null,
                 'error' => $data['errors'][0]['title'] ?? 'Erreur lors du chargement des attestations.',
-                'filters' => $request->only(['per_page', 'printed_at']),
+                'filters' => $request->only(['per_page', 'printed_at', 'cursor', 'search']),
             ]);
         }
 
-        $inner = $data['data'] ?? $data;
-        $list = isset($inner['data']) && is_array($inner['data']) ? $inner['data'] : (is_array($inner) ? $inner : []);
-        $links = $inner['links'] ?? null;
-        $meta = $inner['meta'] ?? null;
+        // Réponse API : { data: [...], links: {...}, meta: { path, per_page, next_cursor, prev_cursor } }
+        $list = isset($data['data']) && is_array($data['data']) ? $data['data'] : [];
+        $links = $data['links'] ?? null;
+        $meta = $data['meta'] ?? null;
 
         return Inertia::render('Digital/Attestations/Index', [
             'attestations' => $list,
             'links' => $links,
             'meta' => $meta,
             'error' => null,
-            'filters' => $request->only(['per_page', 'printed_at']),
+            'filters' => $request->only(['per_page', 'printed_at', 'cursor', 'search']),
         ]);
     }
 
@@ -97,6 +96,53 @@ class DigitalController extends Controller
 
         return response($result->body(), $result->status(), $result->headers())
             ->header('Content-Disposition', 'attachment; filename="attestation-'.$reference.'.pdf"');
+    }
+
+    /**
+     * Visualiser l'attestation dans le modal (PDF en inline).
+     * Utilise l'API GET /api/v1/certificates/{reference} et le champ printed_certificate pour afficher le PDF.
+     */
+    public function viewAttestation(Request $request, string $reference): HttpResponse|RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        if ($token instanceof RedirectResponse) {
+            return $token;
+        }
+
+        $result = $this->externalService->getCertificatePrintedPdf($reference, $token);
+        if (isset($result['errors'])) {
+            // Dernier recours : utiliser l'endpoint download pour la visualisation
+            $download = $this->externalService->downloadCertificate($reference, $token);
+            if (! is_array($download) || ! isset($download['errors'])) {
+                return response($download->body(), 200, [
+                    'Content-Type' => $download->headers()->get('Content-Type') ?? 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.pdf"',
+                ]);
+            }
+            return redirect()
+                ->route('digital.attestations')
+                ->with('error', $result['errors'][0]['title'] ?? 'Visualisation impossible.');
+        }
+
+        $contentType = $result['content_type'] ?? 'application/pdf';
+        $body = $result['body'];
+
+        // Pour les images : renvoyer une page HTML qui affiche l'image sans espace blanc à droite
+        if (str_starts_with($contentType, 'image/')) {
+            $dataUrl = 'data:'.$contentType.';base64,'.base64_encode($body);
+            $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+                .'<style>html,body{margin:0;padding:0;background:#f1f5f9;}img{display:block;max-width:100%;height:auto;margin:0 auto;}</style></head>'
+                .'<body><img src="'.htmlspecialchars($dataUrl, ENT_QUOTES, 'UTF-8').'" alt="Attestation"></body></html>';
+            return response($html, 200, [
+                'Content-Type' => 'text/html; charset=utf-8',
+                'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.html"',
+            ]);
+        }
+
+        return response($body, 200, [
+            'Content-Type' => $contentType,
+            'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.pdf"',
+        ]);
     }
 
     /**

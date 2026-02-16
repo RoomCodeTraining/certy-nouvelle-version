@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 class StatisticsController extends Controller
 {
     /**
-     * KPIs pour le tableau de bord : revenus totaux, contrats actifs, clients, véhicules.
+     * KPIs pour le tableau de bord : revenus totaux, total des contrats, clients, véhicules.
      * Périmètre selon l'utilisateur (accessibleBy).
      */
     public function __invoke(Request $request): JsonResponse
@@ -23,13 +23,13 @@ class StatisticsController extends Controller
         }
 
         $revenusTotaux = (int) Contract::accessibleBy($user)->sum('total_amount');
-        $contratsActifs = (int) Contract::accessibleBy($user)->where('status', Contract::STATUS_ACTIVE)->count();
+        $totalContrats = (int) Contract::accessibleBy($user)->count();
         $clients = (int) Client::accessibleBy($user)->count();
         $vehicules = (int) Vehicle::accessibleBy($user)->count();
 
         return response()->json([
             'revenus_totaux' => $revenusTotaux,
-            'contrats_actifs' => $contratsActifs,
+            'contrats_actifs' => $totalContrats,
             'clients' => $clients,
             'vehicules' => $vehicules,
         ]);

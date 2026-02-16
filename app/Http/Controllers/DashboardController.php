@@ -25,6 +25,7 @@ class DashboardController extends Controller
             ->get()
             ->map(fn (Contract $c) => [
                 'id' => $c->id,
+                'reference' => $c->reference ?? '—',
                 'created_at' => $c->created_at?->format('Y-m-d'),
                 'client' => $c->client?->full_name ?? '—',
                 'vehicle' => $c->vehicle

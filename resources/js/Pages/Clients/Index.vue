@@ -23,6 +23,7 @@ const breadcrumbs = [
 
 const columns = [
     { key: 'created_at', label: 'Date', getValue: (row) => formatDate(row.created_at) },
+    { key: 'reference', label: 'Référence', getValue: (row) => row.reference ?? '—' },
     { key: 'full_name', label: 'Nom complet', type: 'link', getValue: (row) => row.full_name ?? '—', href: (row) => route('clients.show', row.id) },
     { key: 'email', label: 'Email', getValue: (row) => row.email ?? '—' },
     { key: 'phone', label: 'Téléphone', getValue: (row) => row.phone ?? '—' },
@@ -76,7 +77,7 @@ function destroy(client, clientName) {
                 type="search"
                 name="search"
                 :value="filters?.search"
-                placeholder="Rechercher (nom, email, tél.)..."
+                placeholder="Rechercher (réf., nom, email, tél.)..."
                 class="rounded-lg border border-slate-200 px-3 py-2 text-sm w-full sm:w-64 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none"
             />
             <select name="type_assure" class="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none">

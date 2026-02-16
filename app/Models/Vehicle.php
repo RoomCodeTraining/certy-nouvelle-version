@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Vehicle extends Model
 {
     protected $fillable = [
+        'reference',
         'client_id',
         'pricing_type',
         'vehicle_brand_id',
@@ -34,6 +36,23 @@ class Vehicle extends Model
         'new_value',
         'replacement_value',
     ];
+
+    /** Préfixe et longueur après le tiret : 11 caractères alphanumériques majuscules (ex. VH-A7K9M2X4B1Q). */
+    public const REFERENCE_PREFIX = 'VH-';
+
+    public const REFERENCE_SUFFIX_LENGTH = 11;
+
+    /**
+     * Génère une référence unique : VH- + 11 caractères alphanumériques majuscules.
+     */
+    public static function generateUniqueReference(): string
+    {
+        do {
+            $ref = self::REFERENCE_PREFIX . strtoupper(Str::random(self::REFERENCE_SUFFIX_LENGTH));
+        } while (self::query()->where('reference', $ref)->exists());
+
+        return $ref;
+    }
 
     /**
      * Périmètre d'accès : véhicules dont le client est accessible par l'utilisateur (root = tous via org, non-root = owner_id).
