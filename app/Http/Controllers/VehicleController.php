@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\CreateVehicleAction;
 use App\Actions\UpdateVehicleAction;
+use App\Http\Requests\QuickStoreVehicleRequest;
 use App\Http\Requests\StoreVehicleRequest;
 use App\Http\Requests\UpdateVehicleRequest;
 use App\Models\CirculationZone;
@@ -16,6 +17,7 @@ use App\Models\VehicleCategory;
 use App\Models\VehicleGender;
 use App\Models\VehicleType;
 use App\Models\VehicleUsage;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -78,13 +80,49 @@ class VehicleController extends Controller
         ]);
     }
 
-    public function store(StoreVehicleRequest $request, CreateVehicleAction $action): RedirectResponse
+    public function store(StoreVehicleRequest $request, CreateVehicleAction $action): JsonResponse|RedirectResponse
     {
         $validated = $request->validated();
         $client = Client::findOrFail($validated['client_id']);
         $this->authorizeClient($request, $client);
-        $action->execute($validated);
+        $vehicle = $action->execute($validated);
+        if ($request->wantsJson()) {
+            $vehicle->load('brand:id,name', 'model:id,name');
+            return response()->json(['vehicle' => $vehicle]);
+        }
         return redirect()->route('clients.show', $client)->with('success', 'Véhicule ajouté.');
+    }
+
+    /**
+     * Création rapide véhicule (depuis la page contrat) : champs minimaux, retourne JSON.
+     */
+    public function quickStore(QuickStoreVehicleRequest $request, CreateVehicleAction $action): JsonResponse
+    {
+        $validated = $request->validated();
+        $client = Client::findOrFail($validated['client_id']);
+        $this->authorizeClient($request, $client);
+        $vehicle = $action->execute(array_merge($validated, [
+            'body_type' => null,
+            'circulation_zone_id' => null,
+            'energy_source_id' => null,
+            'vehicle_usage_id' => null,
+            'vehicle_type_id' => null,
+            'vehicle_category_id' => null,
+            'vehicle_gender_id' => null,
+            'color_id' => null,
+            'fiscal_power' => null,
+            'payload_capacity' => null,
+            'engine_capacity' => null,
+            'seat_count' => null,
+            'year_of_first_registration' => null,
+            'first_registration_date' => null,
+            'registration_card_number' => null,
+            'chassis_number' => null,
+            'new_value' => null,
+            'replacement_value' => null,
+        ]));
+        $vehicle->load('brand:id,name', 'model:id,name');
+        return response()->json(['vehicle' => $vehicle]);
     }
 
     public function show(Request $request, Vehicle $vehicle): Response|RedirectResponse

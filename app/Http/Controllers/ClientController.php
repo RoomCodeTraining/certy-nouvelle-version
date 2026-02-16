@@ -56,9 +56,14 @@ class ClientController extends Controller
         ]);
     }
 
-    public function store(StoreClientRequest $request, CreateClientAction $action): RedirectResponse
+    public function store(StoreClientRequest $request, CreateClientAction $action): \Illuminate\Http\JsonResponse|RedirectResponse
     {
         $client = $action->execute($request->user(), $request->validated());
+        if ($request->wantsJson()) {
+            return response()->json([
+                'client' => array_merge($client->only(['id', 'full_name']), ['vehicles' => []]),
+            ]);
+        }
         return redirect()->route('clients.index')->with('success', 'Client créé.');
     }
 

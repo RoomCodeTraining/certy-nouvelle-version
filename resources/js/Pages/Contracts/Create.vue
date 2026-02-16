@@ -19,6 +19,15 @@ const props = defineProps({
     contractTypes: Array,
     durationOptions: Array,
     parentContract: { type: Object, default: null },
+    typeAssureOptions: { type: Array, default: () => [] },
+    vehicleBrands: { type: Array, default: () => [] },
+    circulationZones: { type: Array, default: () => [] },
+    energySources: { type: Array, default: () => [] },
+    vehicleUsages: { type: Array, default: () => [] },
+    vehicleTypes: { type: Array, default: () => [] },
+    vehicleCategories: { type: Array, default: () => [] },
+    vehicleGenders: { type: Array, default: () => [] },
+    colors: { type: Array, default: () => [] },
 });
 
 const breadcrumbs = [
@@ -29,6 +38,58 @@ const breadcrumbs = [
 
 const step = ref(1);
 const previewLoading = ref(false);
+/** Liste clients mutable (pour ajout rapide depuis les panneaux). */
+const localClients = ref([]);
+function syncClientsFromProps() {
+    localClients.value = (props.clients || []).map((c) => ({
+        ...c,
+        vehicles: (c.vehicles || []).map((v) => ({ ...v })),
+    }));
+}
+onMounted(syncClientsFromProps);
+watch(() => props.clients, syncClientsFromProps, { deep: true });
+
+const showClientDrawer = ref(false);
+const showVehicleDrawer = ref(false);
+const clientQuickForm = ref({
+    full_name: "",
+    email: "",
+    phone: "",
+    address: "",
+    postal_address: "",
+    profession: "",
+    type_assure: "",
+});
+const clientQuickErrors = ref({});
+const clientQuickSubmitting = ref(false);
+const vehicleQuickForm = ref({
+    client_id: "",
+    pricing_type: "VP",
+    registration_number: "",
+    vehicle_brand_id: "",
+    vehicle_model_id: "",
+    body_type: "",
+    color_id: "",
+    circulation_zone_id: "",
+    energy_source_id: "",
+    vehicle_usage_id: "",
+    vehicle_type_id: "",
+    vehicle_category_id: "",
+    vehicle_gender_id: "",
+    fiscal_power: null,
+    payload_capacity: null,
+    engine_capacity: null,
+    seat_count: 5,
+    year_of_first_registration: null,
+    first_registration_date: new Date().toISOString().slice(0, 10),
+    registration_card_number: "",
+    chassis_number: "",
+    new_value: null,
+    replacement_value: null,
+});
+const vehicleQuickErrors = ref({});
+const vehicleQuickSubmitting = ref(false);
+
 const recap = ref({
     prime_amount: null,
     accessory_amount: null,
@@ -71,7 +132,7 @@ const form = useForm({
 });
 
 const selectedClient = computed(() =>
-    props.clients?.find((c) => String(c.id) === String(form.client_id)),
+    localClients.value.find((c) => String(c.id) === String(form.client_id)),
 );
 const vehiclesForClient = computed(() => selectedClient.value?.vehicles ?? []);
 const vehiclesForSelect = computed(() =>
@@ -91,6 +152,133 @@ function onVehicleChange() {
         (vh) => String(vh.id) === String(form.vehicle_id),
     );
     form.contract_type = v?.pricing_type ?? "VP";
+}
+
+const vehicleQuickModels = computed(() => {
+    if (!vehicleQuickForm.value.vehicle_brand_id) return [];
+    const brand = props.vehicleBrands.find(
+        (b) => String(b.id) === String(vehicleQuickForm.value.vehicle_brand_id),
+    );
+    return brand?.models ?? [];
+});
+
+function openClientDrawer() {
+    clientQuickForm.value = {
+        full_name: "",
+        email: "",
+        phone: "",
+        address: "",
+        postal_address: "",
+        profession: "",
+        type_assure: "",
+    };
+    clientQuickErrors.value = {};
+    showClientDrawer.value = true;
+}
+
+function openVehicleDrawer() {
+    vehicleQuickForm.value = {
+        client_id: String(form.client_id),
+        pricing_type: form.contract_type || "VP",
+        registration_number: "",
+        vehicle_brand_id: "",
+        vehicle_model_id: "",
+        body_type: "",
+        color_id: "",
+        circulation_zone_id: "",
+        energy_source_id: "",
+        vehicle_usage_id: "",
+        vehicle_type_id: "",
+        vehicle_category_id: "",
+        vehicle_gender_id: "",
+        fiscal_power: null,
+        payload_capacity: null,
+        engine_capacity: null,
+        seat_count: 5,
+        year_of_first_registration: null,
+        first_registration_date: new Date().toISOString().slice(0, 10),
+        registration_card_number: "",
+        chassis_number: "",
+        new_value: null,
+        replacement_value: null,
+    };
+    vehicleQuickErrors.value = {};
+    showVehicleDrawer.value = true;
+}
+
+function closeClientDrawer() {
+    showClientDrawer.value = false;
+}
+
+function closeVehicleDrawer() {
+    showVehicleDrawer.value = false;
+}
+
+async function submitClientQuick() {
+    clientQuickErrors.value = {};
+    clientQuickSubmitting.value = true;
+    try {
+        const { data } = await axios.post(route("clients.store"), clientQuickForm.value, {
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.content || "",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        });
+        const client = data.client;
+        if (client) {
+            localClients.value.push({ ...client, vehicles: client.vehicles ?? [] });
+            form.client_id = String(client.id);
+            closeClientDrawer();
+        }
+    } catch (err) {
+        if (err.response?.status === 422 && err.response?.data?.errors) {
+            clientQuickErrors.value = err.response.data.errors;
+        }
+    } finally {
+        clientQuickSubmitting.value = false;
+    }
+}
+
+async function submitVehicleQuick() {
+    vehicleQuickErrors.value = {};
+    vehicleQuickSubmitting.value = true;
+    const payload = { ...vehicleQuickForm.value };
+    ["fiscal_power", "payload_capacity", "engine_capacity", "seat_count", "year_of_first_registration", "new_value", "replacement_value"].forEach((k) => {
+        if (payload[k] === "" || payload[k] == null) payload[k] = null;
+        else if (typeof payload[k] === "string" && /^\d+$/.test(payload[k])) payload[k] = parseInt(payload[k], 10);
+    });
+    try {
+        const { data } = await axios.post(route("vehicles.store"), payload, {
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.content || "",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        });
+        const vehicle = data.vehicle;
+        if (vehicle) {
+            const client = localClients.value.find((c) => String(c.id) === String(form.client_id));
+            if (client) {
+                if (!client.vehicles) client.vehicles = [];
+                client.vehicles.push({
+                    ...vehicle,
+                    name: vehicle.registration_number || `Sans immat (id ${vehicle.id})`,
+                });
+            }
+            form.vehicle_id = String(vehicle.id);
+            form.contract_type = vehicle.pricing_type || form.contract_type;
+            closeVehicleDrawer();
+        }
+    } catch (err) {
+        if (err.response?.status === 422 && err.response?.data?.errors) {
+            vehicleQuickErrors.value = err.response.data.errors;
+        }
+    } finally {
+        vehicleQuickSubmitting.value = false;
+    }
 }
 
 function applyParentContract(parent) {
@@ -373,7 +561,7 @@ function submitDraft() {
                         >
                         <SearchableSelect
                             v-model="form.client_id"
-                            :options="clients"
+                            :options="localClients"
                             value-key="id"
                             label-key="full_name"
                             placeholder="Sélectionner un client"
@@ -389,6 +577,13 @@ function submitDraft() {
                         >
                             {{ form.errors.client_id }}
                         </p>
+                        <button
+                            type="button"
+                            class="mt-2 text-sm font-medium text-slate-600 hover:text-slate-900 inline-flex items-center gap-1"
+                            @click="openClientDrawer"
+                        >
+                            + Nouveau client
+                        </button>
                     </div>
                     <div>
                         <label
@@ -418,9 +613,16 @@ function submitDraft() {
                             v-if="form.client_id && !vehiclesForClient.length"
                             class="mt-1 text-sm text-amber-600"
                         >
-                            Ce client n'a aucun véhicule. Ajoutez-en un depuis
-                            sa fiche.
+                            Ce client n'a aucun véhicule.
                         </p>
+                        <button
+                            v-if="form.client_id"
+                            type="button"
+                            class="mt-2 text-sm font-medium text-slate-600 hover:text-slate-900 inline-flex items-center gap-1"
+                            @click="openVehicleDrawer"
+                        >
+                            + Nouveau véhicule
+                        </button>
                         <p
                             v-if="form.vehicle_id && form.contract_type"
                             class="mt-2 flex items-center gap-2"
@@ -905,6 +1107,296 @@ function submitDraft() {
                 </div>
             </aside>
         </div>
+
+        <!-- Panneau latéral : Nouveau client -->
+        <Teleport to="body">
+            <div
+                v-if="showClientDrawer"
+                class="fixed inset-0 z-50 flex"
+                aria-modal="true"
+            >
+                <div
+                    class="fixed inset-0 bg-slate-900/50 transition-opacity"
+                    aria-hidden="true"
+                    @click="closeClientDrawer"
+                />
+                <div
+                    class="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white border-l border-slate-200 flex flex-col shadow-lg overflow-hidden"
+                >
+                    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-900">Nouveau client</h3>
+                        <button
+                            type="button"
+                            class="p-2 text-slate-500 hover:text-slate-700 rounded-lg"
+                            @click="closeClientDrawer"
+                        >
+                            <span class="sr-only">Fermer</span>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    <form class="flex-1 overflow-auto p-5 space-y-4" @submit.prevent="submitClientQuick">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Nom complet *</label>
+                            <input v-model="clientQuickForm.full_name" type="text" required :class="[inputClass, clientQuickErrors.full_name && inputErrorClass]" placeholder="Nom du client" />
+                            <p v-if="clientQuickErrors.full_name" class="mt-1 text-sm text-red-600">{{ clientQuickErrors.full_name[0] }}</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                                <input v-model="clientQuickForm.email" type="email" :class="[inputClass, clientQuickErrors.email && inputErrorClass]" />
+                                <p v-if="clientQuickErrors.email" class="mt-1 text-sm text-red-600">{{ clientQuickErrors.email[0] }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Téléphone</label>
+                                <input v-model="clientQuickForm.phone" type="text" :class="[inputClass, clientQuickErrors.phone && inputErrorClass]" />
+                                <p v-if="clientQuickErrors.phone" class="mt-1 text-sm text-red-600">{{ clientQuickErrors.phone[0] }}</p>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Adresse</label>
+                            <input v-model="clientQuickForm.address" type="text" :class="[inputClass, clientQuickErrors.address && inputErrorClass]" />
+                            <p v-if="clientQuickErrors.address" class="mt-1 text-sm text-red-600">{{ clientQuickErrors.address[0] }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Adresse postale</label>
+                            <input v-model="clientQuickForm.postal_address" type="text" :class="[inputClass, clientQuickErrors.postal_address && inputErrorClass]" />
+                            <p v-if="clientQuickErrors.postal_address" class="mt-1 text-sm text-red-600">{{ clientQuickErrors.postal_address[0] }}</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Profession *</label>
+                                <input v-model="clientQuickForm.profession" type="text" required :class="[inputClass, clientQuickErrors.profession && inputErrorClass]" placeholder="Profession" />
+                                <p v-if="clientQuickErrors.profession" class="mt-1 text-sm text-red-600">{{ clientQuickErrors.profession[0] }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Type assuré</label>
+                                <select v-model="clientQuickForm.type_assure" :class="inputClass">
+                                    <option value="">—</option>
+                                    <option v-for="opt in (typeAssureOptions || [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 pt-4 border-t border-slate-200">
+                            <button type="submit" class="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50" :disabled="clientQuickSubmitting">
+                                {{ clientQuickSubmitting ? "Création…" : "Créer" }}
+                            </button>
+                            <button type="button" class="px-4 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50" @click="closeClientDrawer">
+                                Annuler
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- Panneau latéral : Nouveau véhicule -->
+        <Teleport to="body">
+            <div
+                v-if="showVehicleDrawer"
+                class="fixed inset-0 z-50 flex"
+                aria-modal="true"
+            >
+                <div
+                    class="fixed inset-0 bg-slate-900/50 transition-opacity"
+                    aria-hidden="true"
+                    @click="closeVehicleDrawer"
+                />
+                <div
+                    class="fixed right-0 top-0 bottom-0 w-full max-w-2xl bg-white border-l border-slate-200 flex flex-col shadow-lg overflow-hidden"
+                >
+                    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-900">Nouveau véhicule</h3>
+                        <button
+                            type="button"
+                            class="p-2 text-slate-500 hover:text-slate-700 rounded-lg"
+                            @click="closeVehicleDrawer"
+                        >
+                            <span class="sr-only">Fermer</span>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    <form class="flex-1 overflow-auto p-5 space-y-4" @submit.prevent="submitVehicleQuick">
+                        <p class="text-sm text-slate-600">Client : <strong>{{ selectedClient?.full_name }}</strong></p>
+
+                        <fieldset class="space-y-3">
+                            <legend class="text-sm font-semibold text-slate-800 border-b border-slate-200 pb-1 w-full">Informations générales</legend>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Type *</label>
+                                    <select v-model="vehicleQuickForm.pricing_type" :class="inputClass" required @change="vehicleQuickForm.vehicle_model_id = ''">
+                                        <option value="VP">VP</option>
+                                        <option value="TPC">TPC</option>
+                                        <option value="TPM">TPM</option>
+                                        <option value="TWO_WHEELER">Deux roues</option>
+                                    </select>
+                                    <p v-if="vehicleQuickErrors.pricing_type" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.pricing_type[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Immatriculation *</label>
+                                    <input v-model="vehicleQuickForm.registration_number" type="text" required :class="[inputClass, vehicleQuickErrors.registration_number && inputErrorClass]" placeholder="Numéro d'immatriculation" />
+                                    <p v-if="vehicleQuickErrors.registration_number" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.registration_number[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Marque *</label>
+                                    <select v-model="vehicleQuickForm.vehicle_brand_id" :class="inputClass" required @change="vehicleQuickForm.vehicle_model_id = ''">
+                                        <option value="">— Choisir —</option>
+                                        <option v-for="b in (vehicleBrands || [])" :key="b.id" :value="b.id">{{ b.name }}</option>
+                                    </select>
+                                    <p v-if="vehicleQuickErrors.vehicle_brand_id" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.vehicle_brand_id[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Modèle *</label>
+                                    <select v-model="vehicleQuickForm.vehicle_model_id" :class="inputClass" required :disabled="!vehicleQuickForm.vehicle_brand_id">
+                                        <option value="">— Choisir —</option>
+                                        <option v-for="m in vehicleQuickModels" :key="m.id" :value="m.id">{{ m.name }}</option>
+                                    </select>
+                                    <p v-if="vehicleQuickErrors.vehicle_model_id" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.vehicle_model_id[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Carrosserie *</label>
+                                    <input v-model="vehicleQuickForm.body_type" type="text" :class="[inputClass, vehicleQuickErrors.body_type && inputErrorClass]" placeholder="Ex. Berline, SUV" />
+                                    <p v-if="vehicleQuickErrors.body_type" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.body_type[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Couleur *</label>
+                                    <select v-model="vehicleQuickForm.color_id" :class="inputClass" required>
+                                        <option value="">— Choisir —</option>
+                                        <option v-for="c in (colors || [])" :key="c.id" :value="c.id">{{ c.name }}</option>
+                                    </select>
+                                    <p v-if="vehicleQuickErrors.color_id" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.color_id[0] }}</p>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="space-y-3">
+                            <legend class="text-sm font-semibold text-slate-800 border-b border-slate-200 pb-1 w-full">Spécifications techniques</legend>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div v-if="vehicleQuickForm.pricing_type === 'TPC' || vehicleQuickForm.pricing_type === 'TPM'">
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Charge utile (tonne) *</label>
+                                    <input v-model.number="vehicleQuickForm.payload_capacity" type="number" min="0" step="0.01" :class="[inputClass, vehicleQuickErrors.payload_capacity && inputErrorClass]" />
+                                    <p v-if="vehicleQuickErrors.payload_capacity" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.payload_capacity[0] }}</p>
+                                </div>
+                                <div v-if="vehicleQuickForm.pricing_type === 'VP'">
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Énergie *</label>
+                                    <select v-model="vehicleQuickForm.energy_source_id" :class="inputClass">
+                                        <option value="">— Choisir —</option>
+                                        <option v-for="e in (energySources || [])" :key="e.id" :value="e.id">{{ e.name }}</option>
+                                    </select>
+                                    <p v-if="vehicleQuickErrors.energy_source_id" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.energy_source_id[0] }}</p>
+                                </div>
+                                <div v-if="vehicleQuickForm.pricing_type === 'TWO_WHEELER'">
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Cylindrée (cm³) *</label>
+                                    <input v-model.number="vehicleQuickForm.engine_capacity" type="number" min="0" :class="[inputClass, vehicleQuickErrors.engine_capacity && inputErrorClass]" />
+                                    <p v-if="vehicleQuickErrors.engine_capacity" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.engine_capacity[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Nombre de places *</label>
+                                    <input v-model.number="vehicleQuickForm.seat_count" type="number" min="0" :class="[inputClass, vehicleQuickErrors.seat_count && inputErrorClass]" />
+                                    <p v-if="vehicleQuickErrors.seat_count" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.seat_count[0] }}</p>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="space-y-3">
+                            <legend class="text-sm font-semibold text-slate-800 border-b border-slate-200 pb-1 w-full">Classification</legend>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Usage *</label>
+                                    <select v-model="vehicleQuickForm.vehicle_usage_id" :class="inputClass" required>
+                                        <option value="">— Choisir —</option>
+                                        <option v-for="u in (vehicleUsages || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
+                                    </select>
+                                    <p v-if="vehicleQuickErrors.vehicle_usage_id" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.vehicle_usage_id[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Catégorie *</label>
+                                    <select v-model="vehicleQuickForm.vehicle_category_id" :class="inputClass" required>
+                                        <option value="">— Choisir —</option>
+                                        <option v-for="cat in (vehicleCategories || [])" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                                    </select>
+                                    <p v-if="vehicleQuickErrors.vehicle_category_id" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.vehicle_category_id[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Genre *</label>
+                                    <select v-model="vehicleQuickForm.vehicle_gender_id" :class="inputClass" required>
+                                        <option value="">— Choisir —</option>
+                                        <option v-for="g in (vehicleGenders || [])" :key="g.id" :value="g.id">{{ g.name }}</option>
+                                    </select>
+                                    <p v-if="vehicleQuickErrors.vehicle_gender_id" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.vehicle_gender_id[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Type</label>
+                                    <select v-model="vehicleQuickForm.vehicle_type_id" :class="inputClass">
+                                        <option value="">— Choisir —</option>
+                                        <option v-for="t in (vehicleTypes || [])" :key="t.id" :value="t.id">{{ t.name }}</option>
+                                    </select>
+                                    <p v-if="vehicleQuickErrors.vehicle_type_id" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.vehicle_type_id[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Zone de circulation</label>
+                                    <select v-model="vehicleQuickForm.circulation_zone_id" :class="inputClass">
+                                        <option value="">— Choisir —</option>
+                                        <option v-for="z in (circulationZones || [])" :key="z.id" :value="z.id">{{ z.name }}</option>
+                                    </select>
+                                    <p v-if="vehicleQuickErrors.circulation_zone_id" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.circulation_zone_id[0] }}</p>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="space-y-3">
+                            <legend class="text-sm font-semibold text-slate-800 border-b border-slate-200 pb-1 w-full">Informations techniques</legend>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Date 1ère mise en circulation *</label>
+                                    <input v-model="vehicleQuickForm.first_registration_date" type="date" :class="[inputClass, vehicleQuickErrors.first_registration_date && inputErrorClass]" />
+                                    <p v-if="vehicleQuickErrors.first_registration_date" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.first_registration_date[0] }}</p>
+                                </div>
+                                <div v-if="vehicleQuickForm.pricing_type === 'VP'">
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Puissance fiscale (CV) *</label>
+                                    <input v-model.number="vehicleQuickForm.fiscal_power" type="number" min="0" :class="[inputClass, vehicleQuickErrors.fiscal_power && inputErrorClass]" />
+                                    <p v-if="vehicleQuickErrors.fiscal_power" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.fiscal_power[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Numéro de carte grise</label>
+                                    <input v-model="vehicleQuickForm.registration_card_number" type="text" :class="[inputClass, vehicleQuickErrors.registration_card_number && inputErrorClass]" />
+                                    <p v-if="vehicleQuickErrors.registration_card_number" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.registration_card_number[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Numéro de châssis</label>
+                                    <input v-model="vehicleQuickForm.chassis_number" type="text" :class="[inputClass, vehicleQuickErrors.chassis_number && inputErrorClass]" />
+                                    <p v-if="vehicleQuickErrors.chassis_number" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.chassis_number[0] }}</p>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="space-y-3">
+                            <legend class="text-sm font-semibold text-slate-800 border-b border-slate-200 pb-1 w-full">Valeurs financières</legend>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Valeur neuve</label>
+                                    <input v-model.number="vehicleQuickForm.new_value" type="number" min="0" step="0.01" :class="[inputClass, vehicleQuickErrors.new_value && inputErrorClass]" />
+                                    <p v-if="vehicleQuickErrors.new_value" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.new_value[0] }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Valeur de remplacement</label>
+                                    <input v-model.number="vehicleQuickForm.replacement_value" type="number" min="0" step="0.01" :class="[inputClass, vehicleQuickErrors.replacement_value && inputErrorClass]" />
+                                    <p v-if="vehicleQuickErrors.replacement_value" class="mt-1 text-sm text-red-600">{{ vehicleQuickErrors.replacement_value[0] }}</p>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <div class="flex gap-3 pt-4 border-t border-slate-200">
+                            <button type="submit" class="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50" :disabled="vehicleQuickSubmitting">
+                                {{ vehicleQuickSubmitting ? "Création…" : "Créer" }}
+                            </button>
+                            <button type="button" class="px-4 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50" @click="closeVehicleDrawer">
+                                Annuler
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </Teleport>
 
         <div class="mt-4">
             <Link

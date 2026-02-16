@@ -15,6 +15,7 @@ export function route(name, ...params) {
         'vehicles.create': () => '/vehicles/create',
         'vehicles.create.for_client': (clientId) => `/clients/${clientId}/vehicles/create`,
         'vehicles.store': () => '/vehicles',
+        'vehicles.quick-store': () => '/vehicles/quick-store',
         'vehicles.show': (id) => `/vehicles/${id}`,
         'vehicles.edit': (id) => `/vehicles/${id}/edit`,
         'vehicles.update': (id) => `/vehicles/${id}`,

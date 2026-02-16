@@ -7,10 +7,18 @@ use App\Actions\UpdateContractAction;
 use App\Http\Requests\ContractPreviewRequest;
 use App\Http\Requests\StoreContractRequest;
 use App\Http\Requests\UpdateContractRequest;
+use App\Models\CirculationZone;
 use App\Models\Client;
+use App\Models\Color;
 use App\Models\Company;
 use App\Models\Contract;
+use App\Models\EnergySource;
 use App\Models\Vehicle;
+use App\Models\VehicleBrand;
+use App\Models\VehicleCategory;
+use App\Models\VehicleGender;
+use App\Models\VehicleType;
+use App\Models\VehicleUsage;
 use App\Services\ContractPricingService;
 use App\Services\ExternalService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -183,6 +191,18 @@ class ContractController extends Controller
             'contractTypes' => $this->contractTypes(),
             'durationOptions' => $this->durationOptions(),
             'parentContract' => $parentContract,
+            'typeAssureOptions' => [
+                ['value' => Client::TYPE_TAPP, 'label' => 'TAPP'],
+                ['value' => Client::TYPE_TAPM, 'label' => 'TAPM'],
+            ],
+            'vehicleBrands' => VehicleBrand::with('models:id,vehicle_brand_id,name')->get(['id', 'name']),
+            'circulationZones' => CirculationZone::orderBy('name')->get(['id', 'name']),
+            'energySources' => EnergySource::orderBy('name')->get(['id', 'name']),
+            'vehicleUsages' => VehicleUsage::orderBy('name')->get(['id', 'name']),
+            'vehicleTypes' => VehicleType::orderBy('name')->get(['id', 'name']),
+            'vehicleCategories' => VehicleCategory::orderBy('name')->get(['id', 'name']),
+            'vehicleGenders' => VehicleGender::orderBy('name')->get(['id', 'name']),
+            'colors' => Color::orderBy('name')->get(['id', 'name']),
         ]);
     }
 

@@ -43,6 +43,7 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     Route::get('/vehicles/create', [VehicleController::class, 'create'])->name('vehicles.create');
     Route::get('/clients/{client}/vehicles/create', [RedirectController::class, 'vehiclesCreateForClient'])->name('vehicles.create.for_client');
     Route::post('/vehicles', [VehicleController::class, 'store'])->name('vehicles.store');
+    Route::post('/vehicles/quick-store', [VehicleController::class, 'quickStore'])->name('vehicles.quick-store');
     Route::get('/vehicles/{vehicle}', [VehicleController::class, 'show'])->name('vehicles.show');
     Route::get('/vehicles/{vehicle}/edit', [VehicleController::class, 'edit'])->name('vehicles.edit');
     Route::put('/vehicles/{vehicle}', [VehicleController::class, 'update'])->name('vehicles.update');
