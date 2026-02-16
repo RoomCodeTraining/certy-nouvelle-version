@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasColumn('organization_company_configs', 'organization_id')) {
+            return;
+        }
+
         Schema::table('organization_company_configs', function (Blueprint $table) {
             $table->dropForeign(['organization_id']);
         });
@@ -18,9 +22,11 @@ return new class extends Migration
             $table->string('code', 100)->nullable()->after('name');
         });
 
-        Schema::table('organization_company_configs', function (Blueprint $table) {
-            $table->unique('company_id');
-        });
+        if (Schema::hasColumn('organization_company_configs', 'company_id')) {
+            Schema::table('organization_company_configs', function (Blueprint $table) {
+                $table->unique('company_id');
+            });
+        }
     }
 
     public function down(): void
