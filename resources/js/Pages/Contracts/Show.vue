@@ -93,6 +93,17 @@ function cancel(contract) {
     });
 }
 
+function validateContract(contract) {
+    confirmDialog({
+        title: "Valider le contrat",
+        message: "Voulez-vous valider ce contrat ? Il passera au statut « Validé » et ne pourra plus être modifié en brouillon.",
+        confirmLabel: "Valider",
+        variant: "default",
+    }).then((ok) => {
+        if (ok) router.post(route("contracts.validate", contract.id));
+    });
+}
+
 const generatingAttestation = ref(false);
 const csrfToken =
     typeof document !== 'undefined'
@@ -124,7 +135,16 @@ function markAttestationIssued(contract) {
                     >
                         Modifier
                     </Link>
+                    <button
+                        v-if="canEdit"
+                        type="button"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
+                        @click="validateContract(contract)"
+                    >
+                        Valider le contrat
+                    </button>
                     <Link
+                        v-if="!canEdit"
                         :href="route('contracts.renew', contract.id)"
                         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors"
                     >
@@ -150,7 +170,7 @@ function markAttestationIssued(contract) {
                 <div class="flex flex-wrap items-center gap-4">
                     <span
                         :class="[
-                            'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium',
+                            'inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap',
                             isNewBusiness ? 'bg-emerald-100 text-emerald-800' : 'bg-violet-100 text-violet-800',
                         ]"
                     >
@@ -310,7 +330,7 @@ function markAttestationIssued(contract) {
                 <div class="lg:col-span-2 space-y-6">
                     <!-- Carte Détails du contrat -->
                     <section
-                        class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+                        class="rounded-2xl border border-slate-200 bg-white overflow-hidden"
                     >
                         <div
                             class="px-6 py-4 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3"
@@ -325,7 +345,16 @@ function markAttestationIssued(contract) {
                             >
                                 Modifier
                             </Link>
+                            <button
+                                v-if="canEdit"
+                                type="button"
+                                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
+                                @click="validateContract(contract)"
+                            >
+                                Valider
+                            </button>
                             <Link
+                                v-if="!canEdit"
                                 :href="route('contracts.renew', contract.id)"
                                 class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors"
                             >
@@ -342,6 +371,14 @@ function markAttestationIssued(contract) {
                                     </dt>
                                     <dd class="text-slate-900 font-mono font-semibold">
                                         {{ contractReference }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-slate-500 font-medium mb-0.5">
+                                        Numéro de police
+                                    </dt>
+                                    <dd class="text-slate-900 font-mono font-semibold">
+                                        {{ contract.policy_number ?? '—' }}
                                     </dd>
                                 </div>
                                 <div>
@@ -432,7 +469,7 @@ function markAttestationIssued(contract) {
 
                     <!-- Carte Partie prenante -->
                     <section
-                        class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+                        class="rounded-2xl border border-slate-200 bg-white overflow-hidden"
                     >
                         <div
                             class="px-6 py-4 border-b border-slate-100 bg-slate-50/80"
@@ -545,7 +582,7 @@ function markAttestationIssued(contract) {
                 <div class="lg:col-span-1">
                     <section
                         v-if="hasPremiumData"
-                        class="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden sticky top-4"
+                        class="rounded-2xl border border-slate-200 bg-white overflow-hidden sticky top-4"
                     >
                         <div
                             class="px-6 py-4 border-b border-slate-100 bg-slate-900"

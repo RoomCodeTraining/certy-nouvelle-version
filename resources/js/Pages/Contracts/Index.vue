@@ -15,6 +15,7 @@ import { useConfirm } from '@/Composables/useConfirm';
 const props = defineProps({
     contracts: Object,
     filters: Object,
+    draft_count: { type: Number, default: 0 },
 });
 
 const breadcrumbs = [
@@ -25,6 +26,14 @@ const breadcrumbs = [
 /** Référence contrat : CA- + 11 caractères alphanumériques majuscules. */
 function contractReference(row) {
     return row.reference ?? '—';
+}
+
+/** Badge Affaire : Nouvelle affaire (pas de parent) ou Renouvellement (parent_id présent). */
+function dealTypeLabel(row) {
+    return row.parent_id ? 'Renouvellement' : 'Nouvelle affaire';
+}
+function dealTypeBadgeClass(row) {
+    return row.parent_id ? 'bg-violet-100 text-violet-800' : 'bg-emerald-100 text-emerald-800';
 }
 
 const columns = [
@@ -40,8 +49,9 @@ const columns = [
         key: 'deal_type',
         label: 'Affaire',
         type: 'badge',
-        getValue: (row) => row.parent_id ? 'Renouvellement' : 'Nouvelle affaire',
-        getBadgeClass: (row) => row.parent_id ? 'bg-violet-100 text-violet-800' : 'bg-emerald-100 text-emerald-800',
+        getValue: (row) => dealTypeLabel(row),
+        getBadgeClass: (row) => dealTypeBadgeClass(row),
+        cellClass: 'whitespace-nowrap',
     },
     {
         key: 'vehicle',
@@ -85,6 +95,18 @@ const queryParams = computed(() => ({
     date_to: props.filters?.date_to ?? '',
 }));
 
+/** URL d'export Excel avec les filtres courants (sans per_page). */
+const exportExcelUrl = computed(() => {
+    const base = route('contracts.export');
+    const params = new URLSearchParams();
+    if (props.filters?.search) params.set('search', props.filters.search);
+    if (props.filters?.status) params.set('status', props.filters.status);
+    if (props.filters?.date_from) params.set('date_from', props.filters.date_from);
+    if (props.filters?.date_to) params.set('date_to', props.filters.date_to);
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+});
+
 const hasActiveFilters = computed(() => !!(
     props.filters?.search || props.filters?.status || props.filters?.date_from || props.filters?.date_to
 ));
@@ -118,6 +140,14 @@ function cancel(contract, label) {
             <PageHeader :breadcrumbs="breadcrumbs" title="Contrats">
                 <template #actions>
                     <Link
+                        :href="exportExcelUrl"
+                        class="inline-flex items-center justify-center gap-2 w-full sm:w-auto min-h-[44px] sm:min-h-0 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Exporter Excel
+                    </Link>
+                    <Link
                         :href="route('contracts.create')"
                         class="inline-flex items-center justify-center w-full sm:w-auto min-h-[44px] sm:min-h-0 px-4 py-3 sm:py-2 bg-slate-900 text-white text-sm font-medium rounded-xl sm:rounded-lg hover:bg-slate-800"
                     >
@@ -139,6 +169,13 @@ function cancel(contract, label) {
                 placeholder="Rechercher (réf., type, client, compagnie, immat)..."
                 class="rounded-lg border border-slate-200 px-3 py-2 text-sm w-full sm:w-72 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none"
             />
+            <Link
+                v-if="draft_count > 0"
+                :href="`${route('contracts.index')}?status=draft`"
+                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm font-medium hover:bg-amber-100"
+            >
+                Brouillons ({{ draft_count }})
+            </Link>
             <select name="status" class="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none">
                 <option value="">Tous les statuts</option>
                 <option value="draft" :selected="filters?.status === 'draft'">Brouillon</option>
@@ -179,9 +216,17 @@ function cancel(contract, label) {
                     class="p-4"
                 >
                     <Link :href="route('contracts.show', row.id)" class="block active:bg-slate-50/80 rounded-lg -m-2 p-2 transition-colors">
-                        <p class="font-mono text-sm font-medium text-slate-900">{{ contractReference(row) }}</p>
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="font-mono text-sm font-medium text-slate-900">{{ contractReference(row) }}</p>
+                            <span
+                                class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
+                                :class="dealTypeBadgeClass(row)"
+                            >
+                                {{ dealTypeLabel(row) }}
+                            </span>
+                        </div>
                         <p class="text-sm text-slate-700 mt-0.5">{{ contractTypeLabel(row.contract_type) }}</p>
-                        <p class="text-xs text-slate-500 mt-1">{{ row.vehicle?.registration_number ?? [row.vehicle?.brand?.name, row.vehicle?.model?.name].filter(Boolean).join(' ') ?? '—' }}</p>
+                        <p class="text-xs text-slate-500 mt-1">{{ row.vehicle?.registration_number || [row.vehicle?.brand?.name, row.vehicle?.model?.name].filter(Boolean).join(' ') || '—' }}</p>
                         <p class="text-xs text-slate-500 mt-0.5">{{ formatDate(row.start_date) }} → {{ formatDate(row.end_date) }}</p>
                         <div class="flex items-center justify-between gap-2 mt-2">
                             <span
@@ -196,7 +241,7 @@ function cancel(contract, label) {
                     <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-100">
                         <DataTableAction label="Voir" :to="route('contracts.show', row.id)" icon="eye" />
                         <DataTableAction label="PDF" :href="route('contracts.pdf', row.id)" icon="download" external />
-                        <DataTableAction label="Renouveler" :to="route('contracts.renew', row.id)" icon="refresh" />
+                        <DataTableAction v-if="row.status !== 'draft'" label="Renouveler" :to="route('contracts.renew', row.id)" icon="refresh" />
                         <DataTableAction v-if="canEdit(row)" label="Modifier" :to="route('contracts.edit', row.id)" icon="edit" />
                         <DataTableAction
                             v-if="canCancel(row)"
@@ -223,7 +268,7 @@ function cancel(contract, label) {
                     <template #actions="{ row }">
                         <DataTableAction label="Voir le détail" :to="route('contracts.show', row.id)" icon="eye" />
                         <DataTableAction label="Télécharger le contrat (PDF)" :href="route('contracts.pdf', row.id)" icon="download" external />
-                        <DataTableAction label="Renouveler" :to="route('contracts.renew', row.id)" icon="refresh" />
+                        <DataTableAction v-if="row.status !== 'draft'" label="Renouveler" :to="route('contracts.renew', row.id)" icon="refresh" />
                         <DataTableAction v-if="canEdit(row)" label="Modifier" :to="route('contracts.edit', row.id)" icon="edit" />
                         <DataTableAction
                             v-if="canCancel(row)"

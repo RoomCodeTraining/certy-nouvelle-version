@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Contract;
+use App\Services\PolicyNumberService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -45,7 +46,11 @@ class ExternalService
         $company = $contract->company;
 
         $codeCompagnie = $company && $company->code ? $company->code : 'ASACI_LUNAR';
-        $numeroPolice = 'RC-'.strtoupper(preg_replace('/[^A-Z0-9]/', '', $codeCompagnie ?? '')).'-'.$contract->id;
+        $numeroPolice = $contract->policy_number;
+        if ($numeroPolice === null || $numeroPolice === '') {
+            $numeroPolice = app(PolicyNumberService::class)->generate($company->code ?? null);
+            $contract->update(['policy_number' => $numeroPolice]);
+        }
 
         $listeDemande = [
             'rc' => (string) ($contract->rc_amount ?? '0'),

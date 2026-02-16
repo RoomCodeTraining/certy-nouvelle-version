@@ -12,6 +12,7 @@ class Contract extends Model
 {
     protected $fillable = [
         'reference',
+        'policy_number',
         'organization_id',
         'client_id',
         'vehicle_id',

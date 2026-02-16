@@ -169,7 +169,7 @@ watch(() => props.modelValue, (val) => {
 
         <div
             v-show="isOpen"
-            class="absolute left-0 top-full z-50 mt-1 min-w-[280px] rounded-xl border border-slate-200 bg-white p-4 shadow-lg"
+            class="absolute left-0 top-full z-50 mt-1 min-w-[280px] rounded-xl border border-slate-200 bg-white p-4"
         >
                 <div class="flex flex-wrap items-center gap-2 mb-3">
                     <select

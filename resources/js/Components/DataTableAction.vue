@@ -53,7 +53,7 @@ const path = iconPaths[props.icon] || iconPaths.edit;
             </svg>
         </component>
         <span
-            class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-xs font-medium text-white bg-slate-900 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50"
+            class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-xs font-medium text-white bg-slate-900 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50"
             role="tooltip"
         >
             {{ label }}

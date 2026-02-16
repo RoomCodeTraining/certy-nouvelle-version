@@ -110,7 +110,7 @@ watch(isOpen, (open) => {
 
         <div
             v-show="isOpen"
-            class="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg py-1 min-w-[12rem] max-h-72 flex flex-col"
+            class="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white py-1 min-w-[12rem] max-h-72 flex flex-col"
         >
             <div class="p-2 border-b border-slate-100 sticky top-0 bg-white">
                 <input

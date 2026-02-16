@@ -45,7 +45,7 @@ function getBadgeClass(row, col) {
 </script>
 
 <template>
-    <div class="rounded-xl border border-slate-200 bg-white text-sm shadow-sm overflow-hidden">
+    <div class="rounded-xl border border-slate-200 bg-white text-sm overflow-hidden">
         <!-- Toolbar (Nuxt UI style): optionnel -->
         <div
             v-if="$slots['toolbar-left'] || $slots['toolbar-right']"
@@ -99,7 +99,7 @@ function getBadgeClass(row, col) {
                             </template>
                             <template v-else-if="col.type === 'badge'">
                                 <span
-                                    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                                    class="inline-flex items-center shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
                                     :class="getBadgeClass(row, col)"
                                 >
                                     {{ getCellValue(row, col) }}

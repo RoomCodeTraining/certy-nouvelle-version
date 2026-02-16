@@ -252,7 +252,7 @@ function executeDelete() {
                     aria-labelledby="modal-title"
                     @click.self="closeModal"
                 >
-                    <div class="w-full max-w-md rounded-xl bg-white shadow-xl" @click.stop>
+                    <div class="w-full max-w-md rounded-xl bg-white border border-slate-200" @click.stop>
                         <div class="px-6 py-4 border-b border-slate-200">
                             <h2 id="modal-title" class="text-lg font-semibold text-slate-900">Ajouter une ligne</h2>
                         </div>
@@ -356,7 +356,7 @@ function executeDelete() {
                     aria-labelledby="delete-modal-title"
                     @click.self="closeDeleteModal"
                 >
-                    <div class="w-full max-w-md rounded-xl bg-white shadow-xl" @click.stop>
+                    <div class="w-full max-w-md rounded-xl bg-white border border-slate-200" @click.stop>
                         <div class="px-6 py-4 border-b border-slate-200">
                             <h2 id="delete-modal-title" class="text-lg font-semibold text-slate-900">Supprimer la config</h2>
                         </div>

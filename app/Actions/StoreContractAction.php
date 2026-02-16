@@ -2,9 +2,11 @@
 
 namespace App\Actions;
 
+use App\Models\Company;
 use App\Models\Contract;
 use App\Models\User;
 use App\Services\ContractPricingService;
+use App\Services\PolicyNumberService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
@@ -12,7 +14,8 @@ use Illuminate\Support\Facades\Schema;
 class StoreContractAction
 {
     public function __construct(
-        protected ContractPricingService $pricingService
+        protected ContractPricingService $pricingService,
+        protected PolicyNumberService $policyNumberService
     ) {}
 
     public function execute(User $user, array $validated, $accessoryAmountOverride = null): Contract
@@ -41,6 +44,29 @@ class StoreContractAction
                 : null;
         } else {
             unset($validated['parent_id']);
+        }
+
+        // Règle métier : renouvellement avant échéance → même numéro de police ; après échéance → nouveau numéro
+        if (Schema::hasColumn('contracts', 'policy_number')) {
+            $reuseParentPolicyNumber = false;
+            if (! empty($validated['parent_id'])) {
+                $parent = Contract::find($validated['parent_id']);
+                if ($parent
+                    && $parent->policy_number
+                    && ! empty($validated['start_date'])
+                    && $parent->end_date
+                    && Carbon::parse($validated['start_date'])->lte($parent->end_date)
+                ) {
+                    $reuseParentPolicyNumber = true;
+                    $validated['policy_number'] = $parent->policy_number;
+                }
+            }
+            if (! $reuseParentPolicyNumber) {
+                $companyCode = isset($validated['company_id']) ? Company::find($validated['company_id'])?->code : null;
+                do {
+                    $validated['policy_number'] = $this->policyNumberService->generate($companyCode);
+                } while (Contract::where('policy_number', $validated['policy_number'])->exists());
+            }
         }
 
         $contract = Contract::create($validated);

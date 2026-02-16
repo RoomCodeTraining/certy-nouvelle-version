@@ -349,7 +349,7 @@ const iconPaths = {
                         >
                             <div
                                 v-show="sidebarUserMenuOpen"
-                                class="absolute bottom-full left-0 right-0 mb-1 py-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50"
+                                class="absolute bottom-full left-0 right-0 mb-1 py-1 bg-white rounded-lg border border-slate-200 z-50"
                             >
                                 <div class="px-4 py-2 border-b border-slate-100">
                                     <p class="text-xs text-slate-500">Connecté en tant que</p>
@@ -403,7 +403,7 @@ const iconPaths = {
                     >
                         <div
                             v-show="notifMenuOpen"
-                            class="absolute right-0 mt-1 w-72 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50"
+                            class="absolute right-0 mt-1 w-72 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 z-50"
                         >
                             <div class="px-4 py-3 border-b border-slate-100">
                                 <p class="text-sm font-medium text-slate-900">Notifications</p>
@@ -439,7 +439,7 @@ const iconPaths = {
                     >
                         <div
                             v-show="userMenuOpen"
-                            class="absolute right-0 mt-1 w-56 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50"
+                            class="absolute right-0 mt-1 w-56 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 z-50"
                         >
                             <div class="px-4 py-2 border-b border-slate-100">
                                 <p class="text-xs text-slate-500">Connecté en tant que</p>
@@ -484,7 +484,7 @@ const iconPaths = {
                     aria-label="Menu de navigation"
                 >
                     <div class="absolute inset-0 bg-slate-900/50" @click="mobileMenuOpen = false" />
-                    <div class="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-white shadow-xl flex flex-col">
+                    <div class="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-white border-r border-slate-200 flex flex-col">
                         <div class="h-14 px-4 flex items-center justify-between border-b border-slate-200 shrink-0">
                             <Link href="/dashboard" class="flex items-center gap-2 min-w-0" @click="mobileMenuOpen = false">
                                 <img
@@ -607,7 +607,7 @@ const iconPaths = {
                         >
                             <div
                                 v-show="notifMenuOpen"
-                                class="absolute right-0 mt-1 w-72 sm:w-80 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50"
+                                class="absolute right-0 mt-1 w-72 sm:w-80 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 z-50"
                             >
                                 <div class="px-4 py-3 border-b border-slate-100">
                                     <p class="text-sm font-medium text-slate-900">Notifications</p>
@@ -644,7 +644,7 @@ const iconPaths = {
                         >
                             <div
                                 v-show="userMenuOpen"
-                                class="absolute right-0 mt-1 w-56 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50"
+                                class="absolute right-0 mt-1 w-56 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 z-50"
                             >
                                 <div class="px-4 py-2 border-b border-slate-100">
                                     <p class="text-xs text-slate-500">Connecté en tant que</p>

@@ -418,7 +418,7 @@ const columns = [
                     aria-modal="true"
                     :aria-labelledby="'modal-title-' + (viewReference || '')"
                 >
-                    <div class="bg-white rounded-xl shadow-xl flex flex-col max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                    <div class="bg-white rounded-xl border border-slate-200 flex flex-col max-w-4xl w-full max-h-[90vh] overflow-hidden">
                         <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200 bg-slate-50 shrink-0">
                             <h3 :id="'modal-title-' + (viewReference || '')" class="text-sm font-semibold text-slate-900 truncate">
                                 Attestation {{ viewReference ? `— ${viewReference}` : '' }}

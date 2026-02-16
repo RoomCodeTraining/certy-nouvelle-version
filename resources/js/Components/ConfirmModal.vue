@@ -66,7 +66,7 @@ watch(() => props.open, (isOpen) => {
                 >
                     <div
                         v-if="open"
-                        class="w-full max-w-md rounded-xl bg-white shadow-xl"
+                        class="w-full max-w-md rounded-xl bg-white border border-slate-200"
                         @click.stop
                     >
                         <div class="p-6">

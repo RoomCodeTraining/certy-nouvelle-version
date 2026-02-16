@@ -50,6 +50,7 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
 
     // CRUD Contrats
     Route::get('/contracts', [ContractController::class, 'index'])->name('contracts.index');
+    Route::get('/contracts/export', [ContractController::class, 'export'])->name('contracts.export');
     Route::get('/contracts/create', [ContractController::class, 'create'])->name('contracts.create');
     Route::post('/contracts/preview', [ContractController::class, 'preview'])->name('contracts.preview');
     Route::post('/contracts', [ContractController::class, 'store'])->name('contracts.store');
@@ -58,6 +59,7 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     Route::get('/contracts/{contract}/renew', [ContractController::class, 'renew'])->name('contracts.renew');
     Route::get('/contracts/{contract}/edit', [ContractController::class, 'edit'])->name('contracts.edit');
     Route::put('/contracts/{contract}', [ContractController::class, 'update'])->name('contracts.update');
+    Route::post('/contracts/{contract}/validate', [ContractController::class, 'validate'])->name('contracts.validate');
     Route::post('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->name('contracts.cancel');
     Route::post('/contracts/{contract}/mark-attestation-issued', [ContractController::class, 'markAttestationIssued'])->name('contracts.mark-attestation-issued');
     Route::post('/contracts/{contract}/generate-attestation', [ContractController::class, 'generateAttestation'])->name('contracts.generate-attestation');

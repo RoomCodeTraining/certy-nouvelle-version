@@ -17,9 +17,11 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class ContractController extends Controller
@@ -56,9 +58,102 @@ class ContractController extends Controller
         $perPage = min(max((int) $request->input('per_page', 25), 1), 100);
         $contracts = $query->latest()->paginate($perPage)->withQueryString();
 
+        $draftCount = Contract::accessibleBy($user)->where('status', Contract::STATUS_DRAFT)->count();
+
         return Inertia::render('Contracts/Index', [
             'contracts' => $contracts,
             'filters' => $request->only(['search', 'status', 'per_page', 'date_from', 'date_to']),
+            'draft_count' => $draftCount,
+        ]);
+    }
+
+    /**
+     * Export des contrats en CSV (Excel), en appliquant les mêmes filtres que la liste.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $user = $request->user();
+        $with = ['client:id,full_name', 'vehicle:id,registration_number,vehicle_brand_id,vehicle_model_id', 'vehicle.brand:id,name', 'vehicle.model:id,name', 'company:id,name'];
+        if (Schema::hasColumn('contracts', 'parent_id')) {
+            $with[] = 'parent:id';
+        }
+        $query = Contract::accessibleBy($user)->with($with);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('reference', 'like', '%'.$search.'%')
+                    ->orWhere('contract_type', 'like', '%'.$search.'%')
+                    ->orWhereHas('client', fn ($c) => $c->where('full_name', 'like', '%'.$search.'%'))
+                    ->orWhereHas('company', fn ($co) => $co->where('name', 'like', '%'.$search.'%'))
+                    ->orWhereHas('vehicle', fn ($v) => $v->where('registration_number', 'like', '%'.$search.'%'));
+            });
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+        if ($request->filled('date_from')) {
+            $query->where('end_date', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->where('start_date', '<=', $request->date_to);
+        }
+
+        $contracts = $query->latest()->get();
+
+        $contractTypeLabels = [
+            'VP' => 'VP',
+            'TPC' => 'Transport pour propre compte',
+            'TPM' => 'TPM',
+            'TWO_WHEELER' => 'Deux roues',
+        ];
+        $statusLabels = [
+            'draft' => 'Brouillon',
+            'validated' => 'Validé',
+            'active' => 'Actif',
+            'cancelled' => 'Annulé',
+            'expired' => 'Expiré',
+        ];
+
+        $hasPolicyNumber = Schema::hasColumn('contracts', 'policy_number');
+        $filename = 'contrats-' . now()->format('Y-m-d-His') . '.csv';
+
+        return new StreamedResponse(function () use ($contracts, $contractTypeLabels, $statusLabels, $hasPolicyNumber) {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM for Excel
+
+            $headers = ['Date création', 'Référence', 'Affaire', 'Client', 'Véhicule', 'Type', 'Compagnie', 'Date début', 'Date fin', 'Montant (FCFA)', 'Statut'];
+            if ($hasPolicyNumber) {
+                array_splice($headers, 2, 0, ['N° police']);
+            }
+            fputcsv($out, $headers, ';');
+
+            foreach ($contracts as $c) {
+                $vehicleLabel = $c->vehicle
+                    ? trim(($c->vehicle->brand?->name ?? '').' '.($c->vehicle->model?->name ?? '').' '.($c->vehicle->registration_number ?? '')) ?: ($c->vehicle->registration_number ?? '')
+                    : '';
+                $row = [
+                    $c->created_at?->format('d/m/Y H:i') ?? '',
+                    $c->reference ?? '',
+                    $c->parent_id ? 'Renouvellement' : 'Nouvelle affaire',
+                    $c->client?->full_name ?? '',
+                    $vehicleLabel,
+                    $contractTypeLabels[$c->contract_type] ?? $c->contract_type,
+                    $c->company?->name ?? '',
+                    $c->start_date?->format('d/m/Y') ?? '',
+                    $c->end_date?->format('d/m/Y') ?? '',
+                    $c->total_amount ?? '',
+                    $statusLabels[$c->status] ?? $c->status,
+                ];
+                if ($hasPolicyNumber) {
+                    array_splice($row, 2, 0, [$c->policy_number ?? '']);
+                }
+                fputcsv($out, $row, ';');
+            }
+            fclose($out);
+        }, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -229,6 +324,23 @@ class ContractController extends Controller
         $this->authorizeClientVehicle($request, $request->validated('client_id'), $request->validated('vehicle_id'));
         $action->execute($contract, $request->validated());
         return redirect()->route('contracts.show', $contract)->with('success', 'Contrat mis à jour.');
+    }
+
+    /**
+     * Valider un contrat en brouillon (passage au statut validé).
+     */
+    public function validate(Request $request, Contract $contract): RedirectResponse
+    {
+        $this->authorizeContract($request, $contract);
+        if ($contract->status !== Contract::STATUS_DRAFT) {
+            return redirect()->route('contracts.show', $contract)
+                ->with('error', 'Seul un contrat en brouillon peut être validé.');
+        }
+        $contract->update(['status' => Contract::STATUS_VALIDATED]);
+        Event::dispatch(new \App\Events\ContractValidated($contract, $request->user()));
+
+        return redirect()->route('contracts.show', $contract)
+            ->with('success', 'Contrat validé. Vous pouvez générer l\'attestation ou consulter le contrat en PDF.');
     }
 
     public function cancel(Request $request, Contract $contract): RedirectResponse
