@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import FlashNotifications from '@/Components/FlashNotifications.vue';
 import ConfirmModal from '@/Components/ConfirmModal.vue';
@@ -13,11 +13,16 @@ const auth = page.props.auth;
 
 const userMenuOpen = ref(false);
 const userMenuRef = ref(null);
+const userMenuRefMobile = ref(null);
 const notifMenuOpen = ref(false);
 const notifMenuRef = ref(null);
+const notifMenuRefMobile = ref(null);
 const settingsOpen = ref(false);
 const sidebarUserMenuOpen = ref(false);
 const sidebarUserRef = ref(null);
+const mobileMenuOpen = ref(false);
+const logoError = ref(false);
+const appName = computed(() => page.props.app?.name || 'Certy');
 
 const getInitials = (name) => {
     if (!name) return '?';
@@ -25,12 +30,10 @@ const getInitials = (name) => {
 };
 
 const closeMenus = (e) => {
-    if (userMenuRef.value && !userMenuRef.value.contains(e.target)) {
-        userMenuOpen.value = false;
-    }
-    if (notifMenuRef.value && !notifMenuRef.value.contains(e.target)) {
-        notifMenuOpen.value = false;
-    }
+    const inUser = userMenuRef.value?.contains(e.target) || userMenuRefMobile.value?.contains(e.target);
+    if (!inUser) userMenuOpen.value = false;
+    const inNotif = notifMenuRef.value?.contains(e.target) || notifMenuRefMobile.value?.contains(e.target);
+    if (!inNotif) notifMenuOpen.value = false;
     if (sidebarUserRef.value && !sidebarUserRef.value.contains(e.target)) {
         sidebarUserMenuOpen.value = false;
     }
@@ -47,6 +50,7 @@ const openUserMenu = () => {
 
 onMounted(() => {
     document.addEventListener('click', closeMenus);
+    router.on('navigate', () => { mobileMenuOpen.value = false; });
     if (settingsItems.some((item) => page.url.startsWith(item.href))) {
         settingsOpen.value = true;
     }
@@ -58,6 +62,14 @@ onMounted(() => {
     }
 });
 onUnmounted(() => document.removeEventListener('click', closeMenus));
+
+watch(mobileMenuOpen, (open) => {
+    document.body.style.overflow = open ? 'hidden' : '';
+});
+
+function onLogoError() {
+    logoError.value = true;
+}
 
 const navItems = [
     { href: '/dashboard', label: 'Tableau de bord', icon: 'home' },
@@ -130,24 +142,18 @@ const iconPaths = {
         <!-- Sidebar verticale à gauche (contexte Nuxt UI) -->
         <aside class="fixed inset-y-0 left-0 z-40 w-56 border-r border-slate-200 bg-slate-50/80 hidden lg:flex lg:flex-col">
             <div class="flex flex-col h-full">
-                <!-- Logo + chevron + collapse -->
-                <div class="h-14 px-4 flex items-center justify-between border-b border-slate-200 bg-white/80 shrink-0">
-                    <div class="flex items-center gap-1 min-w-0">
-                        <Link href="/dashboard" class="flex items-center gap-2 min-w-0">
-                            <img v-if="page.props.app?.logo" :src="page.props.app.logo" alt="" class="h-8 w-auto max-w-[120px] object-contain object-left" />
-                            <span v-else class="text-base font-semibold text-slate-900 truncate">{{ page.props.app?.name || 'Certy' }}</span>
-                        </Link>
-                        <button type="button" class="p-0.5 text-slate-400 hover:text-slate-600 rounded" aria-label="Menu">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths.chevronDown" />
-                            </svg>
-                        </button>
-                        <button type="button" class="p-0.5 text-slate-400 hover:text-slate-600 rounded" aria-label="Réduire">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                            </svg>
-                        </button>
-                    </div>
+                <!-- Logo -->
+                <div class="h-14 px-4 flex items-center border-b border-slate-200 bg-white/80 shrink-0">
+                    <Link href="/dashboard" class="flex items-center min-w-0" :aria-label="`${appName}, accueil`">
+                        <img
+                            v-if="page.props.app?.logo && !logoError"
+                            :src="page.props.app.logo"
+                            :alt="appName"
+                            class="h-8 w-auto max-w-[120px] object-contain object-left shrink-0"
+                            @error="onLogoError"
+                        />
+                        <span v-else class="text-base font-semibold text-slate-900 truncate">{{ appName }}</span>
+                    </Link>
                 </div>
                 <!-- Recherche -->
                 <div class="px-3 py-3 shrink-0">
@@ -373,17 +379,222 @@ const iconPaths = {
             </div>
         </aside>
 
-        <!-- Mobile header -->
-        <header class="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 border-b border-slate-200 flex items-center px-4 bg-white">
-            <Link href="/dashboard" class="flex items-center">
-                <img v-if="page.props.app?.logo" :src="page.props.app.logo" alt="" class="h-7 w-auto max-w-[100px] object-contain" />
-                <span v-else class="text-base font-semibold text-slate-900">{{ page.props.app?.name || 'Certy' }}</span>
-            </Link>
+        <!-- Mobile header : hamburger + cloche + avatar sur la même ligne -->
+        <header class="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 border-b border-slate-200 flex items-center justify-between gap-2 px-3 sm:px-4 bg-white">
+            <button
+                type="button"
+                class="p-2 -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg shrink-0"
+                aria-label="Ouvrir le menu"
+                @click="mobileMenuOpen = true"
+            >
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+            <div class="flex items-center gap-0.5 shrink-0">
+                <div ref="notifMenuRefMobile" class="relative">
+                    <button
+                        @click.stop="openNotifMenu"
+                        class="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                        aria-label="Notifications"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                    </button>
+                    <Transition
+                        enter-active-class="transition ease-out duration-100"
+                        enter-from-class="opacity-0 scale-95"
+                        enter-to-class="opacity-100 scale-100"
+                        leave-active-class="transition ease-in duration-75"
+                        leave-from-class="opacity-100 scale-100"
+                        leave-to-class="opacity-0 scale-95"
+                    >
+                        <div
+                            v-show="notifMenuOpen"
+                            class="absolute right-0 mt-1 w-72 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50"
+                        >
+                            <div class="px-4 py-3 border-b border-slate-100">
+                                <p class="text-sm font-medium text-slate-900">Notifications</p>
+                            </div>
+                            <div class="py-8 px-4 text-center">
+                                <svg class="w-10 h-10 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                </svg>
+                                <p class="text-sm text-slate-500">Aucune notification</p>
+                            </div>
+                        </div>
+                    </Transition>
+                </div>
+                <div ref="userMenuRefMobile" class="relative">
+                    <button
+                        @click.stop="openUserMenu"
+                        class="flex items-center gap-1.5 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                    >
+                        <span class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 text-sm font-medium flex items-center justify-center shrink-0">
+                            {{ getInitials(auth?.user?.name) }}
+                        </span>
+                        <svg class="w-4 h-4 text-slate-500 shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <Transition
+                        enter-active-class="transition ease-out duration-100"
+                        enter-from-class="opacity-0 scale-95"
+                        enter-to-class="opacity-100 scale-100"
+                        leave-active-class="transition ease-in duration-75"
+                        leave-from-class="opacity-100 scale-100"
+                        leave-to-class="opacity-0 scale-95"
+                    >
+                        <div
+                            v-show="userMenuOpen"
+                            class="absolute right-0 mt-1 w-56 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50"
+                        >
+                            <div class="px-4 py-2 border-b border-slate-100">
+                                <p class="text-xs text-slate-500">Connecté en tant que</p>
+                                <p class="text-sm font-medium text-slate-900 truncate">{{ auth?.user?.name }}</p>
+                            </div>
+                            <Link href="/settings/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" @click="userMenuOpen = false">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                                Profil
+                            </Link>
+                            <button
+                                @click="userMenuOpen = false; router.post('/logout')"
+                                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 text-left"
+                            >
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                                Déconnexion
+                            </button>
+                        </div>
+                    </Transition>
+                </div>
+            </div>
         </header>
 
+        <!-- Mobile menu drawer -->
+        <Teleport to="body">
+            <Transition
+                enter-active-class="transition ease-out duration-200"
+                enter-from-class="opacity-0"
+                enter-to-class="opacity-100"
+                leave-active-class="transition ease-in duration-150"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0"
+            >
+                <div
+                    v-if="mobileMenuOpen"
+                    class="fixed inset-0 z-50 lg:hidden"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Menu de navigation"
+                >
+                    <div class="absolute inset-0 bg-slate-900/50" @click="mobileMenuOpen = false" />
+                    <div class="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-white shadow-xl flex flex-col">
+                        <div class="h-14 px-4 flex items-center justify-between border-b border-slate-200 shrink-0">
+                            <Link href="/dashboard" class="flex items-center gap-2 min-w-0" @click="mobileMenuOpen = false">
+                                <img
+                                    v-if="page.props.app?.logo && !logoError"
+                                    :src="page.props.app.logo"
+                                    :alt="appName"
+                                    class="h-7 w-auto max-w-[100px] object-contain"
+                                />
+                                <span v-else class="text-base font-semibold text-slate-900">{{ appName }}</span>
+                            </Link>
+                            <button
+                                type="button"
+                                class="p-2 text-slate-500 hover:bg-slate-100 rounded-lg"
+                                aria-label="Fermer le menu"
+                                @click="mobileMenuOpen = false"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <nav class="flex-1 overflow-y-auto p-3 space-y-1">
+                            <template v-for="item in navItems" :key="item.href">
+                                <Link
+                                    v-if="!item.comingSoon"
+                                    :href="item.href"
+                                    class="flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg"
+                                    :class="isActive(item.href) ? 'text-brand-primary bg-brand-primary/10 font-medium' : 'text-slate-600 hover:bg-slate-100'"
+                                    @click="mobileMenuOpen = false"
+                                >
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths[item.icon] || iconPaths.home" />
+                                    </svg>
+                                    {{ item.label }}
+                                </Link>
+                            </template>
+                            <div class="pt-3 mt-3 border-t border-slate-200 space-y-0.5">
+                                <p class="px-3 py-1.5 text-xs font-medium text-slate-400 uppercase tracking-wider">Digital</p>
+                                <Link
+                                    v-for="d in digitalItems"
+                                    :key="d.href"
+                                    :href="d.href"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg"
+                                    :class="page.url.startsWith(d.href) ? 'text-brand-primary bg-brand-primary/10' : 'text-slate-600 hover:bg-slate-100'"
+                                    @click="mobileMenuOpen = false"
+                                >
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths[d.icon] || iconPaths.external" />
+                                    </svg>
+                                    {{ d.label }}
+                                </Link>
+                            </div>
+                            <div class="pt-2 space-y-0.5">
+                                <p class="px-3 py-1.5 text-xs font-medium text-slate-400 uppercase tracking-wider">Référentiel</p>
+                                <Link
+                                    v-for="r in referentialItems"
+                                    :key="r.href"
+                                    :href="r.href"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg"
+                                    :class="page.url.startsWith(r.href) ? 'text-brand-primary bg-brand-primary/10' : 'text-slate-600 hover:bg-slate-100'"
+                                    @click="mobileMenuOpen = false"
+                                >
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths[r.icon] || iconPaths.menuAlt" />
+                                    </svg>
+                                    {{ r.label }}
+                                </Link>
+                            </div>
+                            <div class="pt-2 space-y-0.5">
+                                <p class="px-3 py-1.5 text-xs font-medium text-slate-400 uppercase tracking-wider">Paramètres</p>
+                                <Link
+                                    v-for="s in settingsItems"
+                                    :key="s.href"
+                                    :href="s.href"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg"
+                                    :class="page.url.startsWith(s.href) ? 'text-brand-primary bg-brand-primary/10' : 'text-slate-600 hover:bg-slate-100'"
+                                    @click="mobileMenuOpen = false"
+                                >
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths[s.icon] || iconPaths.user" />
+                                    </svg>
+                                    {{ s.label }}
+                                </Link>
+                            </div>
+                        </nav>
+                        <div class="p-3 border-t border-slate-200">
+                            <div class="flex items-center gap-3 px-3 py-2">
+                                <span class="w-9 h-9 rounded-full bg-brand-primary/15 text-brand-primary text-sm font-semibold flex items-center justify-center shrink-0">
+                                    {{ getInitials(auth?.user?.name) }}
+                                </span>
+                                <span class="text-sm text-slate-700 truncate">{{ auth?.user?.name }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
         <!-- Main -->
-        <main class="lg:pl-56 pt-14 lg:pt-0 min-h-screen flex flex-col">
-            <header class="sticky top-0 z-30 h-14 shrink-0 border-b border-slate-200 flex items-center justify-end px-4 lg:px-8 bg-white">
+        <main class="lg:pl-56 pt-14 lg:pt-0 min-h-screen flex flex-col min-w-0">
+            <header class="hidden lg:flex sticky top-0 z-30 h-14 shrink-0 border-b border-slate-200 items-center justify-end px-3 sm:px-4 lg:px-6 xl:px-8 bg-white">
                 <div class="flex items-center gap-2 sm:gap-3">
                     <div ref="notifMenuRef" class="relative">
                         <button
@@ -405,7 +616,7 @@ const iconPaths = {
                         >
                             <div
                                 v-show="notifMenuOpen"
-                                class="absolute right-0 mt-1 w-80 py-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50"
+                                class="absolute right-0 mt-1 w-72 sm:w-80 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50"
                             >
                                 <div class="px-4 py-3 border-b border-slate-100">
                                     <p class="text-sm font-medium text-slate-900">Notifications</p>
@@ -442,7 +653,7 @@ const iconPaths = {
                         >
                             <div
                                 v-show="userMenuOpen"
-                                class="absolute right-0 mt-1 w-56 py-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50"
+                                class="absolute right-0 mt-1 w-56 max-w-[calc(100vw-2rem)] py-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50"
                             >
                                 <div class="px-4 py-2 border-b border-slate-100">
                                     <p class="text-xs text-slate-500">Connecté en tant que</p>
@@ -468,10 +679,10 @@ const iconPaths = {
                     </div>
                 </div>
             </header>
-            <div v-if="$slots.header" class="shrink-0 border-b border-slate-200 px-4 lg:px-8 py-5 bg-white">
+            <div v-if="$slots.header" class="shrink-0 border-b border-slate-200 px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-5 bg-white">
                 <slot name="header" />
             </div>
-            <div class="flex-1 min-h-0 flex flex-col p-4 lg:p-8">
+            <div class="flex-1 min-h-0 flex flex-col p-3 sm:p-4 lg:p-6 xl:p-8 min-w-0 overflow-x-hidden">
                 <slot />
             </div>
         </main>

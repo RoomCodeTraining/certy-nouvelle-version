@@ -67,7 +67,7 @@ function destroy(vehicle, label) {
                 <template #actions>
                     <Link
                         :href="route('vehicles.create')"
-                        class="inline-flex items-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800"
+                        class="inline-flex items-center justify-center w-full sm:w-auto min-h-[44px] sm:min-h-0 px-4 py-3 sm:py-2 bg-slate-900 text-white text-sm font-medium rounded-xl sm:rounded-lg hover:bg-slate-800"
                     >
                         Ajouter un véhicule
                     </Link>
@@ -91,7 +91,32 @@ function destroy(vehicle, label) {
         </TableFilters>
 
         <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
-            <DataTable
+            <!-- Mobile : liste en cartes -->
+            <div class="md:hidden divide-y divide-slate-100">
+                <div
+                    v-for="row in (vehicles?.data ?? [])"
+                    :key="row.id"
+                    class="p-4"
+                >
+                    <Link :href="route('vehicles.show', row.id)" class="block active:bg-slate-50/80 rounded-lg -m-2 p-2 transition-colors">
+                        <p class="font-medium text-slate-900">{{ row.registration_number ?? '—' }}</p>
+                        <p class="text-sm text-slate-700 mt-0.5">{{ row.brand?.name ?? '—' }} {{ row.model?.name ?? '' }}</p>
+                        <p class="text-xs text-slate-500 mt-1">{{ row.reference ?? '—' }}</p>
+                    </Link>
+                    <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-100">
+                        <DataTableAction label="Voir" :to="route('vehicles.show', row.id)" icon="eye" />
+                        <DataTableAction label="Modifier" :to="route('vehicles.edit', row.id)" icon="edit" />
+                        <DataTableAction label="Supprimer" variant="danger" icon="trash" @click="destroy(row, (row.brand?.name + ' ' + row.model?.name) || row.registration_number)" />
+                    </div>
+                </div>
+                <div v-if="!(vehicles?.data?.length)" class="py-10 px-4 text-center text-slate-500 text-sm">
+                    Aucun véhicule. Créez d'abord un client puis ajoutez un véhicule depuis sa fiche.
+                </div>
+            </div>
+
+            <!-- Desktop : tableau -->
+            <div class="hidden md:block overflow-hidden">
+                <DataTable
                 :data="vehicles.data ?? []"
                 :columns="columns"
                 row-key="id"
@@ -102,7 +127,8 @@ function destroy(vehicle, label) {
                     <DataTableAction label="Modifier" :to="route('vehicles.edit', row.id)" icon="edit" />
                     <DataTableAction label="Supprimer" variant="danger" icon="trash" @click="destroy(row, (row.brand?.name + ' ' + row.model?.name) || row.registration_number)" />
                 </template>
-            </DataTable>
+                </DataTable>
+            </div>
             <Paginator
                 v-if="vehicles"
                 :paginator="vehicles"

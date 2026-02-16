@@ -93,16 +93,33 @@ const columns = [
                 <h2 class="text-sm font-semibold text-slate-900">Liste des rattachements</h2>
                 <Link href="/digital/rattachements" class="text-sm text-slate-600 hover:text-slate-900 font-medium">Actualiser</Link>
             </div>
-            <DataTable
-                :data="list"
-                :columns="columns"
-                :row-key="(row) => row.id"
-                empty-message="Aucun rattachement."
-            >
-                <template #actions>
-                    <span class="text-slate-400">—</span>
-                </template>
-            </DataTable>
+            <!-- Mobile : liste en cartes -->
+            <div class="md:hidden divide-y divide-slate-100">
+                <div v-for="row in list" :key="row.id" class="p-4">
+                    <p class="text-xs text-slate-500">{{ row.formatted_created_at ?? formatDate(row.created_at) }}</p>
+                    <p class="font-medium text-slate-900 mt-0.5">{{ row.owner?.name ?? '—' }} {{ row.owner?.code ? `(${row.owner.code})` : '' }}</p>
+                    <p class="text-sm text-slate-700 mt-1">→ {{ row.related?.name ?? '—' }} {{ row.related?.code ? `(${row.related.code})` : '' }}</p>
+                    <span
+                        :class="['inline-flex mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium', row.is_disabled ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800']"
+                    >
+                        {{ row.is_disabled ? 'Désactivé' : 'Actif' }}
+                    </span>
+                </div>
+                <div v-if="!list.length" class="py-10 px-4 text-center text-slate-500 text-sm">Aucun rattachement.</div>
+            </div>
+            <!-- Desktop : tableau -->
+            <div class="hidden md:block">
+                <DataTable
+                    :data="list"
+                    :columns="columns"
+                    :row-key="(row) => row.id"
+                    empty-message="Aucun rattachement."
+                >
+                    <template #actions>
+                        <span class="text-slate-400">—</span>
+                    </template>
+                </DataTable>
+            </div>
         </div>
     </DashboardLayout>
 </template>

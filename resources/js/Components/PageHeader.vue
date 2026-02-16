@@ -44,7 +44,7 @@ const displayTitle = computed(() => {
                 {{ displayTitle }}
             </h1>
         </div>
-        <div v-if="$slots.actions" class="flex items-center gap-2 shrink-0">
+        <div v-if="$slots.actions" class="w-full sm:w-auto flex items-center gap-2 shrink-0">
             <slot name="actions" />
         </div>
     </div>

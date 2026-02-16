@@ -108,7 +108,7 @@ function enableUser(row) {
                 <template #actions>
                     <Link
                         :href="route('digital.utilisateurs.create')"
-                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800"
+                        class="inline-flex items-center justify-center w-full sm:w-auto min-h-[44px] sm:min-h-0 gap-2 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800"
                     >
                         Créer un utilisateur
                     </Link>
@@ -129,14 +129,18 @@ function enableUser(row) {
                 <h2 class="text-sm font-semibold text-slate-900">Liste des utilisateurs</h2>
                 <Link href="/digital/utilisateurs" class="text-sm text-slate-600 hover:text-slate-900 font-medium">Actualiser</Link>
             </div>
-            <DataTable
-                :data="list"
-                :columns="columns"
-                :row-key="(row) => row.id ?? row.email"
-                empty-message="Aucun utilisateur."
-            >
-                <template #actions="{ row }">
-                    <div class="flex items-center gap-1">
+            <!-- Mobile : liste en cartes -->
+            <div class="md:hidden divide-y divide-slate-100">
+                <div v-for="row in list" :key="id(row)" class="p-4">
+                    <p class="font-medium text-slate-900">{{ row.name ?? ([row.first_name, row.last_name].filter(Boolean).join(' ') || row.username || '—') }}</p>
+                    <p class="text-xs text-slate-500 mt-0.5">{{ row.username ?? '' }}</p>
+                    <p class="text-sm text-slate-700 mt-1">{{ row.email ?? '—' }}</p>
+                    <span
+                        :class="['inline-flex mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium', row.is_disabled ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800']"
+                    >
+                        {{ row.is_disabled ? 'Désactivé' : 'Actif' }}
+                    </span>
+                    <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-100">
                         <DataTableAction label="Modifier" icon="edit" :to="route('digital.utilisateurs.edit', id(row))" />
                         <template v-if="row.is_disabled">
                             <DataTableAction label="Activer" icon="eye" @click="enableUser(row)" />
@@ -145,8 +149,30 @@ function enableUser(row) {
                             <DataTableAction label="Désactiver" icon="x" variant="danger" @click="disableUser(row)" />
                         </template>
                     </div>
-                </template>
-            </DataTable>
+                </div>
+                <div v-if="!list.length" class="py-10 px-4 text-center text-slate-500 text-sm">Aucun utilisateur.</div>
+            </div>
+            <!-- Desktop : tableau -->
+            <div class="hidden md:block">
+                <DataTable
+                    :data="list"
+                    :columns="columns"
+                    :row-key="(row) => row.id ?? row.email"
+                    empty-message="Aucun utilisateur."
+                >
+                    <template #actions="{ row }">
+                        <div class="flex items-center gap-1">
+                            <DataTableAction label="Modifier" icon="edit" :to="route('digital.utilisateurs.edit', id(row))" />
+                            <template v-if="row.is_disabled">
+                                <DataTableAction label="Activer" icon="eye" @click="enableUser(row)" />
+                            </template>
+                            <template v-else>
+                                <DataTableAction label="Désactiver" icon="x" variant="danger" @click="disableUser(row)" />
+                            </template>
+                        </div>
+                    </template>
+                </DataTable>
+            </div>
         </div>
     </DashboardLayout>
 </template>

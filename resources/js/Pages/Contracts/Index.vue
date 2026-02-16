@@ -89,6 +89,10 @@ const hasActiveFilters = computed(() => !!(
     props.filters?.search || props.filters?.status || props.filters?.date_from || props.filters?.date_to
 ));
 
+const statusLabelsMap = { draft: 'Brouillon', validated: 'Validé', active: 'Actif', cancelled: 'Annulé', expired: 'Expiré' };
+function statusLabelFor(status) {
+    return statusLabelsMap[status] ?? status ?? '—';
+}
 function canEdit(row) {
     return row.status === 'draft';
 }
@@ -115,7 +119,7 @@ function cancel(contract, label) {
                 <template #actions>
                     <Link
                         :href="route('contracts.create')"
-                        class="inline-flex items-center justify-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800"
+                        class="inline-flex items-center justify-center w-full sm:w-auto min-h-[44px] sm:min-h-0 px-4 py-3 sm:py-2 bg-slate-900 text-white text-sm font-medium rounded-xl sm:rounded-lg hover:bg-slate-800"
                     >
                         Nouveau contrat
                     </Link>
@@ -167,47 +171,73 @@ function cancel(contract, label) {
         </TableFilters>
 
         <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
-            <DataTable
-                :data="contracts.data ?? []"
-                :columns="columns"
-                row-key="id"
-                empty-message="Aucun contrat."
-            >
-                <template #actions="{ row }">
-                    <DataTableAction
-                        label="Voir le détail"
-                        :to="route('contracts.show', row.id)"
-                        icon="eye"
-                    />
-                    <DataTableAction
-                        label="Télécharger le contrat (PDF)"
-                        :href="route('contracts.pdf', row.id)"
-                        icon="download"
-                        external
-                    />
-                    <DataTableAction
-                        label="Renouveler"
-                        :to="route('contracts.renew', row.id)"
-                        icon="refresh"
-                    />
-                    <DataTableAction
-                        v-if="canEdit(row)"
-                        label="Modifier"
-                        :to="route('contracts.edit', row.id)"
-                        icon="edit"
-                    />
-                    <DataTableAction
-                        v-if="canCancel(row)"
-                        label="Annuler le contrat"
-                        variant="warning"
-                        icon="x"
-                        @click="cancel(row, (contractReference(row) + ' – ' + (contractTypeLabel(row.contract_type) || '') + ' ' + (row.company?.name || '')))"
-                    />
-                </template>
-                <template #empty>
-                    Aucun contrat. <Link :href="route('contracts.create')" class="text-slate-900 underline">Créer un contrat</Link>
-                </template>
-            </DataTable>
+            <!-- Mobile : liste en cartes -->
+            <div class="md:hidden divide-y divide-slate-100">
+                <div
+                    v-for="row in (contracts?.data ?? [])"
+                    :key="row.id"
+                    class="p-4"
+                >
+                    <Link :href="route('contracts.show', row.id)" class="block active:bg-slate-50/80 rounded-lg -m-2 p-2 transition-colors">
+                        <p class="font-mono text-sm font-medium text-slate-900">{{ contractReference(row) }}</p>
+                        <p class="text-sm text-slate-700 mt-0.5">{{ contractTypeLabel(row.contract_type) }}</p>
+                        <p class="text-xs text-slate-500 mt-1">{{ row.vehicle?.registration_number ?? [row.vehicle?.brand?.name, row.vehicle?.model?.name].filter(Boolean).join(' ') ?? '—' }}</p>
+                        <p class="text-xs text-slate-500 mt-0.5">{{ formatDate(row.start_date) }} → {{ formatDate(row.end_date) }}</p>
+                        <div class="flex items-center justify-between gap-2 mt-2">
+                            <span
+                                class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                :class="row.status === 'active' || row.status === 'validated' ? 'bg-emerald-100 text-emerald-800' : ['cancelled', 'expired'].includes(row.status) ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-800'"
+                            >
+                                {{ statusLabelFor(row.status) }}
+                            </span>
+                            <span class="text-sm font-medium text-slate-900">{{ row.total_amount != null ? Number(row.total_amount).toLocaleString('fr-FR') + ' FCFA' : '—' }}</span>
+                        </div>
+                    </Link>
+                    <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-100">
+                        <DataTableAction label="Voir" :to="route('contracts.show', row.id)" icon="eye" />
+                        <DataTableAction label="PDF" :href="route('contracts.pdf', row.id)" icon="download" external />
+                        <DataTableAction label="Renouveler" :to="route('contracts.renew', row.id)" icon="refresh" />
+                        <DataTableAction v-if="canEdit(row)" label="Modifier" :to="route('contracts.edit', row.id)" icon="edit" />
+                        <DataTableAction
+                            v-if="canCancel(row)"
+                            label="Annuler"
+                            variant="warning"
+                            icon="x"
+                            @click="cancel(row, (contractReference(row) + ' – ' + (contractTypeLabel(row.contract_type) || '') + ' ' + (row.company?.name || '')))"
+                        />
+                    </div>
+                </div>
+                <div v-if="!(contracts?.data?.length)" class="py-10 px-4 text-center text-slate-500 text-sm">
+                    Aucun contrat. <Link :href="route('contracts.create')" class="text-sky-600 hover:underline block mt-2">Créer un contrat</Link>
+                </div>
+            </div>
+
+            <!-- Desktop : tableau -->
+            <div class="hidden md:block overflow-hidden">
+                <DataTable
+                    :data="contracts.data ?? []"
+                    :columns="columns"
+                    row-key="id"
+                    empty-message="Aucun contrat."
+                >
+                    <template #actions="{ row }">
+                        <DataTableAction label="Voir le détail" :to="route('contracts.show', row.id)" icon="eye" />
+                        <DataTableAction label="Télécharger le contrat (PDF)" :href="route('contracts.pdf', row.id)" icon="download" external />
+                        <DataTableAction label="Renouveler" :to="route('contracts.renew', row.id)" icon="refresh" />
+                        <DataTableAction v-if="canEdit(row)" label="Modifier" :to="route('contracts.edit', row.id)" icon="edit" />
+                        <DataTableAction
+                            v-if="canCancel(row)"
+                            label="Annuler le contrat"
+                            variant="warning"
+                            icon="x"
+                            @click="cancel(row, (contractReference(row) + ' – ' + (contractTypeLabel(row.contract_type) || '') + ' ' + (row.company?.name || '')))"
+                        />
+                    </template>
+                    <template #empty>
+                        Aucun contrat. <Link :href="route('contracts.create')" class="text-slate-900 underline">Créer un contrat</Link>
+                    </template>
+                </DataTable>
+            </div>
             <Paginator
                 v-if="contracts"
                 :paginator="contracts"

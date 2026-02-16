@@ -167,18 +167,20 @@ function cancelTransaction(row) {
         <template #header>
             <PageHeader :breadcrumbs="breadcrumbs" title="Gestion des Stocks">
                 <template #actions>
-                    <Link
-                        :href="route('digital.stock.create')"
-                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800"
-                    >
-                        Demande de stock
-                    </Link>
-                    <Link
-                        :href="route('digital.stock')"
-                        class="inline-flex items-center px-4 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50"
-                    >
-                        Actualiser
-                    </Link>
+                    <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        <Link
+                            :href="route('digital.stock.create')"
+                            class="inline-flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0 px-4 py-3 sm:py-2 rounded-xl sm:rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800"
+                        >
+                            Demande de stock
+                        </Link>
+                        <Link
+                            :href="route('digital.stock')"
+                            class="inline-flex items-center justify-center min-h-[44px] sm:min-h-0 px-4 py-3 sm:py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-xl sm:rounded-lg hover:bg-slate-50"
+                        >
+                            Actualiser
+                        </Link>
+                    </div>
                 </template>
             </PageHeader>
         </template>
@@ -255,12 +257,33 @@ function cancelTransaction(row) {
                         Exporter
                     </a>
                 </div>
-                <DataTable
-                    :data="detailList"
-                    :columns="detailColumns"
-                    :row-key="(row) => `${row.company}-${row.type}-${row.office_code ?? ''}`"
-                    empty-message="Aucun détail de stock."
-                />
+                <!-- Mobile : cartes -->
+                <div class="md:hidden divide-y divide-slate-100">
+                    <div
+                        v-for="(r, i) in detailList"
+                        :key="`${r.company}-${r.type}-${r.office_code ?? ''}-${i}`"
+                        class="p-4"
+                    >
+                        <p class="font-medium text-slate-900">{{ (r.type ?? '—').toUpperCase() }}</p>
+                        <p class="text-sm text-slate-700 mt-0.5">{{ r.company ?? '—' }}</p>
+                        <p class="text-xs text-slate-500 mt-1">Total: {{ r.total ?? '—' }} · Utilisé: {{ r.used ?? '—' }} · Disponible: {{ r.available ?? '—' }}</p>
+                        <span
+                            :class="['inline-flex mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium', r.status === 'Épuisé' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800']"
+                        >
+                            {{ r.status ?? 'Bon' }}
+                        </span>
+                    </div>
+                    <div v-if="!detailList.length" class="py-8 px-4 text-center text-slate-500 text-sm">Aucun détail de stock.</div>
+                </div>
+                <!-- Desktop : tableau -->
+                <div class="hidden md:block">
+                    <DataTable
+                        :data="detailList"
+                        :columns="detailColumns"
+                        :row-key="(row) => `${row.company}-${row.type}-${row.office_code ?? ''}`"
+                        empty-message="Aucun détail de stock."
+                    />
+                </div>
             </div>
 
             <!-- Demandes de stock d'attestations -->
@@ -272,22 +295,46 @@ function cancelTransaction(row) {
                 <div class="px-4 py-2 border-b border-slate-100 text-sm text-slate-500">
                     {{ transactionsList.length }} demande(s)
                 </div>
-                <DataTable
-                    :data="transactionsList"
-                    :columns="historyColumns"
-                    :row-key="(row) => row.id ?? row.reference ?? String(Math.random())"
-                    empty-message="Aucune demande de stock d'attestations."
-                >
-                    <template #actions="{ row }">
+                <!-- Mobile : cartes -->
+                <div class="md:hidden divide-y divide-slate-100">
+                    <div
+                        v-for="row in transactionsList"
+                        :key="row.id ?? row.reference ?? Math.random()"
+                        class="p-4"
+                    >
+                        <p class="text-xs text-slate-500">{{ row.formatted_created_at ?? formatDate(row.created_at) }}</p>
+                        <p class="font-medium text-slate-900 mt-0.5">{{ row.reference ?? row.id ?? '—' }}</p>
+                        <p class="text-sm text-slate-700">Quantité: {{ row.quantity ?? '—' }} · {{ (typeof row.certificate_type === 'object' && row.certificate_type) ? (row.certificate_type.name ?? row.certificate_type.code ?? '—') : (row.type?.label ?? row.type?.name ?? '—') }}</p>
+                        <p class="text-xs text-slate-500 mt-0.5">{{ (typeof row.status === 'object' && row.status) ? (row.status.label ?? row.status.name ?? '—') : (row.status ?? '—') }}</p>
                         <button
                             type="button"
-                            class="text-sm text-red-600 hover:text-red-700 font-medium"
+                            class="mt-2 text-sm text-red-600 hover:text-red-700 font-medium"
                             @click="cancelTransaction(row)"
                         >
                             Annuler
                         </button>
-                    </template>
-                </DataTable>
+                    </div>
+                    <div v-if="!transactionsList.length" class="py-8 px-4 text-center text-slate-500 text-sm">Aucune demande de stock.</div>
+                </div>
+                <!-- Desktop : tableau -->
+                <div class="hidden md:block">
+                    <DataTable
+                        :data="transactionsList"
+                        :columns="historyColumns"
+                        :row-key="(row) => row.id ?? row.reference ?? String(Math.random())"
+                        empty-message="Aucune demande de stock d'attestations."
+                    >
+                        <template #actions="{ row }">
+                            <button
+                                type="button"
+                                class="text-sm text-red-600 hover:text-red-700 font-medium"
+                                @click="cancelTransaction(row)"
+                            >
+                                Annuler
+                            </button>
+                        </template>
+                    </DataTable>
+                </div>
             </div>
         </div>
     </DashboardLayout>

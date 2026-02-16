@@ -60,7 +60,7 @@ function destroy(client, clientName) {
                 <template #actions>
                     <Link
                         :href="route('clients.create')"
-                        class="inline-flex items-center justify-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800"
+                        class="inline-flex items-center justify-center w-full sm:w-auto min-h-[44px] sm:min-h-0 px-4 py-3 sm:py-2 bg-slate-900 text-white text-sm font-medium rounded-xl sm:rounded-lg hover:bg-slate-800"
                     >
                         Nouveau client
                     </Link>
@@ -88,22 +88,49 @@ function destroy(client, clientName) {
             <input type="hidden" name="per_page" :value="clients?.per_page ?? 25" />
         </TableFilters>
 
-        <div class="overflow-hidden">
-            <DataTable
-                :data="clients.data ?? []"
-                :columns="columns"
-                row-key="id"
-                empty-message="Aucun client."
-            >
-                <template #actions="{ row }">
-                    <DataTableAction label="Voir le détail" :to="route('clients.show', row.id)" icon="eye" />
-                    <DataTableAction label="Modifier" :to="route('clients.edit', row.id)" icon="edit" />
-                    <DataTableAction label="Supprimer" variant="danger" icon="trash" @click="destroy(row, row.full_name)" />
-                </template>
-                <template #empty>
-                    Aucun client. <Link :href="route('clients.create')" class="text-slate-900 underline">Créer un client</Link>
-                </template>
-            </DataTable>
+        <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
+            <!-- Mobile : liste en cartes -->
+            <div class="md:hidden divide-y divide-slate-100">
+                <div
+                    v-for="row in (clients?.data ?? [])"
+                    :key="row.id"
+                    class="p-4"
+                >
+                    <Link :href="route('clients.show', row.id)" class="block active:bg-slate-50/80 rounded-lg -m-2 p-2 transition-colors">
+                        <p class="font-medium text-slate-900">{{ row.full_name ?? '—' }}</p>
+                        <p class="text-sm text-slate-600 mt-0.5">{{ row.reference ?? '—' }}</p>
+                        <p class="text-xs text-slate-500 mt-1 truncate">{{ row.email ?? '—' }}</p>
+                        <p class="text-xs text-slate-500 truncate">{{ row.phone ?? '—' }}</p>
+                    </Link>
+                    <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-100">
+                        <DataTableAction label="Voir" :to="route('clients.show', row.id)" icon="eye" />
+                        <DataTableAction label="Modifier" :to="route('clients.edit', row.id)" icon="edit" />
+                        <DataTableAction label="Supprimer" variant="danger" icon="trash" @click="destroy(row, row.full_name)" />
+                    </div>
+                </div>
+                <div v-if="!(clients?.data?.length)" class="py-10 px-4 text-center text-slate-500 text-sm">
+                    Aucun client. <Link :href="route('clients.create')" class="text-sky-600 hover:underline block mt-2">Créer un client</Link>
+                </div>
+            </div>
+
+            <!-- Desktop : tableau -->
+            <div class="hidden md:block overflow-hidden">
+                <DataTable
+                    :data="clients.data ?? []"
+                    :columns="columns"
+                    row-key="id"
+                    empty-message="Aucun client."
+                >
+                    <template #actions="{ row }">
+                        <DataTableAction label="Voir le détail" :to="route('clients.show', row.id)" icon="eye" />
+                        <DataTableAction label="Modifier" :to="route('clients.edit', row.id)" icon="edit" />
+                        <DataTableAction label="Supprimer" variant="danger" icon="trash" @click="destroy(row, row.full_name)" />
+                    </template>
+                    <template #empty>
+                        Aucun client. <Link :href="route('clients.create')" class="text-slate-900 underline">Créer un client</Link>
+                    </template>
+                </DataTable>
+            </div>
             <Paginator
                 v-if="clients"
                 :paginator="clients"

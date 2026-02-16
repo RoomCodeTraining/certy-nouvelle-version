@@ -282,37 +282,83 @@ const columns = [
                     </button>
                 </form>
             </div>
-            <DataTable
-                :data="list"
-                :columns="columns"
-                :row-key="(row) => row.reference ?? row.id ?? row.reference_id"
-                empty-message="Aucune attestation pour le moment."
-            >
-                <template #actions="{ row }">
-                    <template v-if="row.reference || row.download_link">
+            <!-- Mobile : liste en cartes -->
+            <div class="md:hidden divide-y divide-slate-100">
+                <div
+                    v-for="row in list"
+                    :key="row.reference ?? row.id ?? row.reference_id"
+                    class="p-4"
+                >
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <p class="font-mono text-sm font-medium text-slate-900">{{ row.reference ?? '—' }}</p>
+                            <p class="text-xs text-slate-500 mt-0.5">{{ formatDate(row.printed_at ?? row.issued_at ?? row.created_at) }}</p>
+                            <p class="text-sm text-slate-700 mt-1">{{ row.insured_name ?? row.assure ?? '—' }}</p>
+                            <p class="text-xs text-slate-500">{{ row.licence_plate ?? row.plaque ?? '—' }}</p>
+                            <p class="text-xs text-slate-500 mt-0.5">{{ formatPeriod(row) }}</p>
+                        </div>
+                        <span
+                            :class="['inline-flex px-2.5 py-1 rounded-full text-xs font-medium shrink-0', (typeof row.state === 'object' && row.state) ? 'bg-slate-100 text-slate-800' : 'bg-slate-100 text-slate-800']"
+                        >
+                            {{ (typeof row.state === 'object' && row.state) ? (row.state.label ?? row.state.name ?? '—') : (row.status ?? '—') }}
+                        </span>
+                    </div>
+                    <div v-if="row.reference || row.download_link" class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-100">
                         <button
                             type="button"
                             @click="openViewModal(row)"
-                            title="Visualiser l'attestation"
-                            class="inline-flex items-center justify-center p-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                            aria-label="Visualiser l'attestation"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
                         >
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                            Voir
                         </button>
-                        <span class="text-slate-300 mx-1">|</span>
                         <DataTableAction
-                            label="Télécharger PDF"
+                            label="Télécharger"
                             :href="row.download_link || route('digital.attestations.download', row.reference)"
                             icon="download"
                             external
                         />
+                    </div>
+                </div>
+                <div v-if="!list.length" class="py-10 px-4 text-center text-slate-500 text-sm">
+                    Aucune attestation pour le moment.
+                </div>
+            </div>
+
+            <!-- Desktop : tableau -->
+            <div class="hidden md:block">
+                <DataTable
+                    :data="list"
+                    :columns="columns"
+                    :row-key="(row) => row.reference ?? row.id ?? row.reference_id"
+                    empty-message="Aucune attestation pour le moment."
+                >
+                    <template #actions="{ row }">
+                        <template v-if="row.reference || row.download_link">
+                            <button
+                                type="button"
+                                @click="openViewModal(row)"
+                                title="Visualiser l'attestation"
+                                class="inline-flex items-center justify-center p-1.5 rounded text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                                aria-label="Visualiser l'attestation"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </button>
+                            <span class="text-slate-300 mx-1">|</span>
+                            <DataTableAction
+                                label="Télécharger PDF"
+                                :href="row.download_link || route('digital.attestations.download', row.reference)"
+                                icon="download"
+                                external
+                            />
+                        </template>
+                        <span v-else class="text-slate-400 text-sm">—</span>
                     </template>
-                    <span v-else class="text-slate-400 text-sm">—</span>
-                </template>
-            </DataTable>
+                </DataTable>
+            </div>
             <div class="px-4 py-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50">
                 <div class="flex items-center gap-4">
                     <span class="text-sm text-slate-600">{{ list.length }} attestation(s) sur cette page</span>

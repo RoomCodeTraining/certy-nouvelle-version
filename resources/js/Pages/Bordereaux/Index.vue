@@ -58,7 +58,7 @@ function formatXOF(value) {
                 <template #actions>
                     <Link
                         :href="route('bordereaux.create')"
-                        class="inline-flex items-center justify-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800"
+                        class="inline-flex items-center justify-center w-full sm:w-auto min-h-[44px] sm:min-h-0 px-4 py-3 sm:py-2 bg-slate-900 text-white text-sm font-medium rounded-xl sm:rounded-lg hover:bg-slate-800"
                     >
                         Nouveau bordereau
                     </Link>
@@ -117,7 +117,44 @@ function formatXOF(value) {
         </TableFilters>
 
         <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
-            <div class="overflow-x-auto">
+            <!-- Mobile : liste en cartes -->
+            <div class="md:hidden divide-y divide-slate-100">
+                <Link
+                    v-for="b in (bordereaux?.data ?? [])"
+                    :key="b.id"
+                    :href="route('bordereaux.show', b.id)"
+                    class="block p-4 active:bg-slate-50/80 transition-colors"
+                >
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <p class="font-mono text-sm font-medium text-slate-900">{{ bordereauReference(b) }}</p>
+                            <p class="text-sm text-slate-700 mt-0.5">{{ b.company?.name ?? '—' }}</p>
+                            <p class="text-xs text-slate-500 mt-1">{{ formatDate(b.period_start) }} → {{ formatDate(b.period_end) }}</p>
+                        </div>
+                        <div class="flex flex-col items-end gap-1.5 shrink-0">
+                            <span
+                                :class="[
+                                    'inline-flex px-2.5 py-1 rounded-full text-xs font-medium',
+                                    b.status === 'validated' || b.status === 'paid' ? 'bg-emerald-100 text-emerald-800' : b.status === 'approved' ? 'bg-sky-100 text-sky-800' : b.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-800',
+                                ]"
+                            >
+                                {{ statusLabels[b.status] ?? b.status ?? '—' }}
+                            </span>
+                            <p class="text-sm font-medium text-slate-900">{{ formatXOF(b.total_amount) }}</p>
+                        </div>
+                    </div>
+                </Link>
+                <div
+                    v-if="!(bordereaux?.data?.length)"
+                    class="py-10 px-4 text-center text-slate-500 text-sm"
+                >
+                    Aucun bordereau.
+                    <Link :href="route('bordereaux.create')" class="text-sky-600 hover:underline block mt-2">Créer un bordereau</Link>
+                </div>
+            </div>
+
+            <!-- Desktop : tableau -->
+            <div class="hidden md:block overflow-x-auto">
                 <table class="min-w-full divide-y divide-slate-200">
                     <thead class="bg-slate-50">
                         <tr>

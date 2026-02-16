@@ -19,8 +19,8 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'app' => [
-                'name' => config('app.name'),
-                'logo' => asset(config('app.logo')),
+                'name' => config('app.name', 'Certy'),
+                'logo' => config('app.logo') ? asset(config('app.logo')) : null,
             ],
             'flash' => [
                 'error' => $request->session()->get('error'),
