@@ -21,7 +21,7 @@ class StoreClientRequest extends FormRequest
             'address' => ['nullable', 'string'],
             'postal_address' => ['nullable', 'string'],
             'profession' => ['required', 'string', 'max:255'],
-            'type_assure' => ['nullable', 'in:'.Client::TYPE_TAPP.','.Client::TYPE_TAPM],
+            'type_assure' => ['required', 'in:'.Client::TYPE_TAPP.','.Client::TYPE_TAPM],
         ];
     }
 }

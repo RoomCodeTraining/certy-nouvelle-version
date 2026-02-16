@@ -272,8 +272,8 @@ class ContractController extends Controller
             'durationOptions' => $this->durationOptions(),
             'parentContract' => $parentContract,
             'typeAssureOptions' => [
-                ['value' => Client::TYPE_TAPP, 'label' => 'TAPP'],
-                ['value' => Client::TYPE_TAPM, 'label' => 'TAPM'],
+                ['value' => Client::TYPE_TAPP, 'label' => 'Personne physique (TAPP)'],
+                ['value' => Client::TYPE_TAPM, 'label' => 'Personne morale (TAPM)'],
             ],
             'vehicleBrands' => VehicleBrand::with('models:id,vehicle_brand_id,name')->get(['id', 'name']),
             'circulationZones' => CirculationZone::orderBy('name')->get(['id', 'name']),

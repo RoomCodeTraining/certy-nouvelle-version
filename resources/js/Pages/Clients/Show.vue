@@ -22,6 +22,13 @@ function formatXOF(value) {
     return new Intl.NumberFormat('fr-FR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value) + ' FCFA';
 }
 
+const typeAssureLabel = computed(() => {
+    const t = props.client?.type_assure;
+    if (t === 'TAPP') return 'Personne physique (TAPP)';
+    if (t === 'TAPM') return 'Personne morale (TAPM)';
+    return '—';
+});
+
 const statusLabels = { draft: 'Brouillon', validated: 'Validé', active: 'Actif', cancelled: 'Annulé', expired: 'Expiré' };
 function statusLabel(s) {
     return (s && statusLabels[s]) ? statusLabels[s] : s ?? '—';
@@ -121,7 +128,7 @@ function dealTypeLabel(c) {
                             </div>
                             <div>
                                 <dt class="text-slate-500">Type assuré</dt>
-                                <dd class="text-slate-900 mt-0.5">{{ client?.type_assure || '—' }}</dd>
+                                <dd class="text-slate-900 mt-0.5">{{ typeAssureLabel }}</dd>
                             </div>
                         </dl>
                     </div>
