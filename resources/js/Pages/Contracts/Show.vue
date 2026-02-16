@@ -322,7 +322,7 @@ function markAttestationIssued(contract) {
                             :href="route('digital.attestations')"
                             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
                         >
-                            Accéder à la plateforme attestations
+                            Consulter les attestations
                         </Link>
                     </template>
                     <a
