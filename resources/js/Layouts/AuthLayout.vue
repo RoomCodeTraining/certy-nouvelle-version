@@ -5,6 +5,12 @@ import FlashNotifications from "@/Components/FlashNotifications.vue";
 const page = usePage();
 const appName = page.props.app?.name || "Certy";
 const appLogo = page.props.app?.logo;
+
+const highlights = [
+    { text: "Gestion des contrats, véhicules et clients" },
+    { text: "Connectée à la plateforme digitale de l'ASACI" },
+    { text: "100 % dédiée aux courtiers" },
+];
 </script>
 
 <template>
@@ -44,29 +50,26 @@ const appLogo = page.props.app?.logo;
                                 Une plateforme purement dédiée aux courtiers, connectée à la plateforme digitale de l'ASACI. Gérez vos dossiers, suivez les échéances et pilotez votre activité au quotidien.
                             </p>
                             <ul class="mt-8 xl:mt-10 space-y-4 list-none p-0 m-0" role="list">
-                                <li class="flex items-start gap-3 text-white">
-                                    <span class="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center" aria-hidden="true">
-                                        <svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <li
+                                    v-for="(item, index) in highlights"
+                                    :key="index"
+                                    class="flex items-start gap-3 text-white/95"
+                                >
+                                    <span
+                                        class="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center"
+                                        aria-hidden="true"
+                                    >
+                                        <svg
+                                            class="w-3 h-3 text-emerald-400"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2.5"
+                                            viewBox="0 0 24 24"
+                                        >
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                                         </svg>
                                     </span>
-                                    <span>Gestion des contrats, véhicules et clients</span>
-                                </li>
-                                <li class="flex items-start gap-3 text-white">
-                                    <span class="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center" aria-hidden="true">
-                                        <svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    </span>
-                                    <span>Connectée à la plateforme digitale de l'ASACI</span>
-                                </li>
-                                <li class="flex items-start gap-3 text-white">
-                                    <span class="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center" aria-hidden="true">
-                                        <svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    </span>
-                                    <span>100 % dédiée aux courtiers</span>
+                                    <span class="text-sm xl:text-base leading-snug">{{ item.text }}</span>
                                 </li>
                             </ul>
                         </div>
