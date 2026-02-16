@@ -47,23 +47,23 @@ class AuthenticatedSessionController extends Controller
             ]);
         }
 
-        $userData = $externalService->getUser($token);
+        $raw = $externalService->getUser($token);
 
-        if ($userData === null) {
-            Log::warning('Auth: getUser a retourné null', ['baseUrl' => $externalService->baseUrl]);
+        if ($raw === null || ! is_array($raw)) {
+            Log::warning('Auth: getUser a retourné null ou non-array', ['baseUrl' => $externalService->baseUrl]);
             throw ValidationException::withMessages([
                 'email' => ['Réponse invalide du service externe (auth/user). Vérifiez storage/logs/laravel.log'],
             ]);
         }
 
-        $email = $userData['email']
-            ?? $userData['mail']
-            ?? (is_array($userData['data'] ?? null) ? ($userData['data']['email'] ?? $userData['data']['mail'] ?? null) : null)
-            ?? (is_array($userData['user'] ?? null) ? ($userData['user']['email'] ?? $userData['user']['mail'] ?? null) : null);
+        // Structure API : { status, message, data: { id, email, username, name, first_name, last_name, organization, current_office, role, ... } }
+        $userData = isset($raw['data']) && is_array($raw['data']) ? $raw['data'] : $raw;
+
+        $email = $userData['email'] ?? $userData['mail'] ?? null;
         if (! $email) {
             Log::debug('Auth: profil utilisateur sans email', ['userData' => $userData]);
             throw ValidationException::withMessages([
-                'email' => ['Impossible de récupérer le profil utilisateur (email manquant dans la réponse). Vérifiez storage/logs/laravel.log pour la structure renvoyée.'],
+                'email' => ['Impossible de récupérer le profil utilisateur (email manquant dans la réponse).'],
             ]);
         }
 
@@ -75,9 +75,18 @@ class AuthenticatedSessionController extends Controller
         return redirect()->intended(route('dashboard'))->with('success', 'Vous êtes connecté.');
     }
 
+    /**
+     * Synchronise l'utilisateur local avec le profil ASACI (auth/user).
+     * userData = payload utilisateur (data de la réponse API).
+     * Structure : id, email, username, name, first_name, last_name, organization: { code, name }, role: { name, label }, ...
+     */
     private function syncUser(string $email, array $userData, string $token, array $authData): User
     {
-        $name = $userData['name'] ?? $userData['full_name'] ?? $userData['firstName'] ?? $email;
+        $name = $userData['name']
+            ?? trim(($userData['first_name'] ?? '').' '.($userData['last_name'] ?? ''))
+            ?: $userData['full_name']
+            ?? $userData['firstName']
+            ?? $email;
         if (is_array($name)) {
             $name = $name['first'] ?? $email;
         }
@@ -102,15 +111,16 @@ class AuthenticatedSessionController extends Controller
             ?? $userData['code']
             ?? $userData['identifier']
             ?? null;
-        $relationship = $userData['relationship'] ?? null;
+
+        $organization = $userData['organization'] ?? null;
         $entityCode = $userData['entity_code']
             ?? $userData['code_entite']
             ?? $userData['organization_code']
-            ?? (is_array($relationship) ? ($relationship['code'] ?? null) : null)
-            ?? null;
+            ?? (is_array($organization) ? ($organization['code'] ?? null) : null)
+            ?? (is_array($userData['relationship'] ?? null) ? ($userData['relationship']['code'] ?? null) : null);
 
         $role = $userData['role'] ?? null;
-        $roleCode = is_array($role) ? ($role['name'] ?? $role['code'] ?? null) : null;
+        $roleCode = is_array($role) ? ($role['name'] ?? $role['code'] ?? null) : ($role !== null ? (string) $role : null);
         $roleName = is_array($role) ? ($role['label'] ?? $role['name'] ?? null) : null;
         $isRoot = $roleCode === 'main_office_admin' || $roleName === 'main_office_admin';
 

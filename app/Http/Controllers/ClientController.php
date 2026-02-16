@@ -64,7 +64,15 @@ class ClientController extends Controller
     public function show(Request $request, Client $client): Response|RedirectResponse
     {
         $this->authorizeClient($request, $client);
-        $client->load(['vehicles.brand', 'vehicles.model', 'profession', 'contracts.company']);
+        $client->load([
+            'vehicles.brand',
+            'vehicles.model',
+            'vehicles.energySource',
+            'profession',
+            'contracts.company',
+            'contracts.vehicle.brand',
+            'contracts.vehicle.model',
+        ]);
 
         return Inertia::render('Clients/Show', [
             'client' => $client,
