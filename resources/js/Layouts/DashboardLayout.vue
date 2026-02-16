@@ -314,17 +314,8 @@ const iconPaths = {
                         </Transition>
                     </div>
                 </nav>
-                <!-- Bas de sidebar: Feedback, Aide, Utilisateur -->
+                <!-- Bas de sidebar: Aide, Utilisateur -->
                 <div class="p-3 border-t border-slate-200 bg-white/50 space-y-0.5 shrink-0">
-                    <a href="#" class="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-lg">
-                        <svg class="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths.chat" />
-                        </svg>
-                        Feedback
-                        <svg class="w-3.5 h-3.5 ml-auto opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths.external" />
-                        </svg>
-                    </a>
                     <a href="#" class="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-lg">
                         <svg class="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths.info" />
