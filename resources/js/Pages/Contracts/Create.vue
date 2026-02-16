@@ -230,13 +230,10 @@ async function fetchPreview() {
     }
 }
 
-/** Accessoire issu de la grille (ou surcharge manuelle) */
-const displayAccessory = computed(() => {
-    const override = form.accessory_amount_override;
-    if (override !== null && override !== "" && Number(override) >= 0)
-        return Number(override);
-    return recap.value.accessory_amount ?? 0;
-});
+/** Accessoire issu de la grille (non modifiable) */
+const displayAccessory = computed(
+    () => recap.value.accessory_amount ?? 0,
+);
 
 const companyAccessoryDisplay = computed(
     () => Number(form.company_accessory) || 0,
@@ -553,34 +550,14 @@ function submitDraft() {
                         Étape 2 — Accessoires & réductions
                     </h2>
                     <p class="text-xs text-slate-500">
-                        L’accessoire grille est calculé selon la grille
-                        tarifaire (VP/TPC/TPM/2 roues). Vous pouvez le
-                        surcharger ci‑dessous et ajouter accessoires
-                        compagnie/agence.
+                        Accessoires compagnie et agence (FCFA).
+                        Réductions ci‑dessous.
                     </p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label
                                 class="block text-sm font-medium text-slate-700 mb-1"
-                                >Accessoire grille (surcharge, FCFA)</label
-                            >
-                            <input
-                                v-model.number="form.accessory_amount_override"
-                                type="number"
-                                min="0"
-                                step="1"
-                                :class="[
-                                    inputClass,
-                                    form.errors.accessory_amount_override &&
-                                        inputErrorClass,
-                                ]"
-                                placeholder="Optionnel — laisser vide pour garder la grille"
-                            />
-                        </div>
-                        <div>
-                            <label
-                                class="block text-sm font-medium text-slate-700 mb-1"
-                                >Accessoire compagnie (FCFA)</label
+                                >Accessoires compagnie (FCFA)</label
                             >
                             <input
                                 v-model.number="form.company_accessory"
@@ -603,7 +580,7 @@ function submitDraft() {
                         <div>
                             <label
                                 class="block text-sm font-medium text-slate-700 mb-1"
-                                >Accessoire agence (FCFA)</label
+                                >Accessoires agence (FCFA)</label
                             >
                             <input
                                 v-model.number="form.agency_accessory"
@@ -621,29 +598,6 @@ function submitDraft() {
                                 class="mt-1 text-sm text-red-600"
                             >
                                 {{ form.errors.agency_accessory }}
-                            </p>
-                        </div>
-                        <div>
-                            <label
-                                class="block text-sm font-medium text-slate-700 mb-1"
-                                >Commission (FCFA)</label
-                            >
-                            <input
-                                v-model.number="form.commission_amount"
-                                type="number"
-                                min="0"
-                                step="1"
-                                :class="[
-                                    inputClass,
-                                    form.errors.commission_amount &&
-                                        inputErrorClass,
-                                ]"
-                            />
-                            <p
-                                v-if="form.errors.commission_amount"
-                                class="mt-1 text-sm text-red-600"
-                            >
-                                {{ form.errors.commission_amount }}
                             </p>
                         </div>
                     </div>
@@ -765,8 +719,8 @@ function submitDraft() {
                 </div>
             </form>
 
-            <!-- Récap à droite -->
-            <aside class="lg:w-80 shrink-0">
+            <!-- Récap à droite (largeur élargie pour que les montants tiennent sur une ligne) -->
+            <aside class="lg:w-[28rem] shrink-0">
                 <div
                     class="rounded-xl border border-slate-200 bg-slate-50 p-5 sticky top-4 space-y-4"
                 >
@@ -812,7 +766,7 @@ function submitDraft() {
                                         {{ guaranteeLabels[key] }}
                                     </dt>
                                     <dd
-                                        class="font-medium text-slate-900 shrink-0"
+                                        class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
                                     >
                                         {{
                                             Number(
@@ -827,9 +781,9 @@ function submitDraft() {
                         <dl
                             class="space-y-2 text-sm border-t border-slate-200 pt-3"
                         >
-                            <div class="flex justify-between">
-                                <dt class="text-slate-600">Montant prime</dt>
-                                <dd class="font-medium text-slate-900">
+                            <div class="flex justify-between gap-2">
+                                <dt class="text-slate-600 min-w-0">Montant prime</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
                                     {{
                                         (
                                             recap.prime_amount ?? 0
@@ -838,76 +792,32 @@ function submitDraft() {
                                     FCFA
                                 </dd>
                             </div>
-                            <div class="flex justify-between">
-                                <dt class="text-slate-600">
-                                    Accessoire grille
-                                </dt>
-                                <dd class="font-medium text-slate-900">
-                                    {{
-                                        displayAccessory.toLocaleString("fr-FR")
-                                    }}
-                                    FCFA
-                                </dd>
-                            </div>
                             <div
                                 v-if="companyAccessoryDisplay > 0"
-                                class="flex justify-between"
+                                class="flex justify-between gap-2"
                             >
-                                <dt class="text-slate-600">
-                                    Accessoire compagnie
-                                </dt>
-                                <dd class="font-medium text-slate-900">
-                                    {{
-                                        companyAccessoryDisplay.toLocaleString(
-                                            "fr-FR",
-                                        )
-                                    }}
+                                <dt class="text-slate-600 min-w-0">Accessoire compagnie</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ companyAccessoryDisplay.toLocaleString("fr-FR") }}
                                     FCFA
                                 </dd>
                             </div>
                             <div
                                 v-if="agencyAccessoryDisplay > 0"
-                                class="flex justify-between"
+                                class="flex justify-between gap-2"
                             >
-                                <dt class="text-slate-600">
-                                    Accessoire agence
-                                </dt>
-                                <dd class="font-medium text-slate-900">
-                                    {{
-                                        agencyAccessoryDisplay.toLocaleString(
-                                            "fr-FR",
-                                        )
-                                    }}
+                                <dt class="text-slate-600 min-w-0">Accessoire agence</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ agencyAccessoryDisplay.toLocaleString("fr-FR") }}
                                     FCFA
                                 </dd>
                             </div>
                             <div
-                                class="flex justify-between pt-2 border-t border-slate-200"
+                                class="flex justify-between gap-2 pt-2 border-t border-slate-200"
                             >
-                                <dt class="font-medium text-slate-700">
-                                    Prime TTC
-                                </dt>
-                                <dd class="font-medium text-slate-900">
-                                    {{
-                                        totalBeforeReduction.toLocaleString(
-                                            "fr-FR",
-                                        )
-                                    }}
-                                    FCFA
-                                </dd>
-                            </div>
-                            <div
-                                v-if="commissionDisplay > 0"
-                                class="flex justify-between"
-                            >
-                                <dt class="text-slate-600">Commission</dt>
-                                <dd class="font-medium text-slate-900">
-                                    +
-                                    {{
-                                        commissionDisplay.toLocaleString(
-                                            "fr-FR",
-                                        )
-                                    }}
+                                <dt class="font-medium text-slate-700 min-w-0">Prime TTC</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ totalBeforeReduction.toLocaleString("fr-FR") }}
                                     FCFA
                                 </dd>
                             </div>
@@ -964,27 +874,22 @@ function submitDraft() {
                                     </dd>
                                 </div>
                                 <div
-                                    class="flex justify-between font-medium text-red-600"
+                                    class="flex justify-between gap-2 font-medium text-red-600"
                                 >
-                                    <dt>Total réductions</dt>
-                                    <dd>
-                                        −
-                                        {{
-                                            totalReduction.toLocaleString(
-                                                "fr-FR",
-                                            )
-                                        }}
+                                    <dt class="min-w-0">Total réductions</dt>
+                                    <dd class="shrink-0 whitespace-nowrap">
+                                        − {{ totalReduction.toLocaleString("fr-FR") }}
                                         FCFA
                                     </dd>
                                 </div>
                             </template>
                             <div
-                                class="flex justify-between pt-2 border-t border-slate-200"
+                                class="flex justify-between gap-2 pt-2 border-t border-slate-200"
                             >
-                                <dt class="font-medium text-slate-800">
-                                    Total (TTC + commission − réductions)
+                                <dt class="font-medium text-slate-800 min-w-0">
+                                    Total (TTC − réductions)
                                 </dt>
-                                <dd class="font-semibold text-slate-900">
+                                <dd class="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
                                     {{ displayTotal.toLocaleString("fr-FR") }}
                                     FCFA
                                 </dd>
