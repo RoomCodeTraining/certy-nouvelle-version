@@ -1,7 +1,9 @@
 <script setup>
+import { ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import DashboardLayout from '@/Layouts/DashboardLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
+import DashboardCharts from '@/Components/DashboardCharts.vue';
 import { useStatistics } from '@/Composables/useStatistics';
 import { formatDate } from '@/utils/formatDate';
 import { route } from '@/route';
@@ -12,11 +14,17 @@ const props = defineProps({
     recentContracts: { type: Array, default: () => [] },
 });
 
+const viewMode = ref('ensemble'); // 'ensemble' | 'detaillé'
+
 const {
     revenusTotaux,
     contratsActifs,
     clients,
     vehicules,
+    chartLabels,
+    chartContratsParMois,
+    chartClientsParMois,
+    chartRevenusParMois,
     loading,
     error,
 } = useStatistics();
@@ -54,11 +62,41 @@ function statusBadgeClass(status) {
         </template>
 
         <div class="flex-1 min-h-full flex flex-col w-full min-w-0">
-            <!-- KPIs -->
+            <!-- Onglets Vue ensemble / Vue analytique -->
+            <div class="flex border-b border-slate-200 mb-4 sm:mb-6">
+                <button
+                    type="button"
+                    :class="[
+                        'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+                        viewMode === 'ensemble'
+                            ? 'border-slate-900 text-slate-900'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    ]"
+                    @click="viewMode = 'ensemble'"
+                >
+                    Vue ensemble
+                </button>
+                <button
+                    type="button"
+                    :class="[
+                        'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+                        viewMode === 'detaillé'
+                            ? 'border-slate-900 text-slate-900'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    ]"
+                    @click="viewMode = 'detaillé'"
+                >
+                    Vue analytique
+                </button>
+            </div>
+
+            <!-- Message d'erreur -->
             <div v-if="error" class="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 p-3 sm:p-4 mb-4 sm:mb-6 text-sm">
                 {{ error }}
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+
+            <!-- KPIs (Vue ensemble uniquement) -->
+            <div v-if="viewMode === 'ensemble'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                     <p class="text-sm text-slate-500 mb-0.5">Revenus totaux générés</p>
                     <p v-if="loading" class="text-xl font-semibold text-slate-400">—</p>
@@ -81,8 +119,19 @@ function statusBadgeClass(status) {
                 </div>
             </div>
 
-            <!-- Actions rapides -->
-            <div class="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-6 md:p-8 mb-4 sm:mb-6">
+            <!-- Graphiques (uniquement en Vue analytique) -->
+            <div v-if="viewMode === 'detaillé' && !loading && !error" class="mb-4 sm:mb-6">
+                <DashboardCharts
+                    :labels="chartLabels"
+                    :contrats-par-mois="chartContratsParMois"
+                    :clients-par-mois="chartClientsParMois"
+                    :revenus-par-mois="chartRevenusParMois"
+                    mode="full"
+                />
+            </div>
+
+            <!-- Actions rapides (Vue ensemble uniquement) -->
+            <div v-if="viewMode === 'ensemble'" class="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-6 md:p-8 mb-4 sm:mb-6">
                 <div class="flex flex-col gap-4">
                     <div>
                         <h2 class="text-base sm:text-lg font-semibold text-slate-900">Actions rapides</h2>
@@ -121,8 +170,8 @@ function statusBadgeClass(status) {
                 </div>
             </div>
 
-            <!-- Contrats récents -->
-            <div class="rounded-xl border border-slate-200 bg-white overflow-hidden mb-4 sm:mb-6">
+            <!-- Contrats récents (Vue ensemble uniquement) -->
+            <div v-if="viewMode === 'ensemble'" class="rounded-xl border border-slate-200 bg-white overflow-hidden mb-4 sm:mb-6">
                 <div class="p-3 sm:p-4 md:p-6 border-b border-slate-200">
                     <h2 class="text-base sm:text-lg font-semibold text-slate-900">Contrats récents</h2>
                     <p class="text-xs sm:text-sm text-slate-500 mt-0.5">15 derniers contrats</p>

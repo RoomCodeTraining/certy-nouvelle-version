@@ -1,14 +1,19 @@
 import { ref, onMounted } from 'vue';
 
 /**
- * Charge les KPIs du tableau de bord depuis GET /api/statistics.
- * Expose : revenus_totaux, contrats_actifs, clients, vehicules, loading, error, refresh.
+ * Charge les KPIs et données graphiques du tableau de bord depuis GET /api/statistics.
+ * Expose : revenusTotaux, contratsActifs, clients, vehicules, chartLabels, chartContratsParMois,
+ * chartClientsParMois, chartRevenusParMois, loading, error, refresh.
  */
 export function useStatistics() {
     const revenusTotaux = ref(0);
     const contratsActifs = ref(0);
     const clients = ref(0);
     const vehicules = ref(0);
+    const chartLabels = ref([]);
+    const chartContratsParMois = ref([]);
+    const chartClientsParMois = ref([]);
+    const chartRevenusParMois = ref([]);
     const loading = ref(true);
     const error = ref(null);
 
@@ -26,6 +31,10 @@ export function useStatistics() {
             contratsActifs.value = data.contrats_actifs ?? 0;
             clients.value = data.clients ?? 0;
             vehicules.value = data.vehicules ?? 0;
+            chartLabels.value = data.chart_labels ?? [];
+            chartContratsParMois.value = data.chart_contrats_par_mois ?? [];
+            chartClientsParMois.value = data.chart_clients_par_mois ?? [];
+            chartRevenusParMois.value = data.chart_revenus_par_mois ?? [];
         } catch (e) {
             error.value = e.message || 'Impossible de charger les statistiques';
         } finally {
@@ -40,6 +49,10 @@ export function useStatistics() {
         contratsActifs,
         clients,
         vehicules,
+        chartLabels,
+        chartContratsParMois,
+        chartClientsParMois,
+        chartRevenusParMois,
         loading,
         error,
         refresh: fetchStatistics,
