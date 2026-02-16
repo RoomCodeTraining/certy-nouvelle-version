@@ -25,24 +25,12 @@ class SubscriptionService
 
     public function canUploadDocument(Organization $organization): bool
     {
-        $sub = $this->getActiveSubscription($organization);
-        if (! $sub) {
-            return false;
-        }
-        $count = $organization->documents()->count();
-
-        return $count < $sub->plan->limits_documents;
+        return false; // Archivage désactivé (focus assurance auto)
     }
 
     public function getDocumentsRemaining(Organization $organization): ?int
     {
-        $sub = $this->getActiveSubscription($organization);
-        if (! $sub) {
-            return null;
-        }
-        $count = $organization->documents()->count();
-
-        return max(0, $sub->plan->limits_documents - $count);
+        return null; // Archivage désactivé
     }
 
     public function canUseAssistant(Organization $organization): bool

@@ -49,4 +49,8 @@ return [
         'language' => env('OCR_LANGUAGE', 'fra+eng'),
     ],
 
+    'asaci' => [
+        'base_url' => env('ASACI_BASE_URL', 'https://api.asaci.ci'),
+    ],
+
 ];

@@ -8,7 +8,7 @@ import FlashNotifications from '@/Components/FlashNotifications.vue';
         <FlashNotifications />
         <!-- Gauche : 3/4 -->
         <div class="hidden lg:flex lg:w-3/4 flex-col justify-between bg-slate-50 border-r border-slate-100 p-12 xl:p-16">
-            <Link href="/" class="text-base font-semibold text-slate-900 w-fit">Baaro</Link>
+            <Link href="/dashboard" class="text-base font-semibold text-slate-900 w-fit">Certy</Link>
 
             <div class="max-w-xl">
                 <h1 class="text-3xl xl:text-4xl font-semibold text-slate-900 leading-tight tracking-tight">
@@ -48,7 +48,7 @@ import FlashNotifications from '@/Components/FlashNotifications.vue';
         <div class="flex-1 lg:w-1/4 flex items-center justify-center p-6 sm:p-10 bg-white min-w-0 overflow-y-auto">
             <div class="w-full max-w-md">
                 <div class="lg:hidden mb-8">
-                    <Link href="/" class="text-base font-semibold text-slate-900">Baaro</Link>
+                    <Link href="/dashboard" class="text-base font-semibold text-slate-900">Certy</Link>
                     <p class="mt-2 text-sm text-slate-600">Finalisez la configuration de votre espace</p>
                 </div>
                 <slot />

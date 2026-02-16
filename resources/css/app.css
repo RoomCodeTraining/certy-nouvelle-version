@@ -8,6 +8,15 @@
 @source '../**/*.vue';
 
 @theme {
-    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/* Image de fond optionnelle pour la page de connexion (panneau gauche) :
+   décommentez et placez une image dans public/images/login-bg.jpg
+.auth-panel-bg {
+  background-image: linear-gradient(135deg, rgb(15 23 42 / 0.92), rgb(15 23 42 / 0.88)), url('/images/login-bg.jpg');
+  background-size: cover;
+  background-position: center;
+}
+*/

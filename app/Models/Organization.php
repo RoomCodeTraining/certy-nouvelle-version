@@ -26,19 +26,24 @@ class Organization extends Model
             ->withTimestamps();
     }
 
-    public function documents(): HasMany
-    {
-        return $this->hasMany(Document::class);
-    }
-
-    public function assistantMessages(): HasMany
-    {
-        return $this->hasMany(AssistantMessage::class);
-    }
-
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    public function clients(): HasMany
+    {
+        return $this->hasMany(Client::class);
+    }
+
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(Contract::class);
+    }
+
+    public function bordereaux(): HasMany
+    {
+        return $this->hasMany(Bordereau::class);
     }
 
     public function aiUsageLogs(): HasMany

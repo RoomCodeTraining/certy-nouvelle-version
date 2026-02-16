@@ -17,6 +17,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Logo
+    |--------------------------------------------------------------------------
+    |
+    | Path to the logo image relative to the public directory (e.g. logo.png).
+    | Change APP_LOGO in .env or replace the file in public/ to update the logo
+    | without editing code.
+    |
+    */
+
+    'logo' => env('APP_LOGO', 'logo.png'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Theme Colors (paramétrable via .env)
+    |--------------------------------------------------------------------------
+    |
+    | Couleurs de la marque : primaire (bleu), secondaire (rouge), accent (vert citron).
+    | Valeurs par défaut : Bleu #1e40af, Rouge #dc2626, Vert citron #84cc16.
+    |
+    */
+
+    'theme' => [
+        'primary' => env('APP_THEME_PRIMARY', '#1e40af'),
+        'secondary' => env('APP_THEME_SECONDARY', '#dc2626'),
+        'accent' => env('APP_THEME_ACCENT', '#84cc16'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
@@ -78,9 +107,9 @@ return [
     |
     */
 
-    'locale' => env('APP_LOCALE', 'en'),
+    'locale' => env('APP_LOCALE', 'fr'),
 
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'fr'),
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 
@@ -122,5 +151,20 @@ return [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Request max execution time (seconds)
+    |--------------------------------------------------------------------------
+    | Limite le temps d'exécution des requêtes HTTP. 5 = max 5s par requête.
+    | Mettre à 0 pour désactiver (comportement PHP par défaut).
+    */
+    'request_max_seconds' => (int) env('REQUEST_MAX_SECONDS', 5),
+
+    'asaci_core_url' => env('ASACI_CORE_URL', ''),
+    'asaci_productions_url' => env('ASACI_PRODUCTIONS_URL', 'https://ppsurceatci.asacitech.com'),
+    'asaci_code_demandeur' => env('ASACI_CODE_DEMANDEUR', ''),
+    'asaci_code_intermediaire' => env('ASACI_CODE_INTERMEDIAIRE', ''),
+    'asaci_code_nature_attestation' => env('ASACI_CODE_NATURE_ATTESTATION', 'JAUN'),
 
 ];

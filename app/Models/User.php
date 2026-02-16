@@ -5,7 +5,6 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -19,6 +18,13 @@ class User extends Authenticatable
         'email',
         'password',
         'onboarding_completed_at',
+        'external_token',
+        'external_token_expires_at',
+        'external_username',
+        'external_entity_code',
+        'is_root',
+        'user_role_code',
+        'user_role_name',
     ];
 
     protected $hidden = [
@@ -31,8 +37,24 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'onboarding_completed_at' => 'datetime',
+            'external_token_expires_at' => 'datetime',
+            'is_root' => 'boolean',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Profil root = accès global (données de tous les apporteurs).
+     * Défini par le flag is_root ou par le rôle ASACI main_office_admin.
+     */
+    public function isRoot(): bool
+    {
+        if ($this->is_root) {
+            return true;
+        }
+
+        return $this->user_role_code === 'main_office_admin'
+            || $this->user_role_name === 'main_office_admin';
     }
 
     public function organizations(): BelongsToMany
@@ -49,7 +71,7 @@ class User extends Authenticatable
 
     public function currentOrganization(): ?Organization
     {
-        return $this->organizations()->first();
+        return $this->organizations->first();
     }
 
     public function isAdminOf(Organization $organization): bool
@@ -57,10 +79,5 @@ class User extends Authenticatable
         $pivot = $this->organizations()->where('organization_id', $organization->id)->first()?->pivot;
 
         return $pivot && $pivot->role === 'admin';
-    }
-
-    public function assistantMessages(): HasMany
-    {
-        return $this->hasMany(AssistantMessage::class);
     }
 }

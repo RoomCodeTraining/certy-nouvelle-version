@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Invitation Baaro</title>
+    <title>Invitation Certy</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #334155; margin: 0; padding: 0; }
         .container { max-width: 560px; margin: 0 auto; padding: 24px; }
@@ -15,8 +15,8 @@
 <body>
     <div class="container">
         <p>Bonjour,</p>
-        <p><strong>{{ $invitation->inviter?->name ?? 'Un membre' }}</strong> vous invite à rejoindre <strong>{{ $invitation->organization->name }}</strong> sur Baaro.</p>
-        <p>Baaro est une plateforme d'archivage intelligent pour les PME.</p>
+        <p><strong>{{ $invitation->inviter?->name ?? 'Un membre' }}</strong> vous invite à rejoindre <strong>{{ $invitation->organization->name }}</strong> sur Certy.</p>
+        <p>Certy est un logiciel de gestion de l'assurance auto pour courtiers, compatible avec la plateforme ASACI (Côte d'Ivoire).</p>
         <p style="margin: 24px 0;">
             <a href="{{ url('/invitations/' . $invitation->token) }}" class="btn">Accepter l'invitation</a>
         </p>

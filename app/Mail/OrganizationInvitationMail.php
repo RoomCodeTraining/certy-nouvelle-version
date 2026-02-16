@@ -20,7 +20,7 @@ class OrganizationInvitationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Invitation à rejoindre ' . $this->invitation->organization->name . ' sur Baaro',
+            subject: 'Invitation à rejoindre ' . $this->invitation->organization->name . ' sur Certy',
             replyTo: [$this->invitation->inviter?->email ?? config('mail.from.address')],
         );
     }

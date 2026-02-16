@@ -1,11 +1,17 @@
 <script setup>
-import { useForm } from '@inertiajs/vue3';
-import { Link } from '@inertiajs/vue3';
+import { useForm, Link } from '@inertiajs/vue3';
 import DashboardLayout from '@/Layouts/DashboardLayout.vue';
+import PageHeader from '@/Components/PageHeader.vue';
 
 const props = defineProps({
     user: Object,
 });
+
+const breadcrumbs = [
+    { label: 'Tableau de bord', href: '/dashboard' },
+    { label: 'Paramètres', href: '/settings/profile' },
+    { label: 'Profil' },
+];
 
 const form = useForm({
     name: props.user?.name ?? '',
@@ -22,13 +28,13 @@ const inputErrorClass = 'border-red-400 focus:border-red-400 focus:ring-red-400'
 <template>
     <DashboardLayout>
         <template #header>
-            <h1 class="text-sm font-medium text-slate-900">Profil</h1>
+            <PageHeader :breadcrumbs="breadcrumbs" title="Profil" />
         </template>
 
-        <div class="max-w-2xl">
+        <div class="min-h-[60vh] flex flex-col">
             <p class="text-slate-600 text-sm mb-6">Informations de votre compte</p>
-
-            <form @submit.prevent="form.put('/settings/profile')" class="space-y-4">
+            <div class="flex-1 w-full max-w-none">
+                <form @submit.prevent="form.put('/settings/profile')" class="rounded-xl border border-slate-200 bg-white p-6 md:p-8 space-y-4 w-full">
                 <div>
                     <label for="name" class="block text-sm font-medium text-slate-700 mb-1">Nom</label>
                     <input
@@ -113,6 +119,7 @@ const inputErrorClass = 'border-red-400 focus:border-red-400 focus:ring-red-400'
                     </Link>
                 </div>
             </form>
+            </div>
         </div>
     </DashboardLayout>
 </template>

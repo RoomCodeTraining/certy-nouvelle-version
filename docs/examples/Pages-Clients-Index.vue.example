@@ -1,0 +1,134 @@
+<script setup>
+/**
+ * Exemple de page Inertia Vue 3 : liste des clients.
+ * À placer dans resources/js/Pages/Clients/Index.vue.
+ * Adapter le layout (AppLayout) et les champs selon vos modèles.
+ */
+import { ref, watch } from 'vue';
+import { Link, router, useForm } from '@inertiajs/vue3';
+import AppLayout from '@/Layouts/AppLayout.vue';
+
+const props = defineProps({
+    clients: {
+        type: Object,
+        required: true,
+    },
+    filters: {
+        type: Object,
+        default: () => ({}),
+    },
+});
+
+const search = ref(props.filters.search ?? '');
+const typeAssure = ref(props.filters.type_assure ?? '');
+
+const form = useForm({
+    search: props.filters.search ?? '',
+    type_assure: props.filters.type_assure ?? '',
+});
+
+watch([search, typeAssure], ([newSearch, newType]) => {
+    form.search = newSearch;
+    form.type_assure = newType;
+    form.get(route('clients.index'), { preserveState: true });
+}, { deep: true });
+
+function destroy(clientId, clientName) {
+    if (!confirm(`Supprimer le client « ${clientName} » ?`)) return;
+    router.delete(route('clients.destroy', clientId));
+}
+</script>
+
+<template>
+    <AppLayout title="Clients">
+        <div class="py-6 px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h1 class="text-2xl font-semibold text-slate-900">Clients</h1>
+                <Link
+                    :href="route('clients.create')"
+                    class="inline-flex items-center justify-center px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800"
+                >
+                    Nouveau client
+                </Link>
+            </div>
+
+            <!-- Filtres (optionnel) -->
+            <div class="mb-4 flex flex-wrap gap-3">
+                <input
+                    v-model="search"
+                    type="search"
+                    placeholder="Rechercher..."
+                    class="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+                <select
+                    v-model="typeAssure"
+                    class="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                >
+                    <option value="">Tous types</option>
+                    <option value="TAPP">TAPP</option>
+                    <option value="TAPM">TAPM</option>
+                </select>
+            </div>
+
+            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <ul class="divide-y divide-slate-200">
+                    <li
+                        v-for="client in clients.data"
+                        :key="client.id"
+                        class="flex items-center justify-between px-4 py-3 hover:bg-slate-50"
+                    >
+                        <div class="min-w-0 flex-1">
+                            <Link
+                                :href="route('clients.show', client.id)"
+                                class="font-medium text-slate-900 hover:underline truncate block"
+                            >
+                                {{ client.full_name }}
+                            </Link>
+                            <p class="text-sm text-slate-500 truncate">
+                                {{ client.email }} · {{ client.vehicles_count }} véhicule(s)
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0 ml-4">
+                            <Link
+                                :href="route('clients.edit', client.id)"
+                                class="text-sm text-slate-600 hover:text-slate-900"
+                            >
+                                Modifier
+                            </Link>
+                            <button
+                                type="button"
+                                class="text-sm text-red-600 hover:text-red-700"
+                                @click="destroy(client.id, client.full_name)"
+                            >
+                                Supprimer
+                            </button>
+                        </div>
+                    </li>
+                </ul>
+                <div v-if="clients.data.length === 0" class="px-4 py-8 text-center text-slate-500">
+                    Aucun client. <Link :href="route('clients.create')" class="text-slate-900 underline">Créer un client</Link>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div v-if="clients.prev_page_url || clients.next_page_url" class="mt-4 flex justify-center gap-2">
+                <Link
+                    v-if="clients.prev_page_url"
+                    :href="clients.prev_page_url"
+                    class="px-3 py-1 text-sm border border-slate-200 rounded hover:bg-slate-50"
+                    preserve-scroll
+                >
+                    Précédent
+                </Link>
+                <Link
+                    v-if="clients.next_page_url"
+                    :href="clients.next_page_url"
+                    class="px-3 py-1 text-sm border border-slate-200 rounded hover:bg-slate-50"
+                    preserve-scroll
+                >
+                    Suivant
+                </Link>
+            </div>
+        </div>
+    </AppLayout>
+</template>

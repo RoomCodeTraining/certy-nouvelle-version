@@ -15,12 +15,6 @@ class RedirectIfAuthenticated
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
-                $user = Auth::guard($guard)->user();
-
-                if (! $user->hasCompletedOnboarding()) {
-                    return redirect()->route('onboarding.index');
-                }
-
                 return redirect()->route('dashboard');
             }
         }

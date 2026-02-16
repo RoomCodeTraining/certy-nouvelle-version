@@ -5,7 +5,7 @@ import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 
 createInertiaApp({
-    title: (title) => (title ? `${title} - Archives` : 'Archives'),
+    title: (title) => (title ? `${title} - Certy` : 'Certy'),
     resolve: (name) => {
         const pages = import.meta.glob('./Pages/**/*.vue');
         return pages[`./Pages/${name}.vue`]();
@@ -16,6 +16,6 @@ createInertiaApp({
             .mount(el);
     },
     progress: {
-        color: '#0d9488',
+        color: (window.__appTheme && window.__appTheme.primary) || '#1e40af',
     },
 });

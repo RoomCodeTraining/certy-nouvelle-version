@@ -12,8 +12,8 @@ RÈGLE ABSOLUE COMMANDES
 EXEMPLES CORRECTS
 
 - ddev php artisan migrate
-- ddev php artisan make:model Document
-- ddev php artisan make:controller DocumentController
+- ddev php artisan make:model Client
+- ddev php artisan make:controller ClientController
 - ddev php artisan storage:link
 
 EXEMPLES INTERDITS

@@ -2,7 +2,11 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import FlashNotifications from '@/Components/FlashNotifications.vue';
+import ConfirmModal from '@/Components/ConfirmModal.vue';
+import { useConfirm } from '@/Composables/useConfirm';
 import { router } from '@inertiajs/vue3';
+
+const { state: confirmState } = useConfirm();
 
 const page = usePage();
 const auth = page.props.auth;
@@ -46,22 +50,43 @@ onMounted(() => {
     if (settingsItems.some((item) => page.url.startsWith(item.href))) {
         settingsOpen.value = true;
     }
+    if (digitalItems.some((item) => page.url.startsWith(item.href))) {
+        digitalOpen.value = true;
+    }
+    if (referentialItems.some((item) => page.url.startsWith(item.href))) {
+        referentialOpen.value = true;
+    }
 });
 onUnmounted(() => document.removeEventListener('click', closeMenus));
 
 const navItems = [
     { href: '/dashboard', label: 'Tableau de bord', icon: 'home' },
-    { href: '/documents', label: 'Documents', icon: 'folder' },
-    { href: '/assistant', label: 'Assistant IA', icon: 'sparkles' },
+    { href: '/clients', label: 'Clients', icon: 'folder' },
+    { href: '/vehicles', label: 'Véhicules', icon: 'sparkles' },
+    { href: '/contracts', label: 'Contrats', icon: 'credit' },
+];
+
+const digitalOpen = ref(false);
+const digitalItems = [
+    { href: '/digital/attestations', label: 'Attestations', icon: 'credit' },
+    { href: '/digital/bureaux', label: 'Bureaux', icon: 'building' },
+    { href: '/digital/rattachements', label: 'Rattachements', icon: 'building' },
+    { href: '/digital/stock', label: 'Stock', icon: 'info' },
+    { href: '/digital/utilisateurs', label: 'Utilisateurs', icon: 'users' },
+];
+
+const referentialOpen = ref(false);
+const referentialItems = [
+    { href: '/referential/brands', label: 'Marques', icon: 'menuAlt' },
+    { href: '/referential/models', label: 'Modèles', icon: 'menuAlt' },
 ];
 
 const settingsItems = [
-    { href: '/settings/organization', label: 'Organisation', icon: 'building' },
-    { href: '/settings/team', label: 'Équipe', icon: 'users' },
-    { href: '/settings/subscription', label: 'Abonnement', icon: 'credit' },
     { href: '/settings/profile', label: 'Profil', icon: 'user' },
 ];
 
+const isDigitalActive = () => digitalItems.some((item) => page.url.startsWith(item.href));
+const isReferentialActive = () => referentialItems.some((item) => page.url.startsWith(item.href));
 const isSettingsActive = () => settingsItems.some((item) => page.url.startsWith(item.href));
 
 const isActive = (href) => {
@@ -90,13 +115,26 @@ const iconPaths = {
 <template>
     <div class="min-h-screen bg-white">
         <FlashNotifications />
+        <ConfirmModal
+            :open="confirmState.open"
+            :title="confirmState.title"
+            :message="confirmState.message"
+            :confirm-label="confirmState.confirmLabel"
+            :cancel-label="confirmState.cancelLabel"
+            :variant="confirmState.variant"
+            @confirm="confirmState.resolve?.(true)"
+            @cancel="confirmState.resolve?.(false)"
+        />
         <!-- Sidebar verticale à gauche (contexte Nuxt UI) -->
         <aside class="fixed inset-y-0 left-0 z-40 w-56 border-r border-slate-200 bg-slate-50/80 hidden lg:flex lg:flex-col">
             <div class="flex flex-col h-full">
                 <!-- Logo + chevron + collapse -->
                 <div class="h-14 px-4 flex items-center justify-between border-b border-slate-200 bg-white/80 shrink-0">
                     <div class="flex items-center gap-1 min-w-0">
-                        <Link href="/dashboard" class="text-base font-semibold text-slate-900 truncate">Archives</Link>
+                        <Link href="/dashboard" class="flex items-center gap-2 min-w-0">
+                            <img v-if="page.props.app?.logo" :src="page.props.app.logo" alt="" class="h-8 w-auto max-w-[120px] object-contain object-left" />
+                            <span v-else class="text-base font-semibold text-slate-900 truncate">{{ page.props.app?.name || 'Certy' }}</span>
+                        </Link>
                         <button type="button" class="p-0.5 text-slate-400 hover:text-slate-600 rounded" aria-label="Menu">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths.chevronDown" />
@@ -118,7 +156,7 @@ const iconPaths = {
                         <input
                             type="text"
                             placeholder="Rechercher..."
-                            class="w-full pl-9 pr-8 py-2 text-sm bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                            class="w-full pl-9 pr-8 py-2 text-sm bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary"
                         />
                         <kbd class="absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium text-slate-400 bg-slate-100 rounded">⌘K</kbd>
                     </div>
@@ -130,9 +168,9 @@ const iconPaths = {
                             v-if="!item.comingSoon"
                             :href="item.href"
                             class="flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors rounded-lg"
-                            :class="isActive(item.href) ? 'text-emerald-700 bg-emerald-500/10 font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+                            :class="isActive(item.href) ? 'text-brand-primary bg-brand-primary/10 font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
                         >
-                            <svg class="w-4 h-4 shrink-0" :class="isActive(item.href) ? 'text-emerald-600' : 'opacity-70'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-4 h-4 shrink-0" :class="isActive(item.href) ? 'text-brand-primary' : 'opacity-70'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths[item.icon] || iconPaths.home" />
                             </svg>
                             {{ item.label }}
@@ -147,6 +185,86 @@ const iconPaths = {
                             {{ item.label }}
                         </span>
                     </template>
+                    <!-- Digital (service externe ASACI) -->
+                    <div class="pt-1">
+                        <button
+                            type="button"
+                            class="flex items-center gap-2.5 px-3 py-2.5 text-sm w-full text-left rounded-lg transition-colors"
+                            :class="digitalOpen || isDigitalActive() ? 'text-slate-900 bg-slate-100 font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+                            @click="digitalOpen = !digitalOpen"
+                        >
+                            <svg class="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths.external" />
+                            </svg>
+                            Digital
+                            <svg class="w-4 h-4 ml-auto shrink-0 transition-transform" :class="digitalOpen ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths.chevronRight" />
+                            </svg>
+                        </button>
+                        <Transition
+                            enter-active-class="transition ease-out duration-100"
+                            enter-from-class="opacity-0 -translate-y-1"
+                            enter-to-class="opacity-100 translate-y-0"
+                            leave-active-class="transition ease-in duration-75"
+                            leave-from-class="opacity-100 translate-y-0"
+                            leave-to-class="opacity-0 -translate-y-1"
+                        >
+                            <div v-show="digitalOpen || isDigitalActive()" class="pl-6 pr-2 pb-1 space-y-0.5">
+                                <Link
+                                    v-for="d in digitalItems"
+                                    :key="d.href"
+                                    :href="d.href"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
+                                    :class="page.url.startsWith(d.href) ? 'text-brand-primary bg-brand-primary/10 font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+                                >
+                                    <svg class="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths[d.icon] || iconPaths.external" />
+                                    </svg>
+                                    {{ d.label }}
+                                </Link>
+                            </div>
+                        </Transition>
+                    </div>
+                    <!-- Référentiel (Marques & Modèles) -->
+                    <div class="pt-1">
+                        <button
+                            type="button"
+                            class="flex items-center gap-2.5 px-3 py-2.5 text-sm w-full text-left rounded-lg transition-colors"
+                            :class="referentialOpen || isReferentialActive() ? 'text-slate-900 bg-slate-100 font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+                            @click="referentialOpen = !referentialOpen"
+                        >
+                            <svg class="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths.menuAlt" />
+                            </svg>
+                            Référentiel
+                            <svg class="w-4 h-4 ml-auto shrink-0 transition-transform" :class="referentialOpen ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths.chevronRight" />
+                            </svg>
+                        </button>
+                        <Transition
+                            enter-active-class="transition ease-out duration-100"
+                            enter-from-class="opacity-0 -translate-y-1"
+                            enter-to-class="opacity-100 translate-y-0"
+                            leave-active-class="transition ease-in duration-75"
+                            leave-from-class="opacity-100 translate-y-0"
+                            leave-to-class="opacity-0 -translate-y-1"
+                        >
+                            <div v-show="referentialOpen || isReferentialActive()" class="pl-6 pr-2 pb-1 space-y-0.5">
+                                <Link
+                                    v-for="r in referentialItems"
+                                    :key="r.href"
+                                    :href="r.href"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
+                                    :class="page.url.startsWith(r.href) ? 'text-brand-primary bg-brand-primary/10 font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+                                >
+                                    <svg class="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths[r.icon] || iconPaths.menuAlt" />
+                                    </svg>
+                                    {{ r.label }}
+                                </Link>
+                            </div>
+                        </Transition>
+                    </div>
                     <!-- Paramètres (dépliable) -->
                     <div class="pt-1">
                         <button
@@ -177,7 +295,7 @@ const iconPaths = {
                                     :key="s.href"
                                     :href="s.href"
                                     class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
-                                    :class="page.url.startsWith(s.href) ? 'text-emerald-700 bg-emerald-500/10 font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+                                    :class="page.url.startsWith(s.href) ? 'text-brand-primary bg-brand-primary/10 font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
                                 >
                                     <svg class="w-4 h-4 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPaths[s.icon] || iconPaths.user" />
@@ -214,7 +332,7 @@ const iconPaths = {
                             class="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors text-left"
                             @click="sidebarUserMenuOpen = !sidebarUserMenuOpen"
                         >
-                            <span class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-700 text-sm font-semibold flex items-center justify-center shrink-0">
+                            <span class="w-8 h-8 rounded-full bg-brand-primary/15 text-brand-primary text-sm font-semibold flex items-center justify-center shrink-0">
                                 {{ getInitials(auth?.user?.name) }}
                             </span>
                             <span class="text-sm text-slate-700 truncate flex-1 min-w-0">{{ auth?.user?.name }}</span>
@@ -255,7 +373,10 @@ const iconPaths = {
 
         <!-- Mobile header -->
         <header class="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 border-b border-slate-200 flex items-center px-4 bg-white">
-            <Link href="/dashboard" class="text-base font-semibold text-slate-900">Archives</Link>
+            <Link href="/dashboard" class="flex items-center">
+                <img v-if="page.props.app?.logo" :src="page.props.app.logo" alt="" class="h-7 w-auto max-w-[100px] object-contain" />
+                <span v-else class="text-base font-semibold text-slate-900">{{ page.props.app?.name || 'Certy' }}</span>
+            </Link>
         </header>
 
         <!-- Main -->
@@ -324,26 +445,7 @@ const iconPaths = {
                                 <div class="px-4 py-2 border-b border-slate-100">
                                     <p class="text-xs text-slate-500">Connecté en tant que</p>
                                     <p class="text-sm font-medium text-slate-900 truncate">{{ auth?.user?.name }}</p>
-                                    <p class="text-xs text-slate-500 truncate">{{ auth?.user?.current_organization?.name || '—' }}</p>
                                 </div>
-                                <Link href="/settings/organization" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" @click="userMenuOpen = false">
-                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                    </svg>
-                                    Mon organisation
-                                </Link>
-                                <Link href="/settings/team" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" @click="userMenuOpen = false">
-                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                    </svg>
-                                    Équipe
-                                </Link>
-                                <Link href="/settings/subscription" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" @click="userMenuOpen = false">
-                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                    </svg>
-                                    Abonnement
-                                </Link>
                                 <Link href="/settings/profile" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" @click="userMenuOpen = false">
                                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -364,10 +466,8 @@ const iconPaths = {
                     </div>
                 </div>
             </header>
-            <div v-if="$slots.header" class="shrink-0 border-b border-slate-200 px-4 lg:px-8 py-3 bg-slate-50/50">
-                <div class="border-b-2 border-slate-900 pb-0.5 w-fit *:m-0 *:text-sm *:font-medium *:text-slate-900">
-                    <slot name="header" />
-                </div>
+            <div v-if="$slots.header" class="shrink-0 border-b border-slate-200 px-4 lg:px-8 py-5 bg-white">
+                <slot name="header" />
             </div>
             <div class="flex-1 min-h-0 flex flex-col p-4 lg:p-8">
                 <slot />

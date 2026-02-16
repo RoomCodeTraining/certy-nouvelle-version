@@ -25,10 +25,10 @@ const inputErrorClass = 'border-red-400 focus:border-red-400 focus:ring-red-400'
             <h1 class="text-sm font-medium text-slate-900">Mon organisation</h1>
         </template>
 
-        <div class="max-w-2xl">
+        <div class="min-h-[60vh] flex flex-col">
             <p class="text-slate-600 text-sm mb-6">Informations de votre organisation</p>
-
-            <form @submit.prevent="form.put('/settings/organization')" class="space-y-4">
+            <div class="flex-1 w-full max-w-none">
+                <form @submit.prevent="form.put('/settings/organization')" class="rounded-xl border border-slate-200 bg-white p-6 md:p-8 space-y-4 w-full">
                 <div>
                     <label for="name" class="block text-sm font-medium text-slate-700 mb-1">Nom</label>
                     <input
@@ -68,6 +68,7 @@ const inputErrorClass = 'border-red-400 focus:border-red-400 focus:ring-red-400'
                     </Link>
                 </div>
             </form>
+            </div>
         </div>
     </DashboardLayout>
 </template>
