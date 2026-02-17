@@ -98,6 +98,7 @@ class ExternalService
 
         if ($response->failed()) {
             Log::warning('ExternalService createProduction failed', [
+                'payload' => $payload,
                 'status' => $response->status(),
                 'body' => $response->body(),
                 'contract_id' => $contract->id,
@@ -118,6 +119,7 @@ class ExternalService
 
         if ($statut !== '0' && $statut !== 0) {
             Log::warning('ExternalService createProduction statut non OK', [
+                'payload' => $payload,
                 'statut' => $statut,
                 'http_status' => $response->status(),
                 'raw_response' => $rawBody,
