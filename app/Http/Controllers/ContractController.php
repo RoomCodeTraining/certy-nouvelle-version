@@ -659,13 +659,13 @@ class ContractController extends Controller
     }
 
     /**
-     * Marquer qu'une attestation a été générée pour ce contrat (actif).
+     * Marquer qu'une attestation a été générée pour ce contrat (validé ou actif).
      */
     public function markAttestationIssued(Request $request, Contract $contract): RedirectResponse
     {
         $this->authorizeContract($request, $contract);
-        if ($contract->status !== Contract::STATUS_ACTIVE) {
-            return redirect()->route('contracts.show', $contract)->with('error', 'Seul un contrat actif peut avoir une attestation.');
+        if (! in_array($contract->status, [Contract::STATUS_VALIDATED, Contract::STATUS_ACTIVE], true)) {
+            return redirect()->route('contracts.show', $contract)->with('error', 'Seul un contrat validé ou actif peut avoir une attestation.');
         }
         $contract->update(['attestation_issued_at' => now()]);
 
