@@ -34,6 +34,118 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class ContractController extends Controller
 {
+    public function __construct(
+        private ExternalService $externalService
+    ) {}
+
+    private function token(Request $request): ?string
+    {
+        $user = $request->user();
+        if (! $user || ! $user->external_token) {
+            return null;
+        }
+        if ($user->external_token_expires_at && $user->external_token_expires_at->isPast()) {
+            return null;
+        }
+        return $user->external_token;
+    }
+
+    /**
+     * Compagnies disponibles pour les contrats : uniquement celles issues des rattachements actifs
+     * (ASACI). Logo venant de l'API relationships (owner.logo_url).
+     *
+     * @return array<int, array{id: int, name: string, logo_url: string|null}>
+     */
+    private function companiesForUser(Request $request): array
+    {
+        $token = $this->token($request);
+        if (! $token) {
+            return [];
+        }
+
+        $data = $this->externalService->getRelationships($token);
+        if (isset($data['errors'])) {
+            return [];
+        }
+
+        $inner = $data['data'] ?? [];
+        $list = $inner['data'] ?? (is_array($data['data'] ?? null) ? $data['data'] : []);
+        if (! is_array($list)) {
+            $list = [];
+        }
+
+        // Map code -> name et code -> logo_url depuis les rattachements actifs (owner = compagnie, API fournit logo_url)
+        $codeToName = [];
+        $codeToLogoUrl = [];
+        foreach ($list as $r) {
+            if (! is_array($r) || ! empty($r['is_disabled'])) {
+                continue;
+            }
+            $owner = $r['owner'] ?? null;
+            if (! is_array($owner)) {
+                continue;
+            }
+            $code = $owner['code'] ?? null;
+            $name = $owner['name'] ?? null;
+            $logoUrl = $owner['logo_url'] ?? null;
+            if (is_string($code) && $code !== '') {
+                $codeToName[$code] = is_string($name) && $name !== '' ? $name : $code;
+                if (is_string($logoUrl) && $logoUrl !== '') {
+                    $codeToLogoUrl[$code] = $logoUrl;
+                }
+            }
+        }
+        $codes = array_values(array_unique(array_keys($codeToName)));
+
+        if (empty($codes)) {
+            return [];
+        }
+
+        // S'assurer que les compagnies existent et sont activées localement.
+        foreach ($codes as $code) {
+            Company::updateOrCreate(
+                ['code' => $code],
+                [
+                    'name' => $codeToName[$code] ?? $code,
+                    'is_active' => true,
+                ]
+            );
+        }
+
+        $companies = Company::whereIn('code', $codes)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
+
+        // Liste pour Inertia avec logo_url venant de l'API relationships.
+        $out = [];
+        foreach ($companies as $c) {
+            $out[] = [
+                'id' => $c->id,
+                'name' => $c->name,
+                'logo_url' => $codeToLogoUrl[$c->code] ?? null,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Formate les compagnies pour Inertia (id, name, logo_url). Utilisé en édition quand on ajoute la compagnie courante.
+     */
+    private function formatCompaniesForInertia(iterable $companies, array $logoByCode = []): array
+    {
+        $out = [];
+        foreach ($companies as $c) {
+            $code = is_object($c) ? ($c->code ?? null) : null;
+            $out[] = [
+                'id' => is_object($c) ? $c->id : $c['id'],
+                'name' => is_object($c) ? $c->name : $c['name'],
+                'logo_url' => $code ? ($logoByCode[$code] ?? null) : (is_object($c) && $c->logo_path ? asset($c->logo_path) : null),
+            ];
+        }
+        return $out;
+    }
+
     public function index(Request $request): Response
     {
         $user = $request->user();
@@ -252,7 +364,7 @@ class ContractController extends Controller
             ->with('vehicles:id,client_id,registration_number,pricing_type')
             ->orderBy('full_name')
             ->get(['id', 'full_name']);
-        $companies = Company::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $companies = $this->companiesForUser($request);
 
         $parentContract = null;
         if ($request->filled('parent_id')) {
@@ -393,9 +505,78 @@ class ContractController extends Controller
             'company',
         ]);
 
+        $companyLogoBase64 = $this->resolveCompanyLogoForPdf($request, $contract->company);
+
         $filename = 'contrat-' . ($contract->reference ?? $contract->id) . '.pdf';
-        return Pdf::loadView('contracts.pdf', ['contract' => $contract])
-            ->stream($filename);
+        return Pdf::loadView('contracts.pdf', [
+            'contract' => $contract,
+            'company_logo_base64' => $companyLogoBase64,
+        ])->stream($filename);
+    }
+
+    /**
+     * Récupère le logo de la compagnie depuis l'API relationships (owner.logo_url).
+     * Retourne une data URI base64 pour inclusion dans le PDF, ou null si indisponible.
+     */
+    private function resolveCompanyLogoForPdf(Request $request, ?Company $company): ?string
+    {
+        if (! $company || ! $company->code) {
+            return null;
+        }
+
+        $token = $this->token($request);
+        if (! $token) {
+            return null;
+        }
+
+        $data = $this->externalService->getRelationships($token);
+        if (isset($data['errors'])) {
+            return null;
+        }
+
+        $list = $data['data'] ?? [];
+        if (! is_array($list)) {
+            $list = [];
+        }
+
+        $logoUrl = null;
+        foreach ($list as $r) {
+            if (! is_array($r) || ! empty($r['is_disabled'])) {
+                continue;
+            }
+            $owner = $r['owner'] ?? null;
+            if (! is_array($owner)) {
+                continue;
+            }
+            if (($owner['code'] ?? '') === $company->code) {
+                $logoUrl = $owner['logo_url'] ?? null;
+                if (is_string($logoUrl) && $logoUrl !== '') {
+                    break;
+                }
+            }
+        }
+
+        if (! $logoUrl) {
+            return null;
+        }
+
+        $context = stream_context_create([
+            'http' => ['timeout' => 5],
+            'ssl' => ['verify_peer' => true],
+        ]);
+        $imageContent = @file_get_contents($logoUrl, false, $context);
+        if ($imageContent === false || $imageContent === '') {
+            return null;
+        }
+
+        $mime = 'image/png';
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $detected = $finfo->buffer($imageContent);
+        if (is_string($detected) && str_starts_with($detected, 'image/')) {
+            $mime = $detected;
+        }
+
+        return 'data:' . $mime . ';base64,' . base64_encode($imageContent);
     }
 
     public function edit(Request $request, Contract $contract): Response|RedirectResponse
@@ -409,7 +590,18 @@ class ContractController extends Controller
             ->with('vehicles:id,client_id,registration_number')
             ->orderBy('full_name')
             ->get(['id', 'full_name']);
-        $companies = Company::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $companies = $this->companiesForUser($request);
+        // En édition, on garde la compagnie du contrat même si elle n'est plus rattachée (pour éviter un select vide)
+        if ($contract->company_id) {
+            $hasCompany = collect($companies)->contains('id', $contract->company_id);
+            if (! $hasCompany) {
+                $current = Company::find($contract->company_id);
+                if ($current) {
+                    $companies[] = ['id' => $current->id, 'name' => $current->name, 'logo_url' => null];
+                }
+            }
+        }
+        usort($companies, fn ($a, $b) => strcasecmp($a['name'] ?? '', $b['name'] ?? ''));
 
         return Inertia::render('Contracts/Edit', [
             'contract' => $contract,

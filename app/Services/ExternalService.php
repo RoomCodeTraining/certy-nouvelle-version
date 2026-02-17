@@ -556,6 +556,7 @@ class ExternalService
             'Authorization' => 'Bearer '.$token,
         ])->get($this->baseUrl.'/relationships');
 
+
         return $response->json();
     }
 

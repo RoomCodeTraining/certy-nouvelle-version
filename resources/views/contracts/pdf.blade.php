@@ -147,14 +147,15 @@ function contractTypeLabel($type) {
                 </div>
                 <div class="header-title">Société de Courtage en Assurances</div>
                 <div class="header-compagnie">
-                    @if($company && $company->code)
-                        @php
+                    @php
+                        $compagnieBase64 = $company_logo_base64 ?? null;
+                        if (!$compagnieBase64 && $company && $company->code) {
                             $compagniePath = public_path('companies/'.$company->code.'.jpg');
                             $compagnieBase64 = file_exists($compagniePath) ? 'data:' . mime_content_type($compagniePath) . ';base64,' . base64_encode(file_get_contents($compagniePath)) : null;
-                        @endphp
-                        @if($compagnieBase64 ?? false)
-                            <img src="{{ $compagnieBase64 }}" alt="Logo compagnie">
-                        @endif
+                        }
+                    @endphp
+                    @if($compagnieBase64)
+                        <img src="{{ $compagnieBase64 }}" alt="Logo compagnie">
                     @endif
                 </div>
             </div>
@@ -354,8 +355,8 @@ function contractTypeLabel($type) {
     </div>
 
     <div class="footer" style="border-color: {{ $greenColor }};">
-        SARL au Capital de 1 000 000 FCFA, Entreprise régie par le code CIMA<br>
-        Siège social, Tél : (+225) 07 07 89 59 43 / 07 07 05 87 81
+        {{ config('app.contract_footer.line1') }}<br>
+        {{ config('app.contract_footer.line2') }}
     </div>
 </body>
 </html>

@@ -2,6 +2,7 @@
 import { useForm, Link } from '@inertiajs/vue3';
 import DashboardLayout from '@/Layouts/DashboardLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
+import SearchableSelect from '@/Components/SearchableSelect.vue';
 import { route } from '@/route';
 
 const props = defineProps({
@@ -38,20 +39,18 @@ const inputErrorClass = 'border-red-400 focus:border-red-400 focus:ring-red-400'
             <form @submit.prevent="form.post(route('bordereaux.store'))" class="rounded-xl border border-slate-200 bg-white p-6 md:p-8 space-y-4 w-full">
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Compagnie *</label>
-                    <select
+                    <SearchableSelect
                         v-model="form.company_id"
-                        required
-                        :class="[inputClass, form.errors.company_id && inputErrorClass]"
-                    >
-                        <option value="">— Sélectionner une compagnie —</option>
-                        <option
-                            v-for="c in companies"
-                            :key="c.id"
-                            :value="c.id"
-                        >
-                            {{ c.name }}{{ c.code ? ` (${c.code})` : '' }}
-                        </option>
-                    </select>
+                        :options="companies"
+                        value-key="id"
+                        label-key="name"
+                        image-key="logo_url"
+                        placeholder="— Sélectionner une compagnie —"
+                        :required="true"
+                        :error="!!form.errors.company_id"
+                        :input-class="inputClass"
+                        search-placeholder="Rechercher une compagnie…"
+                    />
                     <p v-if="form.errors.company_id" class="mt-1 text-sm text-red-600">{{ form.errors.company_id }}</p>
                 </div>
 

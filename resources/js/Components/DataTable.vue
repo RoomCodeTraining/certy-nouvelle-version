@@ -42,6 +42,11 @@ function getBadgeClass(row, col) {
     if (col.getBadgeClass && typeof col.getBadgeClass === 'function') return col.getBadgeClass(row);
     return col.badgeClass ?? 'bg-slate-100 text-slate-800';
 }
+
+function getImageAlt(row, col) {
+    if (col.getAlt && typeof col.getAlt === 'function') return col.getAlt(row);
+    return '';
+}
 </script>
 
 <template>
@@ -104,6 +109,15 @@ function getBadgeClass(row, col) {
                                 >
                                     {{ getCellValue(row, col) }}
                                 </span>
+                            </template>
+                            <template v-else-if="col.type === 'image'">
+                                <img
+                                    v-if="getCellValue(row, col)"
+                                    :src="getCellValue(row, col)"
+                                    :alt="getImageAlt(row, col)"
+                                    class="h-8 w-8 rounded object-contain bg-slate-50 border border-slate-100"
+                                />
+                                <span v-else class="text-slate-400">—</span>
                             </template>
                             <template v-else>
                                 <span class="text-slate-700">{{ getCellValue(row, col) }}</span>

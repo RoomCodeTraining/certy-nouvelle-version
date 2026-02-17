@@ -46,6 +46,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Contract PDF footer (paramétrable via .env)
+    |--------------------------------------------------------------------------
+    |
+    | Texte affiché en bas de page sur les attestations / contrats PDF.
+    | Deux lignes configurables (CONTRACT_FOOTER_LINE_1, CONTRACT_FOOTER_LINE_2).
+    |
+    */
+
+    'contract_footer' => [
+        'line1' => env('CONTRACT_FOOTER_LINE_1', 'SARL au Capital de 1 000 000 FCFA, Entreprise régie par le code CIMA'),
+        'line2' => env('CONTRACT_FOOTER_LINE_2', 'Siège social, Tél : (+225) 07 07 89 59 43 / 07 07 05 87 81'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

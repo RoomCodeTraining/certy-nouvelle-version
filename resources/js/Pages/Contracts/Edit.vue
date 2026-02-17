@@ -105,6 +105,7 @@ const inputErrorClass = 'border-red-400 focus:border-red-400 focus:ring-red-400'
                     :options="companies"
                     value-key="id"
                     label-key="name"
+                    image-key="logo_url"
                     placeholder="—"
                     :required="true"
                     :error="!!form.errors.company_id"

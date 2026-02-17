@@ -6,6 +6,8 @@ const props = defineProps({
     options: { type: Array, default: () => [] },
     valueKey: { type: String, default: 'id' },
     labelKey: { type: String, default: 'name' },
+    /** Optional key for image URL (e.g. logo_url). When set, shows a small image next to the label. */
+    imageKey: { type: String, default: '' },
     placeholder: { type: String, default: '— Choisir —' },
     searchPlaceholder: { type: String, default: 'Rechercher…' },
     required: Boolean,
@@ -35,6 +37,12 @@ const getOptionLabel = (opt) => {
     if (opt == null) return '';
     if (typeof opt === 'object' && props.labelKey in opt) return String(opt[props.labelKey]);
     return String(opt);
+};
+
+const getOptionImage = (opt) => {
+    if (!props.imageKey || opt == null || typeof opt !== 'object') return null;
+    const url = opt[props.imageKey];
+    return url && typeof url === 'string' ? url : null;
 };
 
 const filteredOptions = computed(() => {
@@ -100,8 +108,16 @@ watch(isOpen, (open) => {
             @click="isOpen = !isOpen"
             @keydown="onTriggerKeydown"
         >
-            <span class="truncate" :class="!selectedOption && placeholder ? 'text-slate-400' : ''">
-                {{ displayLabel }}
+            <span class="flex items-center gap-2 min-w-0 flex-1">
+                <img
+                    v-if="imageKey && selectedOption && getOptionImage(selectedOption)"
+                    :src="getOptionImage(selectedOption)"
+                    :alt="getOptionLabel(selectedOption)"
+                    class="h-6 w-6 shrink-0 rounded object-contain bg-slate-50"
+                />
+                <span class="truncate" :class="!selectedOption && placeholder ? 'text-slate-400' : ''">
+                    {{ displayLabel }}
+                </span>
             </span>
             <svg class="w-4 h-4 shrink-0 text-slate-400" :class="isOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -135,11 +151,17 @@ watch(isOpen, (open) => {
                     v-for="opt in filteredOptions"
                     :key="getOptionValue(opt)"
                     type="button"
-                    class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 truncate"
+                    class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"
                     :class="String(getOptionValue(opt)) === String(modelValue) ? 'bg-slate-100 text-slate-900 font-medium' : 'text-slate-700'"
                     @click="select(opt)"
                 >
-                    {{ getOptionLabel(opt) }}
+                    <img
+                        v-if="imageKey && getOptionImage(opt)"
+                        :src="getOptionImage(opt)"
+                        :alt="getOptionLabel(opt)"
+                        class="h-6 w-6 shrink-0 rounded object-contain bg-slate-50"
+                    />
+                    <span class="truncate">{{ getOptionLabel(opt) }}</span>
                 </button>
                 <p v-if="filteredOptions.length === 0 && normalizedOptions.length > 0" class="px-3 py-2 text-sm text-slate-500">
                     Aucun résultat

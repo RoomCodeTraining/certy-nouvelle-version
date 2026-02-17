@@ -727,6 +727,7 @@ function submitDraft() {
                             :options="companies"
                             value-key="id"
                             label-key="name"
+                            image-key="logo_url"
                             placeholder="Sélectionner une compagnie"
                             :required="true"
                             :error="!!form.errors.company_id"

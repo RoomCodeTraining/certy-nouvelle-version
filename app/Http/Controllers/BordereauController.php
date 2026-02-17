@@ -60,7 +60,10 @@ class BordereauController extends Controller
             'status' => $b->status,
         ]);
 
-        $companies = Company::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']);
+        $companies = Company::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'logo_path'])
+            ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'code' => $c->code, 'logo_url' => $c->logo_path ? asset($c->logo_path) : null])
+            ->values()
+            ->all();
 
         return Inertia::render('Bordereaux/Index', [
             'bordereaux' => $bordereaux,
@@ -79,7 +82,10 @@ class BordereauController extends Controller
             return Inertia::location(route('dashboard'));
         }
 
-        $companies = Company::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code']);
+        $companies = Company::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'logo_path'])
+            ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'code' => $c->code, 'logo_url' => $c->logo_path ? asset($c->logo_path) : null])
+            ->values()
+            ->all();
 
         return Inertia::render('Bordereaux/Create', [
             'companies' => $companies,

@@ -23,12 +23,19 @@ const list = Array.isArray(props.rattachements)
     ? props.rattachements
     : (Array.isArray(props.rattachements?.data) ? props.rattachements.data : []);
 
-// Affichage sur deux lignes : nom puis code (whitespace-pre-line)
+// Affichage sur deux lignes : nom puis code (whitespace-pre-line). Logo compagnie depuis owner.logo_url (API).
 const columns = [
     {
         key: 'date_rattachement',
         label: 'Date de rattachement',
         getValue: (row) => row.formatted_created_at ?? formatDate(row.created_at),
+    },
+    {
+        key: 'logo_compagnie',
+        label: 'Logo',
+        type: 'image',
+        getValue: (row) => row.owner?.logo_url ?? null,
+        getAlt: (row) => row.owner?.name ?? 'Compagnie',
     },
     {
         key: 'compagnie',
@@ -95,15 +102,23 @@ const columns = [
             </div>
             <!-- Mobile : liste en cartes -->
             <div class="md:hidden divide-y divide-slate-100">
-                <div v-for="row in list" :key="row.id" class="p-4">
-                    <p class="text-xs text-slate-500">{{ row.formatted_created_at ?? formatDate(row.created_at) }}</p>
-                    <p class="font-medium text-slate-900 mt-0.5">{{ row.owner?.name ?? '—' }} {{ row.owner?.code ? `(${row.owner.code})` : '' }}</p>
-                    <p class="text-sm text-slate-700 mt-1">→ {{ row.related?.name ?? '—' }} {{ row.related?.code ? `(${row.related.code})` : '' }}</p>
-                    <span
-                        :class="['inline-flex mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium', row.is_disabled ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800']"
-                    >
-                        {{ row.is_disabled ? 'Désactivé' : 'Actif' }}
-                    </span>
+                <div v-for="row in list" :key="row.id" class="p-4 flex gap-3">
+                    <img
+                        v-if="row.owner?.logo_url"
+                        :src="row.owner.logo_url"
+                        :alt="row.owner?.name ?? 'Compagnie'"
+                        class="h-10 w-10 shrink-0 rounded object-contain bg-slate-50 border border-slate-100"
+                    />
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs text-slate-500">{{ row.formatted_created_at ?? formatDate(row.created_at) }}</p>
+                        <p class="font-medium text-slate-900 mt-0.5">{{ row.owner?.name ?? '—' }} {{ row.owner?.code ? `(${row.owner.code})` : '' }}</p>
+                        <p class="text-sm text-slate-700 mt-1">→ {{ row.related?.name ?? '—' }} {{ row.related?.code ? `(${row.related.code})` : '' }}</p>
+                        <span
+                            :class="['inline-flex mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium', row.is_disabled ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800']"
+                        >
+                            {{ row.is_disabled ? 'Désactivé' : 'Actif' }}
+                        </span>
+                    </div>
                 </div>
                 <div v-if="!list.length" class="py-10 px-4 text-center text-slate-500 text-sm">Aucun rattachement.</div>
             </div>
