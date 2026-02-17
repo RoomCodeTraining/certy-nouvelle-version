@@ -113,9 +113,11 @@ class BordereauController extends Controller
         $periodEnd = $validated['period_end'];
         $companyId = $validated['company_id'];
 
+        // Période du/au = date de création des contrats (created_at)
         $contracts = Contract::accessibleBy($user)
             ->where('company_id', $companyId)
-            ->whereBetween('start_date', [$periodStart, $periodEnd])
+            ->whereDate('created_at', '>=', $periodStart)
+            ->whereDate('created_at', '<=', $periodEnd)
             ->get();
 
         $totalAmount = (int) $contracts->sum('total_amount');
@@ -167,11 +169,13 @@ class BordereauController extends Controller
 
         $bordereau->load('company:id,name,code');
 
+        // Période du/au = date de création des contrats (created_at)
         $contracts = Contract::accessibleBy($user)
             ->where('company_id', $bordereau->company_id)
-            ->whereBetween('start_date', [$bordereau->period_start->format('Y-m-d'), $bordereau->period_end->format('Y-m-d')])
+            ->whereDate('created_at', '>=', $bordereau->period_start->format('Y-m-d'))
+            ->whereDate('created_at', '<=', $bordereau->period_end->format('Y-m-d'))
             ->with(['client:id,full_name', 'vehicle:id,registration_number', 'vehicle.brand:id,name', 'vehicle.model:id,name'])
-            ->orderBy('start_date')
+            ->orderBy('created_at')
             ->get()
             ->map(fn (Contract $c) => [
                 'id' => $c->id,
@@ -248,11 +252,14 @@ class BordereauController extends Controller
             return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
         }
         $bordereau->load('company');
+        // Période du/au = date de création des contrats (created_at)
         $contracts = Contract::query()
+            ->where('organization_id', $bordereau->organization_id)
             ->where('company_id', $bordereau->company_id)
-            ->whereBetween('start_date', [$bordereau->period_start->format('Y-m-d'), $bordereau->period_end->format('Y-m-d')])
+            ->whereDate('created_at', '>=', $bordereau->period_start->format('Y-m-d'))
+            ->whereDate('created_at', '<=', $bordereau->period_end->format('Y-m-d'))
             ->with(['client:id,full_name', 'vehicle:id,registration_number', 'vehicle.brand:id,name', 'vehicle.model:id,name'])
-            ->orderBy('start_date')
+            ->orderBy('created_at')
             ->get();
         $filename = 'bordereau-' . $bordereau->reference . '.pdf';
         return Pdf::loadView('bordereaux.pdf', [
@@ -271,11 +278,14 @@ class BordereauController extends Controller
             return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
         }
         $bordereau->load('company');
+        // Période du/au = date de création des contrats (created_at)
         $contracts = Contract::query()
+            ->where('organization_id', $bordereau->organization_id)
             ->where('company_id', $bordereau->company_id)
-            ->whereBetween('start_date', [$bordereau->period_start->format('Y-m-d'), $bordereau->period_end->format('Y-m-d')])
+            ->whereDate('created_at', '>=', $bordereau->period_start->format('Y-m-d'))
+            ->whereDate('created_at', '<=', $bordereau->period_end->format('Y-m-d'))
             ->with(['client:id,full_name', 'vehicle:id,registration_number', 'vehicle.brand:id,name', 'vehicle.model:id,name'])
-            ->orderBy('start_date')
+            ->orderBy('created_at')
             ->get();
 
         $filename = 'bordereau-' . $bordereau->reference . '.csv';

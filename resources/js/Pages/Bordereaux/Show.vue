@@ -147,7 +147,7 @@ function formatXOF(value) {
             <div class="rounded-xl border border-slate-200 bg-white overflow-hidden mb-6">
                 <div class="p-4 md:p-6 border-b border-slate-200">
                     <h2 class="text-lg font-semibold text-slate-900">Contrats de la période</h2>
-                    <p class="text-sm text-slate-500 mt-0.5">Contrats dont la date de début est comprise entre {{ formatDate(bordereau.period_start) }} et {{ formatDate(bordereau.period_end) }}</p>
+                    <p class="text-sm text-slate-500 mt-0.5">Contrats créés entre le {{ formatDate(bordereau.period_start) }} et le {{ formatDate(bordereau.period_end) }}</p>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-slate-200">

@@ -32,7 +32,7 @@ const inputErrorClass = 'border-red-400 focus:border-red-400 focus:ring-red-400'
 
         <div class="min-h-[60vh] flex flex-col w-full max-w-none">
             <p class="text-slate-600 text-sm mb-4">
-                Choisissez une compagnie et la période calendrier (du → au). Le bordereau recevra une référence au format BR- + 11 caractères alphanumériques majuscules.
+                Choisissez une compagnie et la période (du → au). Sont inclus les contrats dont la date de création est comprise entre ces deux dates. Le bordereau recevra une référence au format BR- + 11 caractères alphanumériques majuscules.
             </p>
 
             <form @submit.prevent="form.post(route('bordereaux.store'))" class="rounded-xl border border-slate-200 bg-white p-6 md:p-8 space-y-4 w-full">

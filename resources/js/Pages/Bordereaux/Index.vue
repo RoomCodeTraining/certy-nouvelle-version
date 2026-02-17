@@ -67,7 +67,7 @@ function formatXOF(value) {
         </template>
 
         <p class="text-slate-600 text-sm mb-4">
-            Bordereaux par compagnie et période calendrier (du → au). Référence au format BR- + 11 caractères alphanumériques majuscules.
+            Bordereaux par compagnie et période (du → au). Sont inclus les contrats dont la date de création est dans cette période. Référence au format BR- + 11 caractères alphanumériques majuscules.
         </p>
 
         <TableFilters
