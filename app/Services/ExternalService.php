@@ -122,7 +122,7 @@ class ExternalService
             'productions' => $productions,
         ];
 
-        $url = $this->baseUrl.'/api/v1/productions';
+        $url = $this->baseUrl.'/productions';
         if ($this->baseUrl === '') {
             return [
                 'success' => false,
