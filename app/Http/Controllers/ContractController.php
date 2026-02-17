@@ -31,9 +31,52 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Illuminate\Support\Collection;
 
 class ContractController extends Controller
 {
+    /**
+     * Compagnies pour le formulaire contrat : uniquement celles des rattachements actifs (ASACI).
+     * Si pas de token ou API indisponible, retourne toutes les compagnies actives.
+     */
+    private function companiesForContractForm(Request $request): Collection
+    {
+        $user = $request->user();
+        $token = $user?->external_token;
+        if (! $token || ($user->external_token_expires_at && $user->external_token_expires_at->isPast())) {
+            return Company::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        }
+        try {
+            $data = app(ExternalService::class)->getRelationships($token);
+            if (isset($data['errors'])) {
+                return Company::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+            }
+            $inner = $data['data'] ?? [];
+            $list = $inner['data'] ?? (is_array($data['data'] ?? null) ? $data['data'] : []);
+            if (! is_array($list)) {
+                $list = [];
+            }
+            $codes = [];
+            foreach ($list as $r) {
+                if (! empty($r['is_disabled'])) {
+                    continue;
+                }
+                $owner = $r['owner'] ?? null;
+                $code = $owner['code'] ?? null;
+                if ($code !== null && $code !== '') {
+                    $codes[] = $code;
+                }
+            }
+            if ($codes === []) {
+                return Company::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+            }
+            $filtered = Company::where('is_active', true)->whereIn('code', array_unique($codes))->orderBy('name')->get(['id', 'name']);
+            return $filtered->isNotEmpty() ? $filtered : Company::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        } catch (\Throwable $e) {
+            return Company::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        }
+    }
+
     public function index(Request $request): Response
     {
         $user = $request->user();
@@ -252,7 +295,7 @@ class ContractController extends Controller
             ->with('vehicles:id,client_id,registration_number,pricing_type')
             ->orderBy('full_name')
             ->get(['id', 'full_name']);
-        $companies = Company::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $companies = $this->companiesForContractForm($request);
 
         $parentContract = null;
         if ($request->filled('parent_id')) {
@@ -409,7 +452,7 @@ class ContractController extends Controller
             ->with('vehicles:id,client_id,registration_number')
             ->orderBy('full_name')
             ->get(['id', 'full_name']);
-        $companies = Company::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $companies = $this->companiesForContractForm($request);
 
         return Inertia::render('Contracts/Edit', [
             'contract' => $contract,
