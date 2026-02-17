@@ -12,7 +12,7 @@ const form = useForm({
 const showPassword = ref(false);
 
 const inputClass =
-    "w-full rounded-lg border border-slate-200 px-2.5 py-2.5 text-slate-900 placeholder-slate-400 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none";
+    "w-full rounded-lg border border-slate-200 px-2.5 py-2.5 text-slate-900 placeholder-slate-400 text-sm focus:border-brand-primary focus:ring-1 focus:ring-brand-primary focus:outline-none";
 const inputErrorClass =
     "border-red-400 focus:border-red-400 focus:ring-red-400";
 </script>
@@ -89,7 +89,7 @@ const inputErrorClass =
 
             <button
                 type="submit"
-                class="w-full py-3 px-4 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full py-3 px-4 rounded-lg bg-brand-primary text-white text-sm font-medium hover:brightness-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 :disabled="form.processing"
             >
                 {{ form.processing ? "Connexion…" : "Se connecter" }}
