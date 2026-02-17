@@ -71,14 +71,6 @@ class ExternalService
         $company = $contract->company;
 
         $organizationCode = $company && $company->code ? $company->code : 'ASACI_LUNAR';
-        $officeCode = config('app.asaci_office_code', '');
-        if ($officeCode === '') {
-            Log::warning('ExternalService createProduction: ASACI_OFFICE_CODE manquant');
-            return [
-                'success' => false,
-                'errors' => [['title' => 'Configuration manquante : code bureau (ASACI_OFFICE_CODE).', 'detail' => []]],
-            ];
-        }
 
         $numeroPolice = $contract->policy_number;
         if ($numeroPolice === null || $numeroPolice === '') {
@@ -126,7 +118,6 @@ class ExternalService
 
         $payload = [
             'organization_code' => $organizationCode,
-            'office_code' => $officeCode,
             'certificate_type' => 'cima',
             'productions' => $productions,
         ];
