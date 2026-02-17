@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 class ExternalService
 {
     /** Timeout en secondes pour tous les appels HTTP (objectif < 5s par requête). */
-    private const HTTP_TIMEOUT = 5;
+    private const HTTP_TIMEOUT = 15;
 
     public $baseUrl;
 
@@ -34,13 +34,13 @@ class ExternalService
     }
 
     /**
-     * Couleur attestation pour le payload API v1 : cima-vert (Deux roues) ou cima-jaune.
+     * Couleur attestation pour le payload API v1 : cima-verte (Deux roues) ou cima-jaune.
      */
     private function couleurAttestationForContract(Contract $contract): string
     {
         $type = $contract->contract_type ?? '';
         if (str_starts_with((string) $type, 'TWO') || $type === 'TWO_WHEELER') {
-            return 'cima-vert';
+            return 'cima-verte';
         }
         return 'cima-jaune';
     }
