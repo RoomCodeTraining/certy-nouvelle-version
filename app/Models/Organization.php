@@ -17,7 +17,20 @@ class Organization extends Model
         'employee_count_range',
         'referral_source',
         'industry',
+        'certy_ia_enabled',
     ];
+
+    /** Certy IA activé par défaut pour les nouvelles organisations quand la fonctionnalité est activée au niveau app. */
+    protected $attributes = [
+        'certy_ia_enabled' => true,
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'certy_ia_enabled' => 'boolean',
+        ];
+    }
 
     public function users(): BelongsToMany
     {

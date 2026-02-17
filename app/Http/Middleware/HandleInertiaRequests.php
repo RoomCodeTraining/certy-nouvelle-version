@@ -41,6 +41,11 @@ class HandleInertiaRequests extends Middleware
                     ];
                 })() : null,
             ],
+            'certy_ia' => $request->user() ? [
+                'name' => config('certy.name', 'Certy IA'),
+                'enabled' => config('certy.enabled', false),
+                'organization_enabled' => $request->user()->currentOrganization()?->certy_ia_enabled ?? false,
+            ] : null,
         ];
     }
 }

@@ -51,7 +51,7 @@ const openUserMenu = () => {
 onMounted(() => {
     document.addEventListener('click', closeMenus);
     router.on('navigate', () => { mobileMenuOpen.value = false; });
-    if (settingsItems.some((item) => page.url.startsWith(item.href))) {
+    if (settingsItems.value.some((item) => page.url.startsWith(item.href))) {
         settingsOpen.value = true;
     }
     if (digitalItems.value.some((item) => page.url.startsWith(item.href))) {
@@ -73,6 +73,8 @@ function onLogoError() {
 
 const isRoot = computed(() => !!auth?.user?.is_root);
 
+const certyIa = computed(() => page.props.certy_ia ?? null);
+
 const navItems = computed(() => {
     const items = [
         { href: '/dashboard', label: 'Tableau de bord', icon: 'home' },
@@ -82,6 +84,9 @@ const navItems = computed(() => {
     ];
     if (isRoot.value) {
         items.push({ href: '/bordereaux', label: 'Bordereaux', icon: 'credit' });
+    }
+    if (certyIa.value?.enabled) {
+        items.push({ href: '/certy-ia', label: certyIa.value.name || 'Certy IA', icon: 'chat' });
     }
     return items;
 });
@@ -108,14 +113,20 @@ const referentialItems = [
     { href: '/referential/models', label: 'Modèles', icon: 'menuAlt' },
 ];
 
-const settingsItems = [
-    { href: '/settings/profile', label: 'Profil', icon: 'user' },
-    { href: '/settings/config', label: 'Config courtier', icon: 'cog' },
-];
+const settingsItems = computed(() => {
+    const items = [
+        { href: '/settings/profile', label: 'Profil', icon: 'user' },
+        { href: '/settings/config', label: 'Config courtier', icon: 'cog' },
+    ];
+    if (certyIa.value?.enabled && isRoot.value) {
+        items.push({ href: '/settings/certy-ia', label: certyIa.value.name || 'Certy IA', icon: 'chat' });
+    }
+    return items;
+});
 
 const isDigitalActive = () => digitalItems.value.some((item) => page.url.startsWith(item.href));
 const isReferentialActive = () => referentialItems.some((item) => page.url.startsWith(item.href));
-const isSettingsActive = () => settingsItems.some((item) => page.url.startsWith(item.href));
+const isSettingsActive = () => settingsItems.value.some((item) => page.url.startsWith(item.href));
 
 const isActive = (href) => {
     if (href === '/dashboard') return page.url === '/dashboard';

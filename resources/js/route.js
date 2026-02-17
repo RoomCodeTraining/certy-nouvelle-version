@@ -80,6 +80,10 @@ export function route(name, ...params) {
         'bordereaux.destroy': (id) => `/bordereaux/${id}`,
         'bordereaux.pdf': (id) => `/bordereaux/${id}/pdf`,
         'bordereaux.excel': (id) => `/bordereaux/${id}/excel`,
+        'certy-ia.index': () => '/certy-ia',
+        'certy-ia.ask': () => '/certy-ia/ask',
+        'settings.certy-ia.edit': () => '/settings/certy-ia',
+        'settings.certy-ia.update': () => '/settings/certy-ia',
     };
     const fn = routes[name];
     if (!fn) return '#';
