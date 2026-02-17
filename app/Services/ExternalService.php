@@ -111,6 +111,7 @@ class ExternalService
             ];
         }
 
+        $rawBody = $response->body();
         $data = $response->json();
         $statut = $data['statut'] ?? null;
         $infos = $data['infos'] ?? [];
@@ -118,6 +119,8 @@ class ExternalService
         if ($statut !== '0' && $statut !== 0) {
             Log::warning('ExternalService createProduction statut non OK', [
                 'statut' => $statut,
+                'http_status' => $response->status(),
+                'raw_response' => $rawBody,
                 'data' => $data,
                 'contract_id' => $contract->id,
             ]);
