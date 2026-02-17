@@ -354,8 +354,8 @@ function contractTypeLabel($type) {
     </div>
 
     <div class="footer" style="border-color: {{ $greenColor }};">
-        SARL au Capital de 1 000 000 FCFA, Entreprise régie par le code CIMA<br>
-        Siège social, Tél : (+225) 07 07 89 59 43 / 07 07 05 87 81
+        {{ config('app.contract_footer.line1') }}<br>
+        {{ config('app.contract_footer.line2') }}
     </div>
 </body>
 </html>
