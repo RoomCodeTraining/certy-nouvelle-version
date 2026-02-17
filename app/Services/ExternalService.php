@@ -34,6 +34,30 @@ class ExternalService
     }
 
     /**
+     * Formate les erreurs de la réponse API productions (ex. 422 Validation) pour affichage flash.
+     * Extrait les champs "detail" (ou "title") de chaque entrée dans data.errors.
+     */
+    private function formatProductionApiErrors(array $data): string
+    {
+        $errors = $data['errors'] ?? [];
+        if (! is_array($errors) || count($errors) === 0) {
+            return '';
+        }
+        $messages = [];
+        foreach ($errors as $err) {
+            if (! is_array($err)) {
+                continue;
+            }
+            $msg = $err['detail'] ?? $err['title'] ?? null;
+            if (is_string($msg) && trim($msg) !== '') {
+                $messages[] = trim($msg);
+            }
+        }
+
+        return implode(' ', $messages);
+    }
+
+    /**
      * Couleur attestation pour le payload API v1 : cima-verte (Deux roues) ou cima-jaune.
      */
     private function couleurAttestationForContract(Contract $contract): string
@@ -139,7 +163,9 @@ class ExternalService
             ->post($url, $payload);
 
         $rawBody = $response->body();
-        $data = $response->json();
+        $data = is_array($response->json()) ? $response->json() : [];
+
+        $apiErrorMessage = $this->formatProductionApiErrors($data);
 
         if ($response->failed()) {
             Log::warning('ExternalService createProduction failed', [
@@ -151,7 +177,7 @@ class ExternalService
             return [
                 'success' => false,
                 'errors' => [[
-                    'title' => $data['message'] ?? 'Erreur lors de la génération de l\'attestation.',
+                    'title' => $apiErrorMessage ?: ($data['message'] ?? 'Erreur lors de la génération de l\'attestation.'),
                     'detail' => $rawBody,
                 ]],
             ];
@@ -168,7 +194,7 @@ class ExternalService
             return [
                 'success' => false,
                 'errors' => [[
-                    'title' => $data['message'] ?? 'La plateforme a refusé la demande d\'attestation.',
+                    'title' => $apiErrorMessage ?: ($data['message'] ?? 'La plateforme a refusé la demande d\'attestation.'),
                     'detail' => $data,
                 ]],
             ];
