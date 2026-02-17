@@ -21,6 +21,19 @@ class ExternalService
     }
 
     /**
+     * Code nature attestation pour l'API ASACI : VERT pour Deux roues, JAUN pour les autres (VP, TPC, TPM).
+     */
+    private function codeNatureAttestationForContract(Contract $contract): string
+    {
+        $type = $contract->contract_type ?? '';
+        if (str_starts_with((string) $type, 'TWO') || $type === 'TWO_WHEELER') {
+            return 'VERT';
+        }
+
+        return config('app.asaci_code_nature_attestation', 'JAUN');
+    }
+
+    /**
      * Génère une attestation digitale via l'API productions ASACI.
      * Construit le payload à partir du contrat, véhicule et client.
      * code_demandeur = username du user connecté (récupéré depuis les infos user ASACI à la connexion).
@@ -76,7 +89,7 @@ class ExternalService
             'adresse_mail_souscripteur' => $client ? ($client->email ?? '') : '',
             'numero_telephone_souscripteur' => $client ? ($client->phone ?? '') : '',
             'boite_postale_souscripteur' => $client ? ($client->postal_address ?? $client->address ?? '') : '',
-            'code_nature_attestation' => config('app.asaci_code_nature_attestation', 'JAUN'),
+            'code_nature_attestation' => $this->codeNatureAttestationForContract($contract),
         ];
 
 
