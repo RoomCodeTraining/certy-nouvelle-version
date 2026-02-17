@@ -690,8 +690,13 @@ class ContractController extends Controller
                 ->with('error', 'Une attestation a déjà été générée pour ce contrat.');
         }
 
-        $codeDemandeur = $request->user()?->external_username;
-        $result = $externalService->createProduction($contract, $codeDemandeur);
+        $token = $request->user()?->external_token;
+        if (! $token || ($request->user()?->external_token_expires_at && $request->user()->external_token_expires_at->isPast())) {
+            return redirect()->route('contracts.show', $contract)
+                ->with('error', 'Connexion ASACI requise. Veuillez vous reconnecter à la plateforme digitale.');
+        }
+
+        $result = $externalService->createProduction($contract, $token);
 
         if (! ($result['success'] ?? false)) {
             $message = $result['errors'][0]['title'] ?? 'Impossible de générer l\'attestation.';

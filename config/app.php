@@ -177,6 +177,7 @@ return [
     'request_max_seconds' => (int) env('REQUEST_MAX_SECONDS', 5),
 
     'asaci_core_url' => env('ASACI_CORE_URL', ''),
+    'asaci_office_code' => env('ASACI_OFFICE_CODE', ''),
     'asaci_productions_url' => env('ASACI_PRODUCTIONS_URL', 'https://ppsurceatci.asacitech.com'),
     'asaci_code_demandeur' => env('ASACI_CODE_DEMANDEUR', ''),
     'asaci_code_intermediaire' => env('ASACI_CODE_INTERMEDIAIRE', ''),

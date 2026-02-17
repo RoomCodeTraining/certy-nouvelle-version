@@ -34,14 +34,25 @@ class ExternalService
     }
 
     /**
-     * Génère une attestation digitale via l'API productions ASACI.
-     * Construit le payload à partir du contrat, véhicule et client.
-     * code_demandeur = username du user connecté (récupéré depuis les infos user ASACI à la connexion).
+     * Couleur attestation pour le payload API v1 : cima-vert (Deux roues) ou cima-jaune.
+     */
+    private function couleurAttestationForContract(Contract $contract): string
+    {
+        $type = $contract->contract_type ?? '';
+        if (str_starts_with((string) $type, 'TWO') || $type === 'TWO_WHEELER') {
+            return 'cima-vert';
+        }
+        return 'cima-jaune';
+    }
+
+    /**
+     * Génère une attestation digitale via l'API ASACI Core (POST /api/v1/productions).
+     * Utilise ASACI_CORE_URL + Bearer token externe (external_token du user).
      *
-     * @param  string|null  $codeDemandeur  Username ASACI du user (ex. depuis $request->user()->external_username)
+     * @param  string  $token  Token externe ASACI (Bearer)
      * @return array{success: bool, numero_attestation?: string, lien_pdf?: string, errors?: array}
      */
-    public function createProduction(Contract $contract, ?string $codeDemandeur = null): array
+    public function createProduction(Contract $contract, string $token): array
     {
         $contract->load([
             'client',
@@ -51,6 +62,7 @@ class ExternalService
             'vehicle.vehicleUsage',
             'vehicle.vehicleType',
             'vehicle.vehicleGender',
+            'vehicle.vehicleCategory',
             'company',
         ]);
 
@@ -58,83 +70,106 @@ class ExternalService
         $client = $contract->client;
         $company = $contract->company;
 
-        $codeCompagnie = $company && $company->code ? $company->code : 'ASACI_LUNAR';
+        $organizationCode = $company && $company->code ? $company->code : 'ASACI_LUNAR';
+        $officeCode = config('app.asaci_office_code', '');
+        if ($officeCode === '') {
+            Log::warning('ExternalService createProduction: ASACI_OFFICE_CODE manquant');
+            return [
+                'success' => false,
+                'errors' => [['title' => 'Configuration manquante : code bureau (ASACI_OFFICE_CODE).', 'detail' => []]],
+            ];
+        }
+
         $numeroPolice = $contract->policy_number;
         if ($numeroPolice === null || $numeroPolice === '') {
             $numeroPolice = app(PolicyNumberService::class)->generate($company->code ?? null);
             $contract->update(['policy_number' => $numeroPolice]);
         }
 
-        $listeDemande = [
-            'rc' => (string) ($contract->rc_amount ?? '0'),
-            'date_effet' => $contract->start_date ? $contract->start_date->format('Y-m-d') : '',
-            'date_echeance' => $contract->end_date ? $contract->end_date->format('Y-m-d') : '',
-            'nom_assure' => $client ? ($client->full_name ?? '') : '',
-            'nom_souscripteur' => $client ? ($client->full_name ?? '') : '',
-            'type_souscripteur' => $client->type ?? "TAPP",
-            'numero_police' => $numeroPolice,
-            'type_vehicule' => $vehicle && $vehicle->vehicleType && $vehicle->vehicleType->code ? $vehicle->vehicleType->code : 'TV06',
-            'genre_vehicule' => $vehicle && $vehicle->vehicleGender && $vehicle->vehicleGender->code ? $vehicle->vehicleGender->code : 'GV01',
-            'model_vehicule' => $vehicle && $vehicle->model ? substr(str_replace(' ', '', $vehicle->model->name ?? ''), 0, 30) : '',
-            'marque_vehicule' => $vehicle && $vehicle->brand ? substr(str_replace(' ', '', $vehicle->brand->name ?? ''), 0, 30) : '',
-            'numero_chassis' => $vehicle ? ($vehicle->chassis_number ?? '') : '',
-            'source_energie' => $vehicle && $vehicle->energySource && $vehicle->energySource->code ? $vehicle->energySource->code : 'SEES',
-            'usage_vehicule' => $vehicle && $vehicle->vehicleUsage && $vehicle->vehicleUsage->code ? $vehicle->vehicleUsage->code : 'UV05',
-            'numero_immatriculation' => $vehicle ? ($vehicle->registration_number ?? '') : '',
-            'nombre_place' => (string) ($vehicle->seat_count ?? 5),
-            'categorie_vehicule' => '01',
-            'adresse_mail_assure' => $client ? ($client->email ?? '') : '',
-            'numero_telephone_assure' => $client ? ($client->phone ?? '') : '',
-            'boite_postale_assure' => $client ? ($client->postal_address ?? $client->address ?? '') : '',
-            'adresse_mail_souscripteur' => $client ? ($client->email ?? '') : '',
-            'numero_telephone_souscripteur' => $client ? ($client->phone ?? '') : '',
-            'boite_postale_souscripteur' => $client ? ($client->postal_address ?? $client->address ?? '') : '',
-            'code_nature_attestation' => $this->codeNatureAttestationForContract($contract),
-        ];
+        $typeSouscripteur = ($client->type ?? 'TAPP') === 'TAPM' ? 'TSPM' : 'TSPP';
+        $primeTtc = (int) ($contract->prime_ttc ?? $contract->total_amount ?? 0);
+        $primeRc = (int) ($contract->rc_amount ?? 0);
+        $primeNet = (int) ($contract->base_amount ?? 0) + $primeRc + (int) ($contract->defence_appeal_amount ?? 0) + (int) ($contract->person_transport_amount ?? 0) + (int) ($contract->accessory_amount ?? 0);
 
+        $productions = [
+            [
+                'COULEUR_D_ATTESTATION_A_EDITER' => $this->couleurAttestationForContract($contract),
+                'IMMATRICULATION_DU_VEHICULE' => $vehicle ? ($vehicle->registration_number ?? '') : '',
+                'NUMERO_DE_CHASSIS_DU_VEHICULE' => $vehicle ? ($vehicle->chassis_number ?? '') : '',
+                'GENRE_DU_VEHICULE' => $vehicle && $vehicle->vehicleGender && $vehicle->vehicleGender->code ? $vehicle->vehicleGender->code : 'GV01',
+                'MARQUE_DU_VEHICULE' => $vehicle && $vehicle->brand ? substr(str_replace(' ', '', $vehicle->brand->name ?? ''), 0, 50) : '',
+                'MODELE_DU_VEHICULE' => $vehicle && $vehicle->model ? substr(str_replace(' ', '', $vehicle->model->name ?? ''), 0, 50) : '',
+                'CATEGORIE_DU_VEHICULE' => $vehicle && $vehicle->vehicleCategory && $vehicle->vehicleCategory->code ? $vehicle->vehicleCategory->code : '01',
+                'TYPE_DU_VEHICULE' => $vehicle && $vehicle->vehicleType && $vehicle->vehicleType->code ? $vehicle->vehicleType->code : 'TV06',
+                'ENERGIE_DU_VEHICULE' => $vehicle && $vehicle->energySource && $vehicle->energySource->code ? $vehicle->energySource->code : 'SEES',
+                'NOMBRE_DE_PLACE_DU_VEHICULE' => (string) ($vehicle->seat_count ?? 5),
+                'USAGE_DU_VEHICULE' => $vehicle && $vehicle->vehicleUsage && $vehicle->vehicleUsage->code ? $vehicle->vehicleUsage->code : 'UV05',
+                'TYPE_DE_SOUSCRIPTEUR' => $typeSouscripteur,
+                'NOM_DU_SOUSCRIPTEUR' => $client ? ($client->full_name ?? '') : '',
+                'ADRESSE_EMAIL_DU_SOUSCRIPTEUR' => $client ? ($client->email ?? '') : '',
+                'NUMERO_DE_TELEPHONE_DU_SOUSCRIPTEUR' => $client ? ($client->phone ?? '') : '',
+                'BOITE_POSTALE_DU_SOUSCRIPTEUR' => $client ? ($client->postal_address ?? $client->address ?? '') : '',
+                'NOM_DE_L_ASSURE' => $client ? ($client->full_name ?? '') : '',
+                'ADRESSE_EMAIL_DE_L_ASSURE' => $client ? ($client->email ?? '') : '',
+                'TELEPHONE_MOBILE_DE_L_ASSURE' => $client ? ($client->phone ?? '') : '',
+                'BOITE_POSTALE_DE_L_ASSURE' => $client ? ($client->postal_address ?? $client->address ?? '') : '',
+                'PRIME_RC' => $primeRc,
+                'PRIME_NET' => $primeNet,
+                'PRIME_TTC' => $primeTtc,
+                'FISCAL_POWER' => (int) ($vehicle->fiscal_power ?? 0),
+                'CYLENDER' => (string) ($vehicle->engine_capacity ?? ''),
+                'NUMERO_DE_POLICE' => $numeroPolice,
+                'DATE_D_EFFET_DU_CONTRAT' => $contract->start_date ? $contract->start_date->format('Y-m-d') : '',
+                'DATE_D_ECHEANCE_DU_CONTRAT' => $contract->end_date ? $contract->end_date->format('Y-m-d') : '',
+            ],
+        ];
 
         $payload = [
-            'code_demandeur' => $codeDemandeur !== null && $codeDemandeur !== '' ? $codeDemandeur : config('app.asaci_code_demandeur', ''),
-            'code_intermediaire' => config('app.asaci_code_intermediaire', ''),
-            'code_compagnie' => $codeCompagnie,
-            'liste_demande' => [$listeDemande],
+            'organization_code' => $organizationCode,
+            'office_code' => $officeCode,
+            'certificate_type' => 'cima',
+            'productions' => $productions,
         ];
 
-        $productionsUrl = rtrim(config('app.asaci_productions_url', ''), '/').'/productions';
+        $url = $this->baseUrl.'/api/v1/productions';
+        if ($this->baseUrl === '') {
+            return [
+                'success' => false,
+                'errors' => [['title' => 'Configuration manquante : ASACI_CORE_URL.', 'detail' => []]],
+            ];
+        }
 
         $response = Http::timeout(self::HTTP_TIMEOUT)
             ->withHeaders([
+                'Authorization' => 'Bearer '.$token,
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json',
             ])
-            ->post($productionsUrl, $payload);
+            ->post($url, $payload);
+
+        $rawBody = $response->body();
+        $data = $response->json();
 
         if ($response->failed()) {
             Log::warning('ExternalService createProduction failed', [
                 'payload' => $payload,
                 'status' => $response->status(),
-                'body' => $response->body(),
+                'body' => $rawBody,
                 'contract_id' => $contract->id,
             ]);
             return [
                 'success' => false,
                 'errors' => [[
-                    'title' => $response->json()['message'] ?? 'Erreur lors de la génération de l\'attestation.',
-                    'detail' => $response->body(),
+                    'title' => $data['message'] ?? 'Erreur lors de la génération de l\'attestation.',
+                    'detail' => $rawBody,
                 ]],
             ];
         }
 
-        $rawBody = $response->body();
-        $data = $response->json();
-        $statut = $data['statut'] ?? null;
-        $infos = $data['infos'] ?? [];
-
-        if ($statut !== '0' && $statut !== 0) {
-            Log::warning('ExternalService createProduction statut non OK', [
+        if ($response->status() !== 201) {
+            Log::warning('ExternalService createProduction status non 201', [
                 'payload' => $payload,
-                'statut' => $statut,
-                'http_status' => $response->status(),
+                'status' => $response->status(),
                 'raw_response' => $rawBody,
                 'data' => $data,
                 'contract_id' => $contract->id,
@@ -148,14 +183,20 @@ class ExternalService
             ];
         }
 
-        $first = is_array($infos) && isset($infos[0]) ? $infos[0] : [];
-        $numeroAttestation = $first['numero_attestation'] ?? null;
-        $lienPdf = $first['lien_pdf'] ?? null;
+        $responseData = $data['data'] ?? [];
+        $certificates = $responseData['certificates'] ?? [];
+        $firstCert = is_array($certificates) && isset($certificates[0]) ? $certificates[0] : null;
+        $numeroAttestation = $firstCert['reference'] ?? $responseData['reference'] ?? null;
+        $lienPdf = $firstCert['download_link'] ?? $responseData['download_link'] ?? null;
 
         if (! $numeroAttestation || ! $lienPdf) {
+            Log::warning('ExternalService createProduction: réponse sans numéro ou lien attestation', [
+                'data' => $responseData,
+                'contract_id' => $contract->id,
+            ]);
             return [
                 'success' => false,
-                'errors' => [['title' => 'Réponse invalide : numéro ou lien d\'attestation manquant.', 'detail' => $data]],
+                'errors' => [['title' => 'Réponse invalide : numéro ou lien d\'attestation manquant.', 'detail' => $responseData]],
             ];
         }
 
