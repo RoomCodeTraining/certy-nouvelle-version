@@ -119,6 +119,11 @@ class AuthenticatedSessionController extends Controller
             ?? (is_array($organization) ? ($organization['code'] ?? null) : null)
             ?? (is_array($userData['relationship'] ?? null) ? ($userData['relationship']['code'] ?? null) : null);
 
+        $currentOffice = $userData['current_office'] ?? $userData['office'] ?? null;
+        $officeCode = $userData['office_code']
+            ?? (is_array($currentOffice) ? ($currentOffice['code'] ?? null) : null)
+            ?? null;
+
         $role = $userData['role'] ?? null;
         $roleCode = is_array($role) ? ($role['name'] ?? $role['code'] ?? null) : ($role !== null ? (string) $role : null);
         $roleName = is_array($role) ? ($role['label'] ?? $role['name'] ?? null) : null;
@@ -130,6 +135,7 @@ class AuthenticatedSessionController extends Controller
             'external_token_expires_at' => $expiresAt,
             'external_username' => $username,
             'external_entity_code' => $entityCode,
+            'office_code' => $officeCode,
             'user_role_code' => $roleCode,
             'user_role_name' => $roleName,
             'is_root' => $isRoot,

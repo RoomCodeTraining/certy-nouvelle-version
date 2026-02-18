@@ -74,9 +74,10 @@ class ExternalService
      * Utilise ASACI_CORE_URL + Bearer token externe (external_token du user).
      *
      * @param  string  $token  Token externe ASACI (Bearer)
+     * @param  \App\Models\User|null  $user  Utilisateur qui génère l'attestation (office_code pris sur son profil)
      * @return array{success: bool, numero_attestation?: string, lien_pdf?: string, errors?: array}
      */
-    public function createProduction(Contract $contract, string $token): array
+    public function createProduction(Contract $contract, string $token, ?\App\Models\User $user = null): array
     {
         $contract->load([
             'client',
@@ -140,8 +141,13 @@ class ExternalService
             ],
         ];
 
+        $officeCode = $user?->office_code
+            ?: config('app.asaci_office_code', '')
+            ?: $organizationCode;
+
         $payload = [
             'organization_code' => $organizationCode,
+            'office_code' => $officeCode,
             'certificate_type' => 'cima',
             'productions' => $productions,
         ];
