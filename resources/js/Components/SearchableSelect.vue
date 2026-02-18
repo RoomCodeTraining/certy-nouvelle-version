@@ -108,14 +108,18 @@ watch(isOpen, (open) => {
             @click="isOpen = !isOpen"
             @keydown="onTriggerKeydown"
         >
-            <span class="flex items-center gap-2 min-w-0 flex-1">
+            <span class="flex items-center gap-2 min-w-0 flex-1 text-left">
                 <img
                     v-if="imageKey && selectedOption && getOptionImage(selectedOption)"
                     :src="getOptionImage(selectedOption)"
                     :alt="getOptionLabel(selectedOption)"
                     class="h-6 w-6 shrink-0 rounded object-contain bg-slate-50"
                 />
-                <span class="truncate" :class="!selectedOption && placeholder ? 'text-slate-400' : ''">
+                <span
+                    class="whitespace-normal break-words"
+                    :class="!selectedOption && placeholder ? 'text-slate-400' : ''"
+                    :title="displayLabel"
+                >
                     {{ displayLabel }}
                 </span>
             </span>
@@ -126,7 +130,7 @@ watch(isOpen, (open) => {
 
         <div
             v-show="isOpen"
-            class="absolute z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white py-1 min-w-[12rem] max-h-72 flex flex-col"
+            class="absolute z-50 mt-1 left-0 right-0 min-w-full rounded-lg border border-slate-200 bg-white py-1 max-h-72 flex flex-col shadow-lg"
         >
             <div class="p-2 border-b border-slate-100 sticky top-0 bg-white">
                 <input
@@ -151,7 +155,7 @@ watch(isOpen, (open) => {
                     v-for="opt in filteredOptions"
                     :key="getOptionValue(opt)"
                     type="button"
-                    class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2"
+                    class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-start gap-2"
                     :class="String(getOptionValue(opt)) === String(modelValue) ? 'bg-slate-100 text-slate-900 font-medium' : 'text-slate-700'"
                     @click="select(opt)"
                 >
@@ -159,9 +163,9 @@ watch(isOpen, (open) => {
                         v-if="imageKey && getOptionImage(opt)"
                         :src="getOptionImage(opt)"
                         :alt="getOptionLabel(opt)"
-                        class="h-6 w-6 shrink-0 rounded object-contain bg-slate-50"
+                        class="h-6 w-6 shrink-0 rounded object-contain bg-slate-50 mt-0.5"
                     />
-                    <span class="truncate">{{ getOptionLabel(opt) }}</span>
+                    <span class="whitespace-normal break-words min-w-0">{{ getOptionLabel(opt) }}</span>
                 </button>
                 <p v-if="filteredOptions.length === 0 && normalizedOptions.length > 0" class="px-3 py-2 text-sm text-slate-500">
                     Aucun résultat
