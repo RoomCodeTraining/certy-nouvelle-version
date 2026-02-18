@@ -44,20 +44,26 @@ class Client extends Model
     }
 
     /**
-     * Périmètre d'accès : root = tous les clients de l'organisation, non-root = clients dont owner_id = user.
+     * Périmètre d'accès : root = tous les clients des organisations auxquelles il appartient ;
+     * non-root = clients de son organisation dont owner_id = user.
      */
     public function scopeAccessibleBy(Builder $query, \App\Models\User $user): Builder
     {
+        if ($user->isRoot()) {
+            $orgIds = $user->organizations()->pluck('id');
+            if ($orgIds->isEmpty()) {
+                return $query->whereRaw('1=0');
+            }
+
+            return $query->whereIn('organization_id', $orgIds);
+        }
+
         $org = $user->currentOrganization();
         if (! $org) {
             return $query->whereRaw('1=0');
         }
-        $query->where('organization_id', $org->id);
-        if (! $user->isRoot()) {
-            $query->where('owner_id', $user->id);
-        }
 
-        return $query;
+        return $query->where('organization_id', $org->id)->where('owner_id', $user->id);
     }
 
     public function organization(): BelongsTo

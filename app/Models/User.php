@@ -32,8 +32,8 @@ class User extends Authenticatable
     }
 
     /**
-     * Profil root = accès global (données de tous les apporteurs).
-     * Défini par le flag is_root ou par le rôle ASACI main_office_admin.
+     * Profil root = accès global (données de tous les apporteurs / collaborateurs).
+     * Défini par le flag is_root ou par le rôle ASACI main_office_admin (insensible à la casse).
      */
     public function isRoot(): bool
     {
@@ -41,8 +41,10 @@ class User extends Authenticatable
             return true;
         }
 
-        return $this->user_role_code === 'main_office_admin'
-            || $this->user_role_name === 'main_office_admin';
+        $code = is_string($this->user_role_code) ? strtolower($this->user_role_code) : '';
+        $name = is_string($this->user_role_name) ? strtolower($this->user_role_name) : '';
+
+        return $code === 'main_office_admin' || $name === 'main_office_admin';
     }
 
     public function organizations(): BelongsToMany
