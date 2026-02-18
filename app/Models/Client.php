@@ -50,7 +50,7 @@ class Client extends Model
     public function scopeAccessibleBy(Builder $query, \App\Models\User $user): Builder
     {
         if ($user->isRoot()) {
-            $orgIds = $user->organizations()->pluck('id');
+            $orgIds = $user->organizations()->pluck('organizations.id');
             if ($orgIds->isEmpty()) {
                 return $query->whereRaw('1=0');
             }
