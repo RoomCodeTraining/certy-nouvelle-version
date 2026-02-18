@@ -18,21 +18,23 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class BordereauController extends Controller
 {
     /**
-     * Liste des bordereaux de l'organisation (compagnie + période du -> au).
+     * Liste des bordereaux : root = tous, non-root = ceux de son organisation.
      */
     public function index(Request $request): Response
     {
         $user = $request->user();
         $organization = $user->currentOrganization();
-        if (! $organization) {
+        if (! $user->isRoot() && ! $organization) {
             return Inertia::location(route('dashboard'));
         }
 
         $query = Bordereau::query()
-            ->where('organization_id', $organization->id)
             ->with('company:id,name,code')
             ->orderByDesc('period_end')
             ->orderByDesc('period_start');
+        if (! $user->isRoot()) {
+            $query->where('organization_id', $organization->id);
+        }
 
         if ($request->filled('search')) {
             $query->where('reference', 'like', '%'.$request->search.'%');
@@ -168,9 +170,11 @@ class BordereauController extends Controller
     public function show(Request $request, Bordereau $bordereau): Response|RedirectResponse
     {
         $user = $request->user();
-        $organization = $user->currentOrganization();
-        if (! $organization || $bordereau->organization_id !== $organization->id) {
-            return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
+        if (! $user->isRoot()) {
+            $organization = $user->currentOrganization();
+            if (! $organization || $bordereau->organization_id !== $organization->id) {
+                return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
+            }
         }
 
         $bordereau->load('company:id,name,code');
@@ -221,9 +225,12 @@ class BordereauController extends Controller
      */
     public function validate(Request $request, Bordereau $bordereau): RedirectResponse
     {
-        $organization = $request->user()->currentOrganization();
-        if (! $organization || $bordereau->organization_id !== $organization->id) {
-            return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
+        $user = $request->user();
+        if (! $user->isRoot()) {
+            $organization = $user->currentOrganization();
+            if (! $organization || $bordereau->organization_id !== $organization->id) {
+                return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
+            }
         }
         if ($bordereau->status !== Bordereau::STATUS_DRAFT) {
             return redirect()->route('bordereaux.show', $bordereau)->with('error', 'Seul un bordereau en brouillon peut être validé.');
@@ -237,9 +244,12 @@ class BordereauController extends Controller
      */
     public function destroy(Request $request, Bordereau $bordereau): RedirectResponse
     {
-        $organization = $request->user()->currentOrganization();
-        if (! $organization || $bordereau->organization_id !== $organization->id) {
-            return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
+        $user = $request->user();
+        if (! $user->isRoot()) {
+            $organization = $user->currentOrganization();
+            if (! $organization || $bordereau->organization_id !== $organization->id) {
+                return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
+            }
         }
         if ($bordereau->status !== Bordereau::STATUS_DRAFT) {
             return redirect()->route('bordereaux.show', $bordereau)->with('error', 'Seul un bordereau en brouillon peut être supprimé.');
@@ -253,9 +263,12 @@ class BordereauController extends Controller
      */
     public function pdf(Request $request, Bordereau $bordereau): HttpResponse|RedirectResponse
     {
-        $organization = $request->user()->currentOrganization();
-        if (! $organization || $bordereau->organization_id !== $organization->id) {
-            return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
+        $user = $request->user();
+        if (! $user->isRoot()) {
+            $organization = $user->currentOrganization();
+            if (! $organization || $bordereau->organization_id !== $organization->id) {
+                return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
+            }
         }
         $bordereau->load('company');
         // Période du/au = date de création des contrats (created_at)
@@ -279,9 +292,12 @@ class BordereauController extends Controller
      */
     public function excel(Request $request, Bordereau $bordereau): StreamedResponse|RedirectResponse
     {
-        $organization = $request->user()->currentOrganization();
-        if (! $organization || $bordereau->organization_id !== $organization->id) {
-            return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
+        $user = $request->user();
+        if (! $user->isRoot()) {
+            $organization = $user->currentOrganization();
+            if (! $organization || $bordereau->organization_id !== $organization->id) {
+                return redirect()->route('bordereaux.index')->with('error', 'Bordereau non trouvé.');
+            }
         }
         $bordereau->load('company');
         // Période du/au = date de création des contrats (created_at)
