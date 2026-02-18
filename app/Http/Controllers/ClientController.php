@@ -20,7 +20,7 @@ class ClientController extends Controller
         $user = $request->user();
         $query = Client::accessibleBy($user)
             ->withCount('vehicles')
-            ->with('profession:id,name');
+            ->with(['profession:id,name', 'owner:id,name']);
 
         if ($request->filled('search')) {
             $search = $request->search;

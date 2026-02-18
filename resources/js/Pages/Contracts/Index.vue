@@ -60,6 +60,7 @@ const columns = [
             ?? [row.vehicle?.brand?.name, row.vehicle?.model?.name].filter(Boolean).join(' ')
             ?? '—',
     },
+    { key: 'owner', label: 'Propriétaire', getValue: (row) => row.client?.owner?.name ?? '—' },
     { key: 'contract_type', label: 'Type', getValue: (row) => contractTypeLabel(row.contract_type) },
     { key: 'start_date', label: 'Date début', getValue: (row) => formatDate(row.start_date) },
     { key: 'end_date', label: 'Date fin', getValue: (row) => formatDate(row.end_date) },
@@ -228,6 +229,7 @@ function cancel(contract, label) {
                         </div>
                         <p class="text-sm text-slate-700 mt-0.5">{{ contractTypeLabel(row.contract_type) }}</p>
                         <p class="text-xs text-slate-500 mt-1">{{ row.vehicle?.registration_number || [row.vehicle?.brand?.name, row.vehicle?.model?.name].filter(Boolean).join(' ') || '—' }}</p>
+                        <p v-if="row.client?.owner?.name" class="text-xs text-slate-500 mt-0.5">Propriétaire : {{ row.client.owner.name }}</p>
                         <p class="text-xs text-slate-500 mt-0.5">{{ formatDate(row.start_date) }} → {{ formatDate(row.end_date) }}</p>
                         <div class="flex items-center justify-between gap-2 mt-2">
                             <span

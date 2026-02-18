@@ -31,6 +31,7 @@ const columns = [
         getValue: (row) => row.registration_number ?? '—',
         href: (row) => route('vehicles.show', row.id),
     },
+    { key: 'owner', label: 'Propriétaire', getValue: (row) => row.client?.owner?.name ?? '—' },
     { key: 'brand', label: 'Marque', getValue: (row) => row.brand?.name ?? '—' },
     { key: 'model', label: 'Modèle', getValue: (row) => row.model?.name ?? '—' },
     { key: 'seat_count', label: 'Places', getValue: (row) => row.seat_count != null ? row.seat_count : '—' },
@@ -101,6 +102,7 @@ function destroy(vehicle, label) {
                     <Link :href="route('vehicles.show', row.id)" class="block active:bg-slate-50/80 rounded-lg -m-2 p-2 transition-colors">
                         <p class="font-medium text-slate-900">{{ row.registration_number ?? '—' }}</p>
                         <p class="text-sm text-slate-700 mt-0.5">{{ row.brand?.name ?? '—' }} {{ row.model?.name ?? '' }}</p>
+                        <p v-if="row.client?.owner?.name" class="text-xs text-slate-500 mt-1">Propriétaire : {{ row.client.owner.name }}</p>
                         <p class="text-xs text-slate-500 mt-1">{{ row.reference ?? '—' }}</p>
                     </Link>
                     <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-100">

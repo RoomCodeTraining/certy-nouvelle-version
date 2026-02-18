@@ -149,7 +149,7 @@ class ContractController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
-        $with = ['client:id,full_name', 'vehicle:id,registration_number,vehicle_brand_id,vehicle_model_id', 'vehicle.brand:id,name', 'vehicle.model:id,name', 'company:id,name'];
+        $with = ['client:id,full_name,owner_id', 'client.owner:id,name', 'vehicle:id,registration_number,vehicle_brand_id,vehicle_model_id', 'vehicle.brand:id,name', 'vehicle.model:id,name', 'company:id,name'];
         if (Schema::hasColumn('contracts', 'parent_id')) {
             $with[] = 'parent:id';
         }
@@ -193,7 +193,7 @@ class ContractController extends Controller
     public function export(Request $request): StreamedResponse
     {
         $user = $request->user();
-        $with = ['client:id,full_name', 'vehicle:id,registration_number,vehicle_brand_id,vehicle_model_id', 'vehicle.brand:id,name', 'vehicle.model:id,name', 'company:id,name'];
+        $with = ['client:id,full_name,owner_id', 'client.owner:id,name', 'vehicle:id,registration_number,vehicle_brand_id,vehicle_model_id', 'vehicle.brand:id,name', 'vehicle.model:id,name', 'company:id,name'];
         if (Schema::hasColumn('contracts', 'parent_id')) {
             $with[] = 'parent:id';
         }
@@ -254,6 +254,7 @@ class ContractController extends Controller
             'Affaire',
             'Statut',
             'Client',
+            'Propriétaire',
             'Véhicule',
             'Type contrat',
             'Compagnie',
@@ -310,6 +311,7 @@ class ContractController extends Controller
                     $c->parent_id ? 'Renouvellement' : 'Nouvelle affaire',
                     $statusLabels[$c->status] ?? $c->status,
                     $c->client?->full_name ?? '',
+                    $c->client?->owner?->name ?? '',
                     $vehicleLabel,
                     $contractTypeLabels[$c->contract_type] ?? $c->contract_type,
                     $c->company?->name ?? '',

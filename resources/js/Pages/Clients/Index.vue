@@ -25,6 +25,7 @@ const columns = [
     { key: 'created_at', label: 'Date', getValue: (row) => formatDate(row.created_at) },
     { key: 'reference', label: 'Référence', getValue: (row) => row.reference ?? '—' },
     { key: 'full_name', label: 'Nom complet', type: 'link', getValue: (row) => row.full_name ?? '—', href: (row) => route('clients.show', row.id) },
+    { key: 'owner', label: 'Propriétaire', getValue: (row) => row.owner?.name ?? '—' },
     { key: 'email', label: 'Email', getValue: (row) => row.email ?? '—' },
     { key: 'phone', label: 'Téléphone', getValue: (row) => row.phone ?? '—' },
     { key: 'address', label: 'Adresse', getValue: (row) => row.address ?? '—' },
@@ -99,6 +100,7 @@ function destroy(client, clientName) {
                     <Link :href="route('clients.show', row.id)" class="block active:bg-slate-50/80 rounded-lg -m-2 p-2 transition-colors">
                         <p class="font-medium text-slate-900">{{ row.full_name ?? '—' }}</p>
                         <p class="text-sm text-slate-600 mt-0.5">{{ row.reference ?? '—' }}</p>
+                        <p v-if="row.owner?.name" class="text-xs text-slate-500 mt-1">Propriétaire : {{ row.owner.name }}</p>
                         <p class="text-xs text-slate-500 mt-1 truncate">{{ row.email ?? '—' }}</p>
                         <p class="text-xs text-slate-500 truncate">{{ row.phone ?? '—' }}</p>
                     </Link>

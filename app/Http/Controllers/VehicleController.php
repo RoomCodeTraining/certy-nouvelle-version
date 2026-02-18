@@ -29,7 +29,7 @@ class VehicleController extends Controller
     {
         $user = $request->user();
         $query = Vehicle::accessibleBy($user)
-            ->with(['client:id,full_name', 'brand:id,name', 'model:id,name', 'color:id,name']);
+            ->with(['client:id,full_name,owner_id', 'client.owner:id,name', 'brand:id,name', 'model:id,name', 'color:id,name']);
 
         if ($request->filled('search')) {
             $search = $request->search;
