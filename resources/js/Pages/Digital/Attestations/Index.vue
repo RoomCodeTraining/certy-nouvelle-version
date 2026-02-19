@@ -109,6 +109,11 @@ function isDownloading(ref, source) {
 async function handleDownload(ref, source) {
     const url = downloadUrlFor(ref, source);
     if (!url) return;
+    // Pour « Autres », ouvrir dans un nouvel onglet pour que l’utilisateur télécharge là (évite l’erreur PDF dans l’iframe).
+    if (source === "autres") {
+        window.open(url, "_blank");
+        return;
+    }
     const key = `${ref}|${source}`;
     downloadingKey.value = key;
     try {
