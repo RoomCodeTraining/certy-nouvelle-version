@@ -688,10 +688,10 @@ class ContractController extends Controller
                 ->with('error', 'Seul un contrat validé ou actif peut générer une attestation.');
         }
 
-        if ($contract->attestation_issued_at !== null || $contract->attestation_number !== null) {
-            return redirect()->route('contracts.show', $contract)
-                ->with('error', 'Une attestation a déjà été générée pour ce contrat.');
-        }
+        // if ($contract->attestation_issued_at !== null || $contract->attestation_number !== null) {
+        //     return redirect()->route('contracts.show', $contract)
+        //         ->with('error', 'Une attestation a déjà été générée pour ce contrat.');
+        // }
 
         $token = $request->user()?->external_token;
         if (! $token || ($request->user()?->external_token_expires_at && $request->user()->external_token_expires_at->isPast())) {
