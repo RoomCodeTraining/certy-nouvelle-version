@@ -480,7 +480,8 @@ class ContractController extends Controller
         }
         $contract->load($relations);
 
-        $hasAttestation = $contract->attestation_issued_at !== null || $contract->attestation_number !== null;
+        // Une attestation "réelle" = numéro ou lien disponible (pas seulement attestation_issued_at)
+        $hasAttestation = $contract->attestation_number !== null || $contract->attestation_link !== null;
         $canEditAttestation = in_array($contract->status, [Contract::STATUS_VALIDATED, Contract::STATUS_ACTIVE], true) && ! $hasAttestation;
 
         return Inertia::render('Contracts/Show', [
