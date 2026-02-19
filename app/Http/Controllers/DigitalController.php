@@ -94,6 +94,17 @@ class DigitalController extends Controller
             }
             if (is_array($cedeao) && ($cedeao['ok'] ?? false) === true) {
                 $res = $cedeao['response'];
+                $contentType = $res->header('Content-Type', '');
+                // Si la réponse est du JSON avec une URL de téléchargement directe, rediriger vers elle (ouvre directement).
+                if (str_contains($contentType, 'application/json')) {
+                    $body = $res->json();
+                    $data = $body['data'] ?? $body;
+                    $directUrl = $data['download_link'] ?? $data['download_url'] ?? $body['download_link'] ?? $body['download_url'] ?? null;
+                    if ($directUrl && is_string($directUrl) && str_starts_with($directUrl, 'http')) {
+                        return redirect()->away($directUrl);
+                    }
+                }
+                // Sinon : réponse binaire (PDF), on renvoie le corps.
                 return response($res->body(), $res->status())
                     ->header('Content-Type', $res->header('Content-Type') ?: 'application/pdf')
                     ->header('Content-Disposition', 'attachment; filename="attestation-'.$reference.'.pdf"');
