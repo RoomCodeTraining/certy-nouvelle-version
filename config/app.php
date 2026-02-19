@@ -183,4 +183,10 @@ return [
     'asaci_code_intermediaire' => env('ASACI_CODE_INTERMEDIAIRE', ''),
     'asaci_code_nature_attestation' => env('ASACI_CODE_NATURE_ATTESTATION', 'JAUN'),
 
+    /*
+    | API CEDEAO (EATCI BNICB) pour télécharger / visualiser les attestations.
+    | GET {eatci_cedeao_api_url}/api/v1/certificates/related/{reference}
+    */
+    'eatci_cedeao_api_url' => rtrim(env('EATCI_CEDEAO_API_URL', 'https://eatci-api.bnicb.com'), '/'),
+
 ];

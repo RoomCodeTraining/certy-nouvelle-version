@@ -79,9 +79,17 @@ class DigitalController extends Controller
 
     /**
      * Télécharger le PDF d'une attestation.
+     * Tente d'abord l'API CEDEAO (EATCI BNICB) GET /api/v1/certificates/related/{reference}, puis l'API ASACI.
      */
     public function downloadAttestation(Request $request, string $reference): HttpResponse|RedirectResponse
     {
+        $cedeao = $this->externalService->getCertificateRelatedCedeao($reference);
+        if ($cedeao !== null) {
+            return response($cedeao->body(), $cedeao->status())
+                ->header('Content-Type', $cedeao->header('Content-Type') ?: 'application/pdf')
+                ->header('Content-Disposition', 'attachment; filename="attestation-'.$reference.'.pdf"');
+        }
+
         $token = $this->requireToken($request);
         if ($token instanceof RedirectResponse) {
             return $token;
@@ -100,10 +108,19 @@ class DigitalController extends Controller
 
     /**
      * Visualiser l'attestation dans le modal (PDF en inline).
-     * Utilise l'API GET /api/v1/certificates/{reference} et le champ printed_certificate pour afficher le PDF.
+     * Tente d'abord l'API CEDEAO (EATCI BNICB) GET /api/v1/certificates/related/{reference}, puis l'API ASACI.
      */
     public function viewAttestation(Request $request, string $reference): HttpResponse|RedirectResponse
     {
+        $cedeao = $this->externalService->getCertificateRelatedCedeao($reference);
+        if ($cedeao !== null) {
+            $contentType = $cedeao->header('Content-Type') ?: 'application/pdf';
+            return response($cedeao->body(), 200, [
+                'Content-Type' => $contentType,
+                'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.pdf"',
+            ]);
+        }
+
         $token = $this->requireToken($request);
         if ($token instanceof RedirectResponse) {
             return $token;

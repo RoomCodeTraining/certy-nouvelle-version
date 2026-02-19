@@ -569,6 +569,37 @@ class ExternalService
     }
 
     /**
+     * Récupère le PDF d'une attestation CEDEAO via l'API EATCI BNICB.
+     * GET {eatci_cedeao_api_url}/api/v1/certificates/related/{reference}
+     * Un seul paramètre : la référence (ex. ATD-8A3272B348).
+     *
+     * @param  string  $reference  Référence du certificat (ex. ATD-8A3272B348)
+     * @return \Illuminate\Http\Client\Response|null  Réponse avec le corps PDF, ou null si config absente / erreur
+     */
+    public function getCertificateRelatedCedeao(string $reference): ?\Illuminate\Http\Client\Response
+    {
+        $baseUrl = config('app.eatci_cedeao_api_url', '');
+        if ($baseUrl === '') {
+            return null;
+        }
+
+        $url = $baseUrl.'/api/v1/certificates/related/'.ltrim($reference, '/');
+        $response = Http::timeout(self::HTTP_TIMEOUT)->get($url);
+
+        if ($response->failed()) {
+            Log::debug('EATCI CEDEAO getCertificateRelated failed', [
+                'reference' => $reference,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return null;
+        }
+
+        return $response;
+    }
+
+    /**
      * Télécharge le PDF d'un certificat depuis l'API externe (GET /certificates/{reference}/download).
      *
      * @param  string  $reference
