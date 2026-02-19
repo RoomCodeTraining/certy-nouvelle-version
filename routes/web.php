@@ -106,6 +106,7 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     // Digital (service externe ASACI)
     Route::get('/digital/attestations', [DigitalController::class, 'attestations'])->name('digital.attestations');
     Route::get('/digital/attestations/{reference}/download', [DigitalController::class, 'downloadAttestation'])->name('digital.attestations.download');
+    Route::get('/digital/attestations/{reference}/download-url', [DigitalController::class, 'downloadUrlAttestation'])->name('digital.attestations.download_url');
     Route::get('/digital/attestations/{reference}/view', [DigitalController::class, 'viewAttestation'])->name('digital.attestations.view');
     Route::middleware('root')->group(function () {
         Route::get('/digital/rattachements', [DigitalController::class, 'rattachements'])->name('digital.rattachements');

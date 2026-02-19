@@ -1,5 +1,5 @@
 <script setup>
-import { Link, router } from "@inertiajs/vue3";
+import { Link, router, usePage } from "@inertiajs/vue3";
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import DashboardLayout from "@/Layouts/DashboardLayout.vue";
 import PageHeader from "@/Components/PageHeader.vue";
@@ -15,6 +15,11 @@ const props = defineProps({
     error: String,
     filters: Object,
 });
+
+const page = usePage();
+/** Erreur à afficher : prop (chargement liste), flash (redirect après 404), ou erreur locale (fetch download-url 404). */
+const displayError = ref(null);
+const errorToShow = computed(() => displayError.value ?? props.error ?? page.props.flash?.error ?? null);
 
 const list = Array.isArray(props.attestations)
     ? props.attestations
@@ -111,6 +116,28 @@ async function handleDownload(ref, source) {
     if (!url) return;
     // Pour « Autres », ouvrir dans un nouvel onglet pour que l’utilisateur télécharge là (évite l’erreur PDF dans l’iframe).
     if (source === "autres") {
+        const key = `${ref}|${source}`;
+        downloadingKey.value = key;
+        displayError.value = null;
+        try {
+            const res = await fetch(route("digital.attestations.download_url", ref) + "?source=autres", {
+                credentials: "same-origin",
+                method: "GET",
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.url && typeof data.url === "string") {
+                window.open(data.url, "_blank");
+                return;
+            }
+            if (res.status === 404 && data.message && typeof data.message === "string") {
+                displayError.value = data.message;
+                return;
+            }
+        } catch (_) {
+            /* ignore */
+        } finally {
+            if (downloadingKey.value === key) downloadingKey.value = null;
+        }
         window.open(url, "_blank");
         return;
     }
@@ -413,10 +440,20 @@ const columns = [
         </p>
 
         <div
-            v-if="error"
-            class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm mb-6"
+            v-if="errorToShow"
+            class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm mb-6 flex items-start justify-between gap-3"
         >
-            {{ error }}
+            <span>{{ errorToShow }}</span>
+            <button
+                type="button"
+                class="shrink-0 text-amber-600 hover:text-amber-800"
+                aria-label="Fermer"
+                @click="displayError = null"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
         </div>
 
         <div
@@ -800,10 +837,7 @@ const columns = [
                                         <div class="p-1">
                                             <button
                                                 type="button"
-                                                @click="
-                                                    openViewModal(row, 'cima');
-                                                    closeActionMenu();
-                                                "
+                                                @click="openViewModal(row, 'cima')"
                                                 class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left"
                                             >
                                                 <span
@@ -843,8 +877,7 @@ const columns = [
                                                     handleDownload(
                                                         getAttestationRef(row),
                                                         'cima',
-                                                    );
-                                                    closeActionMenu();
+                                                    )
                                                 "
                                                 class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left disabled:opacity-70 disabled:cursor-wait"
                                             >
@@ -919,8 +952,7 @@ const columns = [
                                                     openViewModal(
                                                         row,
                                                         'autres',
-                                                    );
-                                                    closeActionMenu();
+                                                    )
                                                 "
                                                 class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left"
                                             >
@@ -961,8 +993,7 @@ const columns = [
                                                     handleDownload(
                                                         getAttestationRef(row),
                                                         'autres',
-                                                    );
-                                                    closeActionMenu();
+                                                    )
                                                 "
                                                 class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left disabled:opacity-70 disabled:cursor-wait"
                                             >

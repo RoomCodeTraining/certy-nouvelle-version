@@ -132,6 +132,25 @@ class DigitalController extends Controller
     }
 
     /**
+     * Retourne l'URL directe de téléchargement pour une attestation (source=autres uniquement).
+     * Permet au front d'ouvrir directement l'URL EATCI au lieu de passer par notre proxy.
+     */
+    public function downloadUrlAttestation(Request $request, string $reference): HttpResponse
+    {
+        $source = strtolower((string) $request->query('source', ''));
+        if ($source !== 'autres') {
+            return response()->json(['url' => null], 400);
+        }
+
+        $result = $this->externalService->getCertificateDownloadUrlCedeao($reference);
+        if (($result['url'] ?? null) !== null) {
+            return response()->json(['url' => $result['url']]);
+        }
+        $message = $result['message'] ?? 'URL de téléchargement indisponible.';
+        return response()->json(['url' => null, 'message' => $message], 404);
+    }
+
+    /**
      * Visualiser l'attestation dans le modal (PDF en inline).
      * source=cima : API ASACI (token requis). source=autres : API EATCI BNICB (certificates/related).
      */

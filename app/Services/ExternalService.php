@@ -605,6 +605,51 @@ class ExternalService
     }
 
     /**
+     * Retourne l'URL directe de téléchargement EATCI pour une attestation CEDEAO, si l'API la fournit.
+     * En cas d'échec (ex. 404), retourne le message d'erreur pour l'afficher à l'utilisateur.
+     *
+     * @return array{url: string|null, message: string|null}
+     */
+    public function getCertificateDownloadUrlCedeao(string $reference): array
+    {
+        $cedeao = $this->getCertificateRelatedCedeao($reference);
+        if ($cedeao === null) {
+            return ['url' => null, 'message' => 'Téléchargement indisponible (service non configuré).'];
+        }
+        if (($cedeao['ok'] ?? false) !== true) {
+            return ['url' => null, 'message' => $cedeao['message'] ?? 'Téléchargement indisponible pour cette attestation.'];
+        }
+
+        $res = $cedeao['response'];
+        $contentType = $res->header('Content-Type', '');
+        if (! str_contains($contentType, 'application/json')) {
+            return ['url' => null, 'message' => null];
+        }
+
+        $body = $res->json();
+        if (! is_array($body)) {
+            return ['url' => null, 'message' => null];
+        }
+
+        $data = $body['data'] ?? $body;
+        $directUrl = $data['download_link'] ?? $data['download_url'] ?? $data['pdf_url'] ?? $body['download_link'] ?? $body['download_url'] ?? null;
+        if ($directUrl && is_string($directUrl) && str_starts_with($directUrl, 'http')) {
+            return ['url' => $directUrl, 'message' => null];
+        }
+
+        // Construire l'URL si on a une signature dans la réponse
+        $baseUrl = rtrim(config('app.eatci_cedeao_api_url', ''), '/');
+        if ($baseUrl !== '') {
+            $signature = $data['signature'] ?? $data['download_signature'] ?? $body['signature'] ?? null;
+            if ($signature && is_string($signature)) {
+                return ['url' => $baseUrl.'/api/v1/certificates/'.ltrim($reference, '/').'/download?signature='.rawurlencode($signature), 'message' => null];
+            }
+        }
+
+        return ['url' => null, 'message' => null];
+    }
+
+    /**
      * Télécharge le PDF d'un certificat depuis l'API externe (GET /certificates/{reference}/download).
      *
      * @param  string  $reference
