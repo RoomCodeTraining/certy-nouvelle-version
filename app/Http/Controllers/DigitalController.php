@@ -87,14 +87,21 @@ class DigitalController extends Controller
 
         if ($source === 'autres') {
             $cedeao = $this->externalService->getCertificateRelatedCedeao($reference);
-            if ($cedeao !== null) {
-                return response($cedeao->body(), $cedeao->status())
-                    ->header('Content-Type', $cedeao->header('Content-Type') ?: 'application/pdf')
+            if ($cedeao === null) {
+                return redirect()
+                    ->route('digital.attestations')
+                    ->with('error', 'Téléchargement indisponible (service non configuré).');
+            }
+            if (is_array($cedeao) && ($cedeao['ok'] ?? false) === true) {
+                $res = $cedeao['response'];
+                return response($res->body(), $res->status())
+                    ->header('Content-Type', $res->header('Content-Type') ?: 'application/pdf')
                     ->header('Content-Disposition', 'attachment; filename="attestation-'.$reference.'.pdf"');
             }
+            $message = is_array($cedeao) && isset($cedeao['message']) ? $cedeao['message'] : 'Téléchargement indisponible pour cette source.';
             return redirect()
                 ->route('digital.attestations')
-                ->with('error', 'Téléchargement indisponible pour cette source.');
+                ->with('error', $message);
         }
 
         $token = $this->requireToken($request);
@@ -123,16 +130,42 @@ class DigitalController extends Controller
 
         if ($source === 'autres') {
             $cedeao = $this->externalService->getCertificateRelatedCedeao($reference);
-            if ($cedeao !== null) {
-                $contentType = $cedeao->header('Content-Type') ?: 'application/pdf';
-                return response($cedeao->body(), 200, [
-                    'Content-Type' => $contentType,
+            if ($cedeao === null) {
+                return redirect()
+                    ->route('digital.attestations')
+                    ->with('error', 'Visualisation indisponible (service non configuré).');
+            }
+            if (is_array($cedeao) && ($cedeao['ok'] ?? false) === true) {
+                $res = $cedeao['response'];
+                $body = $res->body();
+                $contentType = $res->header('Content-Type') ?? '';
+
+                // Réponse JSON CEDEAO avec printed_certificate (image base64) : afficher en image comme CIMA
+                if (str_contains($contentType, 'application/json')) {
+                    $json = json_decode($body, true);
+                    $printedCertificate = is_array($json) ? ($json['data']['printed_certificate'] ?? $json['printed_certificate'] ?? null) : null;
+                    if (is_string($printedCertificate) && (str_starts_with($printedCertificate, 'data:image/') || preg_match('/^[A-Za-z0-9+\/=]+$/', $printedCertificate))) {
+                        $dataUrl = str_starts_with($printedCertificate, 'data:') ? $printedCertificate : 'data:image/jpeg;base64,'.$printedCertificate;
+                        $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+                            .'<style>html,body{margin:0;padding:0;background:#f1f5f9;}img{display:block;max-width:100%;height:auto;margin:0 auto;}</style></head>'
+                            .'<body><img src="'.htmlspecialchars($dataUrl, ENT_QUOTES, 'UTF-8').'" alt="Attestation"></body></html>';
+                        return response($html, 200, [
+                            'Content-Type' => 'text/html; charset=utf-8',
+                            'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.html"',
+                        ]);
+                    }
+                }
+
+                // PDF ou autre binaire : renvoyer tel quel
+                return response($body, 200, [
+                    'Content-Type' => $contentType ?: 'application/pdf',
                     'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.pdf"',
                 ]);
             }
+            $message = is_array($cedeao) && isset($cedeao['message']) ? $cedeao['message'] : 'Visualisation indisponible pour cette source.';
             return redirect()
                 ->route('digital.attestations')
-                ->with('error', 'Visualisation indisponible pour cette source.');
+                ->with('error', $message);
         }
 
         $token = $this->requireToken($request);
