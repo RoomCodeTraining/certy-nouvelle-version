@@ -141,18 +141,26 @@ class DigitalController extends Controller
                 $contentType = $res->header('Content-Type') ?? '';
 
                 // Réponse JSON CEDEAO avec printed_certificate (image base64) : afficher en image comme CIMA
-                if (str_contains($contentType, 'application/json')) {
+                // On détecte le JSON par le contenu (certaines APIs renvoient application/pdf avec du JSON)
+                $trimmed = trim($body);
+                if ($trimmed !== '' && ($trimmed[0] === '{' || $trimmed[0] === '[')) {
                     $json = json_decode($body, true);
-                    $printedCertificate = is_array($json) ? ($json['data']['printed_certificate'] ?? $json['printed_certificate'] ?? null) : null;
-                    if (is_string($printedCertificate) && (str_starts_with($printedCertificate, 'data:image/') || preg_match('/^[A-Za-z0-9+\/=]+$/', $printedCertificate))) {
-                        $dataUrl = str_starts_with($printedCertificate, 'data:') ? $printedCertificate : 'data:image/jpeg;base64,'.$printedCertificate;
-                        $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-                            .'<style>html,body{margin:0;padding:0;background:#f1f5f9;}img{display:block;max-width:100%;height:auto;margin:0 auto;}</style></head>'
-                            .'<body><img src="'.htmlspecialchars($dataUrl, ENT_QUOTES, 'UTF-8').'" alt="Attestation"></body></html>';
-                        return response($html, 200, [
-                            'Content-Type' => 'text/html; charset=utf-8',
-                            'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.html"',
-                        ]);
+                    if (is_array($json)) {
+                        $printedCertificate = $json['data']['printed_certificate'] ?? $json['printed_certificate'] ?? $json['data']['data']['printed_certificate'] ?? null;
+                        if (is_string($printedCertificate) && $printedCertificate !== '') {
+                            $isDataUrl = str_starts_with($printedCertificate, 'data:image/');
+                            $isRawBase64 = ! str_contains($printedCertificate, '<') && (preg_match('/^[A-Za-z0-9+\/=]+$/', $printedCertificate) || $isDataUrl);
+                            if ($isDataUrl || $isRawBase64) {
+                                $dataUrl = $isDataUrl ? $printedCertificate : 'data:image/jpeg;base64,'.$printedCertificate;
+                                $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+                                    .'<style>html,body{margin:0;padding:0;background:#f1f5f9;}img{display:block;max-width:100%;height:auto;margin:0 auto;}</style></head>'
+                                    .'<body><img src="'.htmlspecialchars($dataUrl, ENT_QUOTES, 'UTF-8').'" alt="Attestation"></body></html>';
+                                return response($html, 200, [
+                                    'Content-Type' => 'text/html; charset=utf-8',
+                                    'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.html"',
+                                ]);
+                            }
+                        }
                     }
                 }
 

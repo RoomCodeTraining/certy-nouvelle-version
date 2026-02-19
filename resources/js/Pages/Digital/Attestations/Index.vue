@@ -100,6 +100,41 @@ const downloadUrl = computed(() =>
         : null,
 );
 
+/** Téléchargement en cours : clé "ref|source" (ex. ATD-123|cima) pour afficher le loader sur l’action concernée. */
+const downloadingKey = ref(null);
+function isDownloading(ref, source) {
+    if (!ref || !source) return false;
+    return downloadingKey.value === `${ref}|${source}`;
+}
+async function handleDownload(ref, source) {
+    const url = downloadUrlFor(ref, source);
+    if (!url) return;
+    const key = `${ref}|${source}`;
+    downloadingKey.value = key;
+    try {
+        const res = await fetch(url, {
+            credentials: "same-origin",
+            method: "GET",
+        });
+        if (!res.ok) throw new Error(res.statusText);
+        const blob = await res.blob();
+        const disposition = res.headers.get("Content-Disposition");
+        const match =
+            disposition &&
+            disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"'\s;]+)["']?/i);
+        const filename = match ? match[1].trim() : `attestation-${ref}.pdf`;
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch (_) {
+        window.open(url, "_blank");
+    } finally {
+        if (downloadingKey.value === key) downloadingKey.value = null;
+    }
+}
+
 function openViewModal(row, source) {
     const ref = getAttestationRef(row);
     if (ref) {
@@ -148,12 +183,17 @@ function closeViewModal() {
 }
 
 function onActionMenuClickOutside(e) {
-    if (actionMenuOpen.value !== null && !e.target.closest?.('[data-attestation-actions]')) {
+    if (
+        actionMenuOpen.value !== null &&
+        !e.target.closest?.("[data-attestation-actions]")
+    ) {
         closeActionMenu();
     }
 }
 onMounted(() => document.addEventListener("click", onActionMenuClickOutside));
-onUnmounted(() => document.removeEventListener("click", onActionMenuClickOutside));
+onUnmounted(() =>
+    document.removeEventListener("click", onActionMenuClickOutside),
+);
 
 function onViewIframeLoad() {
     if (viewLoadTimeoutId) {
@@ -362,7 +402,9 @@ const columns = [
         </template>
 
         <p class="text-sm text-slate-600 mb-4">
-            Données issues de la plateforme ASACI. Consulter et télécharger : <strong>CIMA</strong> (ASACI) ou <strong>Autres</strong> (API EATCI BNICB).
+            Données issues de la plateforme ASACI. Consulter et télécharger :
+            <strong>CIMA</strong> (ASACI) ou <strong>Autres</strong> (API EATCI
+            BNICB).
         </p>
 
         <div
@@ -383,7 +425,8 @@ const columns = [
                         Liste des attestations
                     </h2>
                     <p class="text-xs text-slate-500 mt-0.5">
-                        Menu CIMA / Autres : Consulter et Télécharger pour chaque type
+                        Menu CIMA / Autres : Consulter et Télécharger pour
+                        chaque type
                     </p>
                 </div>
                 <form
@@ -460,8 +503,13 @@ const columns = [
                         class="mt-3 pt-3 rounded-xl border border-slate-200 bg-slate-50/50 overflow-hidden"
                         data-attestation-actions
                     >
-                        <div class="bg-slate-100/80 px-3 py-2 border-b border-slate-200">
-                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">CIMA</span>
+                        <div
+                            class="bg-slate-100/80 px-3 py-2 border-b border-slate-200"
+                        >
+                            <span
+                                class="text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                                >CIMA</span
+                            >
                         </div>
                         <div class="p-2 flex flex-wrap gap-2">
                             <button
@@ -469,24 +517,108 @@ const columns = [
                                 @click="openViewModal(row, 'cima')"
                                 class="inline-flex items-center gap-2 px-3 py-2.5 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm"
                             >
-                                <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                <span
+                                    class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0"
+                                >
+                                    <svg
+                                        class="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                        />
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                        />
+                                    </svg>
                                 </span>
                                 Consulter
                             </button>
-                            <a
-                                :href="downloadUrlFor(getAttestationRef(row), 'cima')"
-                                class="inline-flex items-center gap-2 px-3 py-2.5 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm"
-                                download
+                            <button
+                                type="button"
+                                :disabled="
+                                    isDownloading(
+                                        getAttestationRef(row),
+                                        'cima',
+                                    )
+                                "
+                                @click="
+                                    handleDownload(
+                                        getAttestationRef(row),
+                                        'cima',
+                                    )
+                                "
+                                class="inline-flex items-center gap-2 px-3 py-2.5 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm disabled:opacity-70 disabled:cursor-wait"
                             >
-                                <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                <span
+                                    class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0"
+                                >
+                                    <svg
+                                        v-if="
+                                            isDownloading(
+                                                getAttestationRef(row),
+                                                'cima',
+                                            )
+                                        "
+                                        class="w-4 h-4 animate-spin"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        aria-hidden="true"
+                                    >
+                                        <circle
+                                            class="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            stroke-width="4"
+                                        />
+                                        <path
+                                            class="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        v-else
+                                        class="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                        />
+                                    </svg>
                                 </span>
-                                Télécharger
-                            </a>
+                                {{
+                                    isDownloading(
+                                        getAttestationRef(row),
+                                        "cima",
+                                    )
+                                        ? "Téléchargement…"
+                                        : "Télécharger"
+                                }}
+                            </button>
                         </div>
-                        <div class="bg-slate-100/80 px-3 py-2 border-t border-slate-200">
-                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Autres</span>
+                        <div
+                            class="bg-slate-100/80 px-3 py-2 border-t border-slate-200"
+                        >
+                            <span
+                                class="text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                                >Autres</span
+                            >
                         </div>
                         <div class="p-2 flex flex-wrap gap-2">
                             <button
@@ -494,21 +626,100 @@ const columns = [
                                 @click="openViewModal(row, 'autres')"
                                 class="inline-flex items-center gap-2 px-3 py-2.5 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm"
                             >
-                                <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                <span
+                                    class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0"
+                                >
+                                    <svg
+                                        class="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                        />
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                        />
+                                    </svg>
                                 </span>
                                 Consulter
                             </button>
-                            <a
-                                :href="downloadUrlFor(getAttestationRef(row), 'autres')"
-                                class="inline-flex items-center gap-2 px-3 py-2.5 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm"
-                                download
+                            <button
+                                type="button"
+                                :disabled="
+                                    isDownloading(
+                                        getAttestationRef(row),
+                                        'autres',
+                                    )
+                                "
+                                @click="
+                                    handleDownload(
+                                        getAttestationRef(row),
+                                        'autres',
+                                    )
+                                "
+                                class="inline-flex items-center gap-2 px-3 py-2.5 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm disabled:opacity-70 disabled:cursor-wait"
                             >
-                                <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                <span
+                                    class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0"
+                                >
+                                    <svg
+                                        v-if="
+                                            isDownloading(
+                                                getAttestationRef(row),
+                                                'autres',
+                                            )
+                                        "
+                                        class="w-4 h-4 animate-spin"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        aria-hidden="true"
+                                    >
+                                        <circle
+                                            class="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            stroke-width="4"
+                                        />
+                                        <path
+                                            class="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        v-else
+                                        class="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                        />
+                                    </svg>
                                 </span>
-                                Télécharger
-                            </a>
+                                {{
+                                    isDownloading(
+                                        getAttestationRef(row),
+                                        "autres",
+                                    )
+                                        ? "Téléchargement…"
+                                        : "Télécharger"
+                                }}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -532,7 +743,10 @@ const columns = [
                 >
                     <template #actions="{ row }">
                         <template v-if="getAttestationRef(row)">
-                            <div class="relative flex items-center justify-end" data-attestation-actions>
+                            <div
+                                class="relative flex items-center justify-end"
+                                data-attestation-actions
+                            >
                                 <button
                                     type="button"
                                     @click.stop="toggleActionMenu(row)"
@@ -541,8 +755,21 @@ const columns = [
                                     aria-haspopup="true"
                                 >
                                     <span>Actions</span>
-                                    <svg class="w-4 h-4 text-slate-500 shrink-0 transition-transform" :class="{ 'rotate-180': isActionMenuOpen(row) }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    <svg
+                                        class="w-4 h-4 text-slate-500 shrink-0 transition-transform"
+                                        :class="{
+                                            'rotate-180': isActionMenuOpen(row),
+                                        }"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M19 9l-7 7-7-7"
+                                        />
                                     </svg>
                                 </button>
                                 <Transition
@@ -557,57 +784,238 @@ const columns = [
                                         v-show="isActionMenuOpen(row)"
                                         class="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 overflow-hidden"
                                     >
-                                        <div class="bg-slate-50/80 px-3 py-2 border-b border-slate-100">
-                                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">CIMA</span>
+                                        <div
+                                            class="bg-slate-50/80 px-3 py-2 border-b border-slate-100"
+                                        >
+                                            <span
+                                                class="text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                                                >CIMA</span
+                                            >
                                         </div>
                                         <div class="p-1">
                                             <button
                                                 type="button"
-                                                @click="openViewModal(row, 'cima'); closeActionMenu()"
+                                                @click="
+                                                    openViewModal(row, 'cima');
+                                                    closeActionMenu();
+                                                "
                                                 class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left"
                                             >
-                                                <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                <span
+                                                    class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0"
+                                                >
+                                                    <svg
+                                                        class="w-4 h-4"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                                        />
+                                                        <path
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                                        />
+                                                    </svg>
                                                 </span>
                                                 <span>Consulter</span>
                                             </button>
-                                            <a
-                                                :href="downloadUrlFor(getAttestationRef(row), 'cima')"
-                                                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left"
-                                                download
-                                                @click="closeActionMenu()"
+                                            <button
+                                                type="button"
+                                                :disabled="
+                                                    isDownloading(
+                                                        getAttestationRef(row),
+                                                        'cima',
+                                                    )
+                                                "
+                                                @click="
+                                                    handleDownload(
+                                                        getAttestationRef(row),
+                                                        'cima',
+                                                    );
+                                                    closeActionMenu();
+                                                "
+                                                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left disabled:opacity-70 disabled:cursor-wait"
                                             >
-                                                <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                <span
+                                                    class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0"
+                                                >
+                                                    <svg
+                                                        v-if="
+                                                            isDownloading(
+                                                                getAttestationRef(
+                                                                    row,
+                                                                ),
+                                                                'cima',
+                                                            )
+                                                        "
+                                                        class="w-4 h-4 animate-spin"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <circle
+                                                            class="opacity-25"
+                                                            cx="12"
+                                                            cy="12"
+                                                            r="10"
+                                                            stroke="currentColor"
+                                                            stroke-width="4"
+                                                        />
+                                                        <path
+                                                            class="opacity-75"
+                                                            fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                        />
+                                                    </svg>
+                                                    <svg
+                                                        v-else
+                                                        class="w-4 h-4"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                                        />
+                                                    </svg>
                                                 </span>
-                                                <span>Télécharger</span>
-                                            </a>
+                                                <span>{{
+                                                    isDownloading(
+                                                        getAttestationRef(row),
+                                                        "cima",
+                                                    )
+                                                        ? "Téléchargement…"
+                                                        : "Télécharger"
+                                                }}</span>
+                                            </button>
                                         </div>
-                                        <div class="bg-slate-50/80 px-3 py-2 border-t border-slate-100">
-                                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Autres</span>
+                                        <div
+                                            class="bg-slate-50/80 px-3 py-2 border-t border-slate-100"
+                                        >
+                                            <span
+                                                class="text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                                                >Autres</span
+                                            >
                                         </div>
                                         <div class="p-1">
                                             <button
                                                 type="button"
-                                                @click="openViewModal(row, 'autres'); closeActionMenu()"
+                                                @click="
+                                                    openViewModal(
+                                                        row,
+                                                        'autres',
+                                                    );
+                                                    closeActionMenu();
+                                                "
                                                 class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left"
                                             >
-                                                <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                <span
+                                                    class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0"
+                                                >
+                                                    <svg
+                                                        class="w-4 h-4"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                                        />
+                                                        <path
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                                        />
+                                                    </svg>
                                                 </span>
                                                 <span>Consulter</span>
                                             </button>
-                                            <a
-                                                :href="downloadUrlFor(getAttestationRef(row), 'autres')"
-                                                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left"
-                                                download
-                                                @click="closeActionMenu()"
+                                            <button
+                                                type="button"
+                                                :disabled="
+                                                    isDownloading(
+                                                        getAttestationRef(row),
+                                                        'autres',
+                                                    )
+                                                "
+                                                @click="
+                                                    handleDownload(
+                                                        getAttestationRef(row),
+                                                        'autres',
+                                                    );
+                                                    closeActionMenu();
+                                                "
+                                                class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left disabled:opacity-70 disabled:cursor-wait"
                                             >
-                                                <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                <span
+                                                    class="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600 shrink-0"
+                                                >
+                                                    <svg
+                                                        v-if="
+                                                            isDownloading(
+                                                                getAttestationRef(
+                                                                    row,
+                                                                ),
+                                                                'autres',
+                                                            )
+                                                        "
+                                                        class="w-4 h-4 animate-spin"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <circle
+                                                            class="opacity-25"
+                                                            cx="12"
+                                                            cy="12"
+                                                            r="10"
+                                                            stroke="currentColor"
+                                                            stroke-width="4"
+                                                        />
+                                                        <path
+                                                            class="opacity-75"
+                                                            fill="currentColor"
+                                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                        />
+                                                    </svg>
+                                                    <svg
+                                                        v-else
+                                                        class="w-4 h-4"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path
+                                                            stroke-linecap="round"
+                                                            stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                                        />
+                                                    </svg>
                                                 </span>
-                                                <span>Télécharger</span>
-                                            </a>
+                                                <span>{{
+                                                    isDownloading(
+                                                        getAttestationRef(row),
+                                                        "autres",
+                                                    )
+                                                        ? "Téléchargement…"
+                                                        : "Télécharger"
+                                                }}</span>
+                                            </button>
                                         </div>
                                     </div>
                                 </Transition>
@@ -697,17 +1105,56 @@ const columns = [
                                 :id="'modal-title-' + (viewReference || '')"
                                 class="text-sm font-semibold text-slate-900 truncate"
                             >
-                                Attestation {{ viewSource === 'autres' ? 'Autres' : 'CIMA' }}{{ viewReference ? ` — ${viewReference}` : '' }}
+                                Attestation
+                                {{ viewSource === "autres" ? "Autres" : "CIMA"
+                                }}{{
+                                    viewReference ? ` — ${viewReference}` : ""
+                                }}
                             </h3>
                             <div class="flex items-center gap-2 shrink-0">
-                                <a
-                                    v-if="downloadUrl"
-                                    :href="downloadUrl"
-                                    download
-                                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50"
+                                <button
+                                    v-if="viewReference && viewSource"
+                                    type="button"
+                                    :disabled="
+                                        isDownloading(viewReference, viewSource)
+                                    "
+                                    @click="
+                                        handleDownload(
+                                            viewReference,
+                                            viewSource,
+                                        )
+                                    "
+                                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-70 disabled:cursor-wait"
                                     title="Télécharger l'attestation"
                                 >
                                     <svg
+                                        v-if="
+                                            isDownloading(
+                                                viewReference,
+                                                viewSource,
+                                            )
+                                        "
+                                        class="w-4 h-4 animate-spin"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        aria-hidden="true"
+                                    >
+                                        <circle
+                                            class="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            stroke-width="4"
+                                        />
+                                        <path
+                                            class="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        v-else
                                         class="w-4 h-4"
                                         fill="none"
                                         stroke="currentColor"
@@ -720,8 +1167,12 @@ const columns = [
                                             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                                         />
                                     </svg>
-                                    Télécharger
-                                </a>
+                                    {{
+                                        isDownloading(viewReference, viewSource)
+                                            ? "Téléchargement…"
+                                            : "Télécharger"
+                                    }}
+                                </button>
                                 <button
                                     type="button"
                                     @click="closeViewModal"
@@ -786,13 +1237,48 @@ const columns = [
                                     Impossible d'afficher l'attestation. Vous
                                     pouvez la télécharger.
                                 </p>
-                                <a
-                                    v-if="downloadUrl"
-                                    :href="downloadUrl"
-                                    download
-                                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-800 hover:bg-slate-700"
+                                <button
+                                    v-if="viewReference && viewSource"
+                                    type="button"
+                                    :disabled="
+                                        isDownloading(viewReference, viewSource)
+                                    "
+                                    @click="
+                                        handleDownload(
+                                            viewReference,
+                                            viewSource,
+                                        )
+                                    "
+                                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 disabled:opacity-70 disabled:cursor-wait"
                                 >
                                     <svg
+                                        v-if="
+                                            isDownloading(
+                                                viewReference,
+                                                viewSource,
+                                            )
+                                        "
+                                        class="w-4 h-4 animate-spin"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        aria-hidden="true"
+                                    >
+                                        <circle
+                                            class="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            stroke-width="4"
+                                        />
+                                        <path
+                                            class="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                        />
+                                    </svg>
+                                    <svg
+                                        v-else
                                         class="w-4 h-4"
                                         fill="none"
                                         stroke="currentColor"
@@ -805,8 +1291,12 @@ const columns = [
                                             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                                         />
                                     </svg>
-                                    Télécharger l'attestation
-                                </a>
+                                    {{
+                                        isDownloading(viewReference, viewSource)
+                                            ? "Téléchargement…"
+                                            : "Télécharger l'attestation"
+                                    }}
+                                </button>
                             </div>
                             <iframe
                                 v-if="viewUrl && !viewError"
