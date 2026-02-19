@@ -77,7 +77,7 @@ function getImageAlt(row, col) {
                         >
                             {{ col.label }}
                         </th>
-                        <th v-if="$slots.actions" scope="col" class="h-11 w-[1%] px-4 text-right align-middle font-medium text-slate-600">
+                        <th v-if="$slots.actions" scope="col" class="h-11 w-[1%] min-w-[7rem] px-4 text-right align-middle font-medium text-slate-600 whitespace-nowrap">
                             <span class="sr-only">Actions</span>
                         </th>
                     </tr>
@@ -123,7 +123,7 @@ function getImageAlt(row, col) {
                                 <span class="text-slate-700">{{ getCellValue(row, col) }}</span>
                             </template>
                         </td>
-                        <td v-if="$slots.actions" class="p-4 align-middle text-right">
+                        <td v-if="$slots.actions" class="p-4 align-middle text-right whitespace-nowrap">
                             <div class="flex items-center justify-end gap-0.5">
                                 <slot name="actions" :row="row" />
                             </div>

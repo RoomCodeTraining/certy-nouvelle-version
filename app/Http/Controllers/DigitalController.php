@@ -79,15 +79,22 @@ class DigitalController extends Controller
 
     /**
      * Télécharger le PDF d'une attestation.
-     * Tente d'abord l'API CEDEAO (EATCI BNICB) GET /api/v1/certificates/related/{reference}, puis l'API ASACI.
+     * source=cima : API ASACI (token requis). source=autres : API EATCI BNICB (certificates/related).
      */
     public function downloadAttestation(Request $request, string $reference): HttpResponse|RedirectResponse
     {
-        $cedeao = $this->externalService->getCertificateRelatedCedeao($reference);
-        if ($cedeao !== null) {
-            return response($cedeao->body(), $cedeao->status())
-                ->header('Content-Type', $cedeao->header('Content-Type') ?: 'application/pdf')
-                ->header('Content-Disposition', 'attachment; filename="attestation-'.$reference.'.pdf"');
+        $source = strtolower((string) $request->query('source', ''));
+
+        if ($source === 'autres') {
+            $cedeao = $this->externalService->getCertificateRelatedCedeao($reference);
+            if ($cedeao !== null) {
+                return response($cedeao->body(), $cedeao->status())
+                    ->header('Content-Type', $cedeao->header('Content-Type') ?: 'application/pdf')
+                    ->header('Content-Disposition', 'attachment; filename="attestation-'.$reference.'.pdf"');
+            }
+            return redirect()
+                ->route('digital.attestations')
+                ->with('error', 'Téléchargement indisponible pour cette source.');
         }
 
         $token = $this->requireToken($request);
@@ -108,17 +115,24 @@ class DigitalController extends Controller
 
     /**
      * Visualiser l'attestation dans le modal (PDF en inline).
-     * Tente d'abord l'API CEDEAO (EATCI BNICB) GET /api/v1/certificates/related/{reference}, puis l'API ASACI.
+     * source=cima : API ASACI (token requis). source=autres : API EATCI BNICB (certificates/related).
      */
     public function viewAttestation(Request $request, string $reference): HttpResponse|RedirectResponse
     {
-        $cedeao = $this->externalService->getCertificateRelatedCedeao($reference);
-        if ($cedeao !== null) {
-            $contentType = $cedeao->header('Content-Type') ?: 'application/pdf';
-            return response($cedeao->body(), 200, [
-                'Content-Type' => $contentType,
-                'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.pdf"',
-            ]);
+        $source = strtolower((string) $request->query('source', ''));
+
+        if ($source === 'autres') {
+            $cedeao = $this->externalService->getCertificateRelatedCedeao($reference);
+            if ($cedeao !== null) {
+                $contentType = $cedeao->header('Content-Type') ?: 'application/pdf';
+                return response($cedeao->body(), 200, [
+                    'Content-Type' => $contentType,
+                    'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.pdf"',
+                ]);
+            }
+            return redirect()
+                ->route('digital.attestations')
+                ->with('error', 'Visualisation indisponible pour cette source.');
         }
 
         $token = $this->requireToken($request);
