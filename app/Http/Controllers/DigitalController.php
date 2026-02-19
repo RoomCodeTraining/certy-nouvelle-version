@@ -95,16 +95,36 @@ class DigitalController extends Controller
             if (is_array($cedeao) && ($cedeao['ok'] ?? false) === true) {
                 $res = $cedeao['response'];
                 $contentType = $res->header('Content-Type', '');
-                // Si la réponse est du JSON avec une URL de téléchargement directe, rediriger vers elle (ouvre directement).
                 if (str_contains($contentType, 'application/json')) {
                     $body = $res->json();
+                    if (! is_array($body)) {
+                        return redirect()->route('digital.attestations')->with('error', 'Réponse invalide.');
+                    }
                     $data = $body['data'] ?? $body;
-                    $directUrl = $data['download_link'] ?? $data['download_url'] ?? $body['download_link'] ?? $body['download_url'] ?? null;
+                    $cert = $data['certificate'] ?? [];
+                    $directUrl = $data['download_link'] ?? $data['download_url']
+                        ?? $cert['download_link'] ?? $cert['download_url']
+                        ?? $body['download_link'] ?? $body['download_url'] ?? null;
                     if ($directUrl && is_string($directUrl) && str_starts_with($directUrl, 'http')) {
                         return redirect()->away($directUrl);
                     }
+                    // JSON sans URL directe mais avec printed_certificate (image base64) : renvoyer l'image
+                    $printedCertificate = $data['printed_certificate'] ?? $body['printed_certificate'] ?? ($data['data']['printed_certificate'] ?? null);
+                    if ($printedCertificate && is_string($printedCertificate)) {
+                        if (preg_match('#^data:image/[^;]+;base64,(.+)$#', $printedCertificate, $m)) {
+                            $bin = base64_decode($m[1], true);
+                        } else {
+                            $bin = base64_decode($printedCertificate, true);
+                        }
+                        if ($bin !== false && $bin !== '') {
+                            $ext = str_contains($printedCertificate, 'png') ? 'png' : 'jpg';
+                            return response($bin)
+                                ->header('Content-Type', $ext === 'png' ? 'image/png' : 'image/jpeg')
+                                ->header('Content-Disposition', 'attachment; filename="attestation-'.$reference.'.'.$ext.'"');
+                        }
+                    }
                 }
-                // Sinon : réponse binaire (PDF), on renvoie le corps.
+                // Réponse binaire (PDF), on renvoie le corps
                 return response($res->body(), $res->status())
                     ->header('Content-Type', $res->header('Content-Type') ?: 'application/pdf')
                     ->header('Content-Disposition', 'attachment; filename="attestation-'.$reference.'.pdf"');
@@ -146,8 +166,13 @@ class DigitalController extends Controller
         if (($result['url'] ?? null) !== null) {
             return response()->json(['url' => $result['url']]);
         }
-        $message = $result['message'] ?? 'URL de téléchargement indisponible.';
-        return response()->json(['url' => null, 'message' => $message], 404);
+        // Erreur API (ex. 404) : on renvoie le message pour l'afficher
+        if (($result['message'] ?? null) !== null) {
+            return response()->json(['url' => null, 'message' => $result['message']], 404);
+        }
+        // Pas d'URL directe EATCI mais attestation trouvée (ex. printed_certificate) : utiliser notre proxy
+        $proxyUrl = route('digital.attestations.download', $reference).'?source=autres';
+        return response()->json(['url' => $proxyUrl]);
     }
 
     /**

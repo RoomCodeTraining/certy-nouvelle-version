@@ -632,7 +632,10 @@ class ExternalService
         }
 
         $data = $body['data'] ?? $body;
-        $directUrl = $data['download_link'] ?? $data['download_url'] ?? $data['pdf_url'] ?? $body['download_link'] ?? $body['download_url'] ?? null;
+        $cert = $data['certificate'] ?? [];
+        $directUrl = $data['download_link'] ?? $data['download_url'] ?? $data['pdf_url']
+            ?? $cert['download_link'] ?? $cert['download_url'] ?? $cert['pdf_url']
+            ?? $body['download_link'] ?? $body['download_url'] ?? null;
         if ($directUrl && is_string($directUrl) && str_starts_with($directUrl, 'http')) {
             return ['url' => $directUrl, 'message' => null];
         }
@@ -640,7 +643,7 @@ class ExternalService
         // Construire l'URL si on a une signature dans la réponse
         $baseUrl = rtrim(config('app.eatci_cedeao_api_url', ''), '/');
         if ($baseUrl !== '') {
-            $signature = $data['signature'] ?? $data['download_signature'] ?? $body['signature'] ?? null;
+            $signature = $data['signature'] ?? $data['download_signature'] ?? $cert['signature'] ?? $cert['download_signature'] ?? $body['signature'] ?? null;
             if ($signature && is_string($signature)) {
                 return ['url' => $baseUrl.'/api/v1/certificates/'.ltrim($reference, '/').'/download?signature='.rawurlencode($signature), 'message' => null];
             }
