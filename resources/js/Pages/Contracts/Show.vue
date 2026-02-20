@@ -70,6 +70,11 @@ const canEdit = computed(() => props.contract?.status === "draft");
 const canCancel = computed(() =>
     ["draft", "validated", "active"].includes(props.contract?.status),
 );
+const canRenew = computed(
+    () =>
+        !canEdit.value &&
+        props.contract?.status !== "cancelled",
+);
 
 const showPostValidateRecap = computed(() =>
     ["validated", "active"].includes(props.contract?.status),
@@ -144,7 +149,7 @@ function markAttestationIssued(contract) {
                         Valider le contrat
                     </button>
                     <Link
-                        v-if="!canEdit"
+                        v-if="canRenew"
                         :href="route('contracts.renew', contract.id)"
                         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors"
                     >
@@ -366,7 +371,7 @@ function markAttestationIssued(contract) {
                                 Valider
                             </button>
                             <Link
-                                v-if="!canEdit"
+                                v-if="canRenew"
                                 :href="route('contracts.renew', contract.id)"
                                 class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors"
                             >
