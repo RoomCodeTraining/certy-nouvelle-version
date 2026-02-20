@@ -23,7 +23,10 @@ class StatisticsController extends Controller
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        $revenusTotaux = (int) Contract::accessibleBy($user)->sum('total_amount');
+        // Montants : exclure brouillons (en attente) et annulés — uniquement validé, actif, expiré
+        $revenusTotaux = (int) Contract::accessibleBy($user)
+            ->whereIn('status', [Contract::STATUS_VALIDATED, Contract::STATUS_ACTIVE, Contract::STATUS_EXPIRED])
+            ->sum('total_amount');
         $totalContrats = (int) Contract::accessibleBy($user)->count();
         $clients = (int) Client::accessibleBy($user)->count();
         $vehicules = (int) Vehicle::accessibleBy($user)->count();
@@ -36,7 +39,7 @@ class StatisticsController extends Controller
         $contratsByMonth = Contract::query()
             ->whereIn('client_id', $clientIds)
             ->where('created_at', '>=', $twelveMonthsAgo)
-            ->get(['created_at', 'total_amount'])
+            ->get(['created_at', 'total_amount', 'status'])
             ->groupBy(fn ($c) => $c->created_at?->format('Y-m'));
 
         $clientsByMonth = Client::accessibleBy($user)
@@ -55,7 +58,7 @@ class StatisticsController extends Controller
             $contratsInMonth = $contratsByMonth->get($mois) ?? collect();
             $contratsData[] = $contratsInMonth->count();
             $clientsData[] = ($clientsByMonth->get($mois) ?? collect())->count();
-            $revenusData[] = (int) $contratsInMonth->sum('total_amount');
+            $revenusData[] = (int) $contratsInMonth->whereIn('status', [Contract::STATUS_VALIDATED, Contract::STATUS_ACTIVE, Contract::STATUS_EXPIRED])->sum('total_amount');
         }
 
         return response()->json([
