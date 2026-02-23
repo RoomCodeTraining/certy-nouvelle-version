@@ -5,6 +5,7 @@ import DashboardLayout from "@/Layouts/DashboardLayout.vue";
 import PageHeader from "@/Components/PageHeader.vue";
 import { route } from "@/route";
 import { contractTypeLabel, attestationColorLabel, attestationColorClasses } from "@/utils/contractTypes";
+import { CONTRACT_STATUS_LABELS } from "@/utils/contractStatus";
 import { formatDate } from "@/utils/formatDate";
 import { useConfirm } from "@/Composables/useConfirm";
 
@@ -32,12 +33,12 @@ const statusConfig = computed(() => {
     const s = props.contract?.status ?? "draft";
     const map = {
         draft: { label: "Brouillon", class: "bg-slate-100 text-slate-700" },
-        validated: { label: "Validé", class: "bg-blue-50 text-blue-700" },
+        validated: { label: "Validé", class: "bg-emerald-50 text-emerald-700" },
         active: { label: "Actif", class: "bg-emerald-50 text-emerald-700" },
         cancelled: { label: "Annulé", class: "bg-red-50 text-red-700" },
         expired: { label: "Expiré", class: "bg-red-100 text-red-800" },
     };
-    return map[s] ?? map.draft;
+    return { label: CONTRACT_STATUS_LABELS[s] ?? s, class: (map[s] ?? map.draft).class };
 });
 
 const guaranteeFields = [
@@ -90,7 +91,7 @@ const { confirm: confirmDialog } = useConfirm();
 function cancel(contract) {
     confirmDialog({
         title: "Annuler le contrat",
-        message: "Voulez-vous annuler ce contrat ?",
+        message: "Cette action est irréversible et changera le statut du contrat en « Annulé ». Aucune modification ultérieure ne sera possible. Continuer ?",
         confirmLabel: "Annuler le contrat",
         variant: "danger",
     }).then((ok) => {
@@ -190,15 +191,17 @@ function markAttestationIssued(contract) {
                             Contrat de base ({{ formatDate(parentContract.start_date) }} → {{ formatDate(parentContract.end_date) }})
                         </Link>
                     </template>
-                    <template v-if="contract.created_by || contract.updated_by">
+                    <template v-if="contract.created_by || contract.updated_by || contract.updated_at">
                         <span class="text-slate-400">|</span>
                         <span class="text-sm text-slate-600">
                             <template v-if="contract.created_by">
                                 Créé par <strong>{{ contract.created_by.name }}</strong>
+                                <template v-if="contract.created_at"> le {{ formatDate(contract.created_at) }}</template>
                             </template>
-                            <template v-if="contract.created_by && contract.updated_by"> · </template>
-                            <template v-if="contract.updated_by">
-                                Modifié par <strong>{{ contract.updated_by.name }}</strong>
+                            <template v-if="(contract.created_by || contract.created_at) && (contract.updated_by || contract.updated_at)"> · </template>
+                            <template v-if="contract.updated_by || contract.updated_at">
+                                Modifié par <strong>{{ contract.updated_by?.name ?? '—' }}</strong>
+                                <template v-if="contract.updated_at"> le {{ formatDate(contract.updated_at) }}</template>
                             </template>
                         </span>
                     </template>
@@ -228,7 +231,7 @@ function markAttestationIssued(contract) {
                                     child.status === 'active' || child.status === 'validated' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600',
                                 ]"
                             >
-                                {{ child.status === 'draft' ? 'Brouillon' : child.status === 'active' ? 'Actif' : child.status === 'validated' ? 'Validé' : child.status === 'cancelled' ? 'Annulé' : child.status === 'expired' ? 'Expiré' : child.status }}
+                                {{ CONTRACT_STATUS_LABELS[child.status] ?? child.status }}
                             </span>
                         </li>
                     </ul>

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import SearchModal from "@/Components/SearchModal.vue";
 import { Link, usePage } from "@inertiajs/vue3";
 import FlashNotifications from "@/Components/FlashNotifications.vue";
 import ConfirmModal from "@/Components/ConfirmModal.vue";
@@ -21,6 +22,7 @@ const settingsOpen = ref(false);
 const sidebarUserMenuOpen = ref(false);
 const sidebarUserRef = ref(null);
 const mobileMenuOpen = ref(false);
+const searchOpen = ref(false);
 const logoError = ref(false);
 const appName = computed(() => page.props.app?.name || "Certy");
 
@@ -57,8 +59,20 @@ const openUserMenu = () => {
     userMenuOpen.value = !userMenuOpen.value;
 };
 
+function onKeydown(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchOpen.value = true;
+    }
+    if (e.key === "Escape") {
+        searchOpen.value = false;
+        if (confirmState?.open) confirmState.resolve?.(false);
+    }
+}
+
 onMounted(() => {
     document.addEventListener("click", closeMenus);
+    document.addEventListener("keydown", onKeydown);
     router.on("navigate", () => {
         mobileMenuOpen.value = false;
     });
@@ -72,7 +86,10 @@ onMounted(() => {
         referentialOpen.value = true;
     }
 });
-onUnmounted(() => document.removeEventListener("click", closeMenus));
+onUnmounted(() => {
+    document.removeEventListener("click", closeMenus);
+    document.removeEventListener("keydown", onKeydown);
+});
 
 watch(mobileMenuOpen, (open) => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -97,7 +114,7 @@ const navItems = computed(() => {
         items.push({
             href: "/bordereaux",
             label: "Bordereaux",
-            icon: "credit",
+            icon: "documentText",
         });
     }
     if (certyIa.value?.enabled) {
@@ -189,12 +206,15 @@ const iconPaths = {
     chevronDown: "M19 9l-7 7-7-7",
     chevronRight: "M9 5l7 7-7 7",
     menuAlt: "M4 6h16M4 12h16M4 18h16",
+    documentText:
+        "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
 };
 </script>
 
 <template>
     <div class="min-h-screen bg-white">
         <FlashNotifications />
+        <SearchModal :open="searchOpen" @close="searchOpen = false" />
         <ConfirmModal
             :open="confirmState.open"
             :title="confirmState.title"
@@ -249,11 +269,13 @@ const iconPaths = {
                                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                             />
                         </svg>
-                        <input
-                            type="text"
-                            placeholder="Rechercher..."
-                            class="w-full pl-9 pr-8 py-2 text-sm bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary"
-                        />
+                        <button
+                            type="button"
+                            class="w-full pl-9 pr-8 py-2 text-sm text-left bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary"
+                            @click="searchOpen = true"
+                        >
+                            <span class="text-slate-400">Rechercher...</span>
+                        </button>
                         <kbd
                             class="absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-medium text-slate-400 bg-slate-100 rounded"
                             >⌘K</kbd

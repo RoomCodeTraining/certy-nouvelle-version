@@ -36,12 +36,21 @@ class ClientController extends Controller
             $query->where('type_assure', $request->type_assure);
         }
 
+        $sortColumn = $request->input('sort', 'created_at');
+        $sortOrder = strtolower($request->input('order', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $allowedSort = ['created_at', 'reference', 'full_name', 'email', 'updated_at'];
+        if (in_array($sortColumn, $allowedSort, true)) {
+            $query->orderBy($sortColumn, $sortOrder);
+        } else {
+            $query->latest();
+        }
+
         $perPage = min(max((int) $request->input('per_page', 25), 1), 100);
-        $clients = $query->latest()->paginate($perPage)->withQueryString();
+        $clients = $query->paginate($perPage)->withQueryString();
 
         return Inertia::render('Clients/Index', [
             'clients' => $clients,
-            'filters' => $request->only(['search', 'type_assure', 'per_page']),
+            'filters' => $request->only(['search', 'type_assure', 'per_page', 'sort', 'order']),
         ]);
     }
 

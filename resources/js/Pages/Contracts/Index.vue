@@ -7,8 +7,10 @@ import DataTable from '@/Components/DataTable.vue';
 import DataTableAction from '@/Components/DataTableAction.vue';
 import TableFilters from '@/Components/TableFilters.vue';
 import Paginator from '@/Components/Paginator.vue';
+import EmptyState from '@/Components/EmptyState.vue';
 import { route } from '@/route';
 import { contractTypeLabel } from '@/utils/contractTypes';
+import { contractStatusLabel, contractStatusBadgeClass } from '@/utils/contractStatus';
 import { formatDate } from '@/utils/formatDate';
 import { useConfirm } from '@/Composables/useConfirm';
 
@@ -37,10 +39,11 @@ function dealTypeBadgeClass(row) {
 }
 
 const columns = [
-    { key: 'created_at', label: 'Date de création', getValue: (row) => formatDate(row.created_at) },
+    { key: 'created_at', label: 'Date de création', sortKey: 'created_at', getValue: (row) => formatDate(row.created_at) },
     {
         key: 'reference',
         label: 'Référence',
+        sortKey: 'reference',
         type: 'link',
         getValue: (row) => contractReference(row),
         href: (row) => route('contracts.show', row.id),
@@ -62,29 +65,21 @@ const columns = [
     },
     { key: 'owner', label: 'Propriétaire', getValue: (row) => row.client?.owner?.name ?? '—' },
     { key: 'contract_type', label: 'Type', getValue: (row) => contractTypeLabel(row.contract_type) },
-    { key: 'start_date', label: 'Date début', getValue: (row) => formatDate(row.start_date) },
-    { key: 'end_date', label: 'Date fin', getValue: (row) => formatDate(row.end_date) },
+    { key: 'start_date', label: 'Date début', sortKey: 'start_date', getValue: (row) => formatDate(row.start_date) },
+    { key: 'end_date', label: 'Date fin', sortKey: 'end_date', getValue: (row) => formatDate(row.end_date) },
     {
         key: 'prime',
         label: 'Prime',
+        sortKey: 'total_amount',
         getValue: (row) => row.total_amount != null ? Number(row.total_amount).toLocaleString('fr-FR') + ' FCFA' : '—',
     },
     {
         key: 'status',
         label: 'Statut',
+        sortKey: 'status',
         type: 'badge',
-        getValue: (row) => {
-            const s = row.status ?? '—';
-            const labels = { draft: 'Brouillon', validated: 'Validé', active: 'Actif', cancelled: 'Annulé', expired: 'Expiré' };
-            return typeof s === 'string' && labels[s] ? labels[s] : s;
-        },
-        getBadgeClass: (row) => {
-            const s = String(row.status ?? '').toLowerCase();
-            if (['expired', 'expiré'].some((x) => s.includes(x)) || s === 'expire') return 'bg-red-100 text-red-800';
-            if (['cancelled', 'annulé'].some((x) => s.includes(x))) return 'bg-red-100 text-red-800';
-            if (['active', 'actif', 'validated', 'validé'].some((x) => s.includes(x))) return 'bg-emerald-100 text-emerald-800';
-            return 'bg-slate-100 text-slate-800';
-        },
+        getValue: (row) => contractStatusLabel(row.status),
+        getBadgeClass: (row) => contractStatusBadgeClass(row.status),
     },
 ];
 
@@ -94,6 +89,8 @@ const queryParams = computed(() => ({
     per_page: props.contracts?.per_page ?? 25,
     date_from: props.filters?.date_from ?? '',
     date_to: props.filters?.date_to ?? '',
+    sort: props.filters?.sort ?? 'created_at',
+    order: props.filters?.order ?? 'desc',
 }));
 
 /** URL d'export Excel avec les filtres courants (sans per_page). */
@@ -112,9 +109,8 @@ const hasActiveFilters = computed(() => !!(
     props.filters?.search || props.filters?.status || props.filters?.date_from || props.filters?.date_to
 ));
 
-const statusLabelsMap = { draft: 'Brouillon', validated: 'Validé', active: 'Actif', cancelled: 'Annulé', expired: 'Expiré' };
 function statusLabelFor(status) {
-    return statusLabelsMap[status] ?? status ?? '—';
+    return contractStatusLabel(status);
 }
 function canEdit(row) {
     return row.status === 'draft';
@@ -126,7 +122,7 @@ const { confirm: confirmDialog } = useConfirm();
 function cancel(contract, label) {
     confirmDialog({
         title: 'Annuler le contrat',
-        message: `Voulez-vous annuler le contrat « ${label} » ?`,
+        message: `Voulez-vous annuler le contrat « ${label} » ? Cette action est irréversible et changera le statut en « Annulé ».`,
         confirmLabel: 'Annuler le contrat',
         variant: 'danger',
     }).then((ok) => {
@@ -207,6 +203,8 @@ function cancel(contract, label) {
                 />
             </div>
             <input type="hidden" name="per_page" :value="contracts?.per_page ?? 25" />
+            <input type="hidden" name="sort" :value="filters?.sort ?? 'created_at'" />
+            <input type="hidden" name="order" :value="filters?.order ?? 'desc'" />
         </TableFilters>
 
         <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -234,7 +232,7 @@ function cancel(contract, label) {
                         <div class="flex items-center justify-between gap-2 mt-2">
                             <span
                                 class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                :class="row.status === 'active' || row.status === 'validated' ? 'bg-emerald-100 text-emerald-800' : ['cancelled', 'expired'].includes(row.status) ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-800'"
+                                :class="contractStatusBadgeClass(row.status)"
                             >
                                 {{ statusLabelFor(row.status) }}
                             </span>
@@ -255,9 +253,14 @@ function cancel(contract, label) {
                         />
                     </div>
                 </div>
-                <div v-if="!(contracts?.data?.length)" class="py-10 px-4 text-center text-slate-500 text-sm">
-                    Aucun contrat. <Link :href="route('contracts.create')" class="text-sky-600 hover:underline block mt-2">Créer un contrat</Link>
-                </div>
+                <EmptyState
+                    v-if="!(contracts?.data?.length)"
+                    title="Aucun contrat"
+                    description="Créez votre premier contrat après avoir ajouté un client et un véhicule."
+                    cta-label="Créer un contrat"
+                    :cta-href="route('contracts.create')"
+                    icon="credit"
+                />
             </div>
 
             <!-- Desktop : tableau -->
@@ -266,7 +269,10 @@ function cancel(contract, label) {
                     :data="contracts.data ?? []"
                     :columns="columns"
                     row-key="id"
-                    empty-message="Aucun contrat."
+                    sort-base-url="/contracts"
+                    :sort-key="filters?.sort ?? 'created_at'"
+                    :sort-order="filters?.order ?? 'desc'"
+                    :sort-query-params="queryParams"
                 >
                     <template #actions="{ row }">
                         <DataTableAction label="Voir le détail" :to="route('contracts.show', row.id)" icon="eye" />
@@ -282,7 +288,13 @@ function cancel(contract, label) {
                         />
                     </template>
                     <template #empty>
-                        Aucun contrat. <Link :href="route('contracts.create')" class="text-slate-900 underline">Créer un contrat</Link>
+                        <EmptyState
+                            title="Aucun contrat"
+                            description="Créez votre premier contrat après avoir ajouté un client et un véhicule."
+                            cta-label="Créer un contrat"
+                            :cta-href="route('contracts.create')"
+                            icon="credit"
+                        />
                     </template>
                 </DataTable>
             </div>

@@ -175,14 +175,23 @@ class ContractController extends Controller
             $query->where('start_date', '<=', $request->date_to);
         }
 
+        $sortColumn = $request->input('sort', 'created_at');
+        $sortOrder = strtolower($request->input('order', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $allowedSort = ['created_at', 'reference', 'start_date', 'end_date', 'status', 'total_amount'];
+        if (in_array($sortColumn, $allowedSort, true)) {
+            $query->orderBy($sortColumn, $sortOrder);
+        } else {
+            $query->latest();
+        }
+
         $perPage = min(max((int) $request->input('per_page', 25), 1), 100);
-        $contracts = $query->latest()->paginate($perPage)->withQueryString();
+        $contracts = $query->paginate($perPage)->withQueryString();
 
         $draftCount = Contract::accessibleBy($user)->where('status', Contract::STATUS_DRAFT)->count();
 
         return Inertia::render('Contracts/Index', [
             'contracts' => $contracts,
-            'filters' => $request->only(['search', 'status', 'per_page', 'date_from', 'date_to']),
+            'filters' => $request->only(['search', 'status', 'per_page', 'date_from', 'date_to', 'sort', 'order']),
             'draft_count' => $draftCount,
         ]);
     }
@@ -241,7 +250,7 @@ class ContractController extends Controller
 
         $hasPolicyNumber = Schema::hasColumn('contracts', 'policy_number');
         $hasAttestation = Schema::hasColumn('contracts', 'attestation_issued_at');
-        $filename = 'contrats-' . now()->format('Y-m-d-His') . '.csv';
+        $filename = 'export-contrats-' . now()->format('Y-m-d-His') . '.csv';
 
         $headers = [
             'Date création',

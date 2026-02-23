@@ -36,7 +36,18 @@ export function useStatistics() {
             chartClientsParMois.value = data.chart_clients_par_mois ?? [];
             chartRevenusParMois.value = data.chart_revenus_par_mois ?? [];
         } catch (e) {
-            error.value = e.message || 'Impossible de charger les statistiques';
+            const msg = e.message || '';
+            if (msg.includes('401') || msg.includes('Unauthenticated')) {
+                error.value = 'Session expirée. Veuillez vous reconnecter.';
+            } else if (msg.includes('403') || msg.includes('Forbidden')) {
+                error.value = "Vous n'avez pas les droits pour afficher ces statistiques.";
+            } else if (msg.includes('500') || msg.includes('Server Error')) {
+                error.value = 'Erreur serveur. Veuillez réessayer plus tard.';
+            } else if (msg.includes(' réseau') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+                error.value = 'Erreur de connexion. Vérifiez votre accès internet.';
+            } else {
+                error.value = msg || 'Impossible de charger les statistiques.';
+            }
         } finally {
             loading.value = false;
         }

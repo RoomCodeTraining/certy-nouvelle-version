@@ -7,6 +7,7 @@ import DataTable from '@/Components/DataTable.vue';
 import DataTableAction from '@/Components/DataTableAction.vue';
 import TableFilters from '@/Components/TableFilters.vue';
 import Paginator from '@/Components/Paginator.vue';
+import EmptyState from '@/Components/EmptyState.vue';
 import { route } from '@/route';
 import { formatDate } from '@/utils/formatDate';
 import { useConfirm } from '@/Composables/useConfirm';
@@ -22,9 +23,9 @@ const breadcrumbs = [
 ];
 
 const columns = [
-    { key: 'created_at', label: 'Date', getValue: (row) => formatDate(row.created_at) },
-    { key: 'reference', label: 'Référence', getValue: (row) => row.reference ?? '—' },
-    { key: 'full_name', label: 'Nom complet', type: 'link', getValue: (row) => row.full_name ?? '—', href: (row) => route('clients.show', row.id) },
+    { key: 'created_at', label: 'Date', sortKey: 'created_at', getValue: (row) => formatDate(row.created_at) },
+    { key: 'reference', label: 'Référence', sortKey: 'reference', getValue: (row) => row.reference ?? '—' },
+    { key: 'full_name', label: 'Nom complet', sortKey: 'full_name', type: 'link', getValue: (row) => row.full_name ?? '—', href: (row) => route('clients.show', row.id) },
     { key: 'owner', label: 'Propriétaire', getValue: (row) => row.owner?.name ?? '—' },
     { key: 'email', label: 'Email', getValue: (row) => row.email ?? '—' },
     { key: 'phone', label: 'Téléphone', getValue: (row) => row.phone ?? '—' },
@@ -36,6 +37,8 @@ const queryParams = computed(() => ({
     search: props.filters?.search ?? '',
     type_assure: props.filters?.type_assure ?? '',
     per_page: props.clients?.per_page ?? 25,
+    sort: props.filters?.sort ?? 'created_at',
+    order: props.filters?.order ?? 'desc',
 }));
 
 const hasActiveFilters = computed(() => !!(props.filters?.search || props.filters?.type_assure));
@@ -87,6 +90,8 @@ function destroy(client, clientName) {
                 <option value="TAPM" :selected="filters?.type_assure === 'TAPM'">TAPM</option>
             </select>
             <input type="hidden" name="per_page" :value="clients?.per_page ?? 25" />
+            <input type="hidden" name="sort" :value="filters?.sort ?? 'created_at'" />
+            <input type="hidden" name="order" :value="filters?.order ?? 'desc'" />
         </TableFilters>
 
         <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -110,9 +115,14 @@ function destroy(client, clientName) {
                         <DataTableAction label="Supprimer" variant="danger" icon="trash" @click="destroy(row, row.full_name)" />
                     </div>
                 </div>
-                <div v-if="!(clients?.data?.length)" class="py-10 px-4 text-center text-slate-500 text-sm">
-                    Aucun client. <Link :href="route('clients.create')" class="text-sky-600 hover:underline block mt-2">Créer un client</Link>
-                </div>
+                <EmptyState
+                    v-if="!(clients?.data?.length)"
+                    title="Aucun client"
+                    description="Ajoutez votre premier client pour commencer à gérer vos contrats."
+                    cta-label="Créer un client"
+                    :cta-href="route('clients.create')"
+                    icon="folder"
+                />
             </div>
 
             <!-- Desktop : tableau -->
@@ -121,7 +131,10 @@ function destroy(client, clientName) {
                     :data="clients.data ?? []"
                     :columns="columns"
                     row-key="id"
-                    empty-message="Aucun client."
+                    sort-base-url="/clients"
+                    :sort-key="filters?.sort ?? 'created_at'"
+                    :sort-order="filters?.order ?? 'desc'"
+                    :sort-query-params="queryParams"
                 >
                     <template #actions="{ row }">
                         <DataTableAction label="Voir le détail" :to="route('clients.show', row.id)" icon="eye" />
@@ -129,7 +142,13 @@ function destroy(client, clientName) {
                         <DataTableAction label="Supprimer" variant="danger" icon="trash" @click="destroy(row, row.full_name)" />
                     </template>
                     <template #empty>
-                        Aucun client. <Link :href="route('clients.create')" class="text-slate-900 underline">Créer un client</Link>
+                        <EmptyState
+                            title="Aucun client"
+                            description="Ajoutez votre premier client pour commencer à gérer vos contrats."
+                            cta-label="Créer un client"
+                            :cta-href="route('clients.create')"
+                            icon="folder"
+                        />
                     </template>
                 </DataTable>
             </div>

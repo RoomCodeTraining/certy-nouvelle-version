@@ -42,12 +42,21 @@ class VehicleController extends Controller
             });
         }
 
+        $sortColumn = $request->input('sort', 'created_at');
+        $sortOrder = strtolower($request->input('order', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $allowedSort = ['created_at', 'reference', 'registration_number', 'updated_at'];
+        if (in_array($sortColumn, $allowedSort, true)) {
+            $query->orderBy($sortColumn, $sortOrder);
+        } else {
+            $query->latest();
+        }
+
         $perPage = min(max((int) $request->input('per_page', 25), 1), 100);
-        $vehicles = $query->latest()->paginate($perPage)->withQueryString();
+        $vehicles = $query->paginate($perPage)->withQueryString();
 
         return Inertia::render('Vehicles/Index', [
             'vehicles' => $vehicles,
-            'filters' => $request->only(['search', 'per_page']),
+            'filters' => $request->only(['search', 'per_page', 'sort', 'order']),
         ]);
     }
 

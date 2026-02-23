@@ -130,6 +130,10 @@ function dealTypeLabel(c) {
                                 <dt class="text-slate-500">Type assuré</dt>
                                 <dd class="text-slate-900 mt-0.5">{{ typeAssureLabel }}</dd>
                             </div>
+                            <div v-if="client?.updated_at">
+                                <dt class="text-slate-500">Dernière modification</dt>
+                                <dd class="text-slate-900 mt-0.5">{{ formatDate(client.updated_at) }}</dd>
+                            </div>
                         </dl>
                     </div>
                 </section>

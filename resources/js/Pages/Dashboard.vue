@@ -1,9 +1,12 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, defineAsyncComponent } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import DashboardLayout from '@/Layouts/DashboardLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
-import DashboardCharts from '@/Components/DashboardCharts.vue';
+const DashboardCharts = defineAsyncComponent(() => import('@/Components/DashboardCharts.vue'));
+import SkeletonKpi from '@/Components/SkeletonKpi.vue';
+import ChartSkeleton from '@/Components/ChartSkeleton.vue';
+import EmptyState from '@/Components/EmptyState.vue';
 import { useStatistics } from '@/Composables/useStatistics';
 import { formatDate } from '@/utils/formatDate';
 import { route } from '@/route';
@@ -49,7 +52,7 @@ function statusLabel(status) {
 }
 function statusBadgeClass(status) {
     const s = String(status ?? '').toLowerCase();
-    if (['active', 'validated'].includes(s)) return 'bg-sky-100 text-sky-800';
+    if (['active', 'validated'].includes(s)) return 'bg-emerald-100 text-emerald-800';
     if (['cancelled', 'expired'].includes(s)) return 'bg-red-100 text-red-800';
     return 'bg-amber-100 text-amber-800';
 }
@@ -97,31 +100,37 @@ function statusBadgeClass(status) {
 
             <!-- KPIs (Vue ensemble uniquement) -->
             <div v-if="viewMode === 'ensemble'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-                <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                    <p class="text-sm text-slate-500 mb-0.5">Revenus totaux générés</p>
-                    <p v-if="loading" class="text-xl font-semibold text-slate-400">—</p>
-                    <p v-else class="text-xl font-semibold text-slate-900">{{ formatXOF(revenusTotaux) }}</p>
-                </div>
-                <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                    <p class="text-sm text-slate-500 mb-0.5">Total des contrats</p>
-                    <p v-if="loading" class="text-xl font-semibold text-slate-400">—</p>
-                    <p v-else class="text-xl font-semibold text-slate-900">{{ contratsActifs }}</p>
-                </div>
-                <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                    <p class="text-sm text-slate-500 mb-0.5">Total des clients</p>
-                    <p v-if="loading" class="text-xl font-semibold text-slate-400">—</p>
-                    <p v-else class="text-xl font-semibold text-slate-900">{{ clients }}</p>
-                </div>
-                <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                    <p class="text-sm text-slate-500 mb-0.5">Total des véhicules</p>
-                    <p v-if="loading" class="text-xl font-semibold text-slate-400">—</p>
-                    <p v-else class="text-xl font-semibold text-slate-900">{{ vehicules }}</p>
-                </div>
+                <template v-if="loading">
+                    <SkeletonKpi label="Revenus totaux générés" />
+                    <SkeletonKpi label="Total des contrats" />
+                    <SkeletonKpi label="Total des clients" />
+                    <SkeletonKpi label="Total des véhicules" />
+                </template>
+                <template v-else>
+                    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                        <p class="text-sm text-slate-500 mb-0.5">Revenus totaux générés</p>
+                        <p class="text-xl font-semibold text-slate-900">{{ formatXOF(revenusTotaux) }}</p>
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                        <p class="text-sm text-slate-500 mb-0.5">Total des contrats</p>
+                        <p class="text-xl font-semibold text-slate-900">{{ contratsActifs }}</p>
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                        <p class="text-sm text-slate-500 mb-0.5">Total des clients</p>
+                        <p class="text-xl font-semibold text-slate-900">{{ clients }}</p>
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                        <p class="text-sm text-slate-500 mb-0.5">Total des véhicules</p>
+                        <p class="text-xl font-semibold text-slate-900">{{ vehicules }}</p>
+                    </div>
+                </template>
             </div>
 
             <!-- Graphiques (uniquement en Vue analytique) -->
-            <div v-if="viewMode === 'detaillé' && !loading && !error" class="mb-4 sm:mb-6">
+            <div v-if="viewMode === 'detaillé'" class="mb-4 sm:mb-6">
+                <ChartSkeleton v-if="loading" />
                 <DashboardCharts
+                    v-else-if="!error"
                     :labels="chartLabels"
                     :contrats-par-mois="chartContratsParMois"
                     :clients-par-mois="chartClientsParMois"
@@ -204,13 +213,14 @@ function statusBadgeClass(status) {
                             </div>
                         </div>
                     </Link>
-                    <div
+                    <EmptyState
                         v-if="props.recentContracts.length === 0"
-                        class="py-10 px-4 text-center text-slate-500 text-sm"
-                    >
-                        Aucun contrat.
-                        <Link :href="route('contracts.create')" class="text-sky-600 hover:underline block mt-2">Créer un contrat</Link>
-                    </div>
+                        title="Aucun contrat"
+                        description="Commencez par créer votre premier contrat pour le voir apparaître ici."
+                        cta-label="Créer un contrat"
+                        :cta-href="route('contracts.create')"
+                        icon="credit"
+                    />
                 </div>
 
                 <!-- Desktop : tableau -->
@@ -261,8 +271,14 @@ function statusBadgeClass(status) {
                                 </td>
                             </tr>
                             <tr v-if="props.recentContracts.length === 0">
-                                <td colspan="7" class="py-8 px-4 text-center text-slate-500 text-sm">
-                                    Aucun contrat. <Link :href="route('contracts.create')" class="text-sky-600 hover:underline">Créer un contrat</Link>
+                                <td colspan="7">
+                                    <EmptyState
+                                        title="Aucun contrat"
+                                        description="Commencez par créer votre premier contrat pour le voir apparaître ici."
+                                        cta-label="Créer un contrat"
+                                        :cta-href="route('contracts.create')"
+                                        icon="credit"
+                                    />
                                 </td>
                             </tr>
                         </tbody>

@@ -7,6 +7,7 @@ import DataTable from '@/Components/DataTable.vue';
 import DataTableAction from '@/Components/DataTableAction.vue';
 import TableFilters from '@/Components/TableFilters.vue';
 import Paginator from '@/Components/Paginator.vue';
+import EmptyState from '@/Components/EmptyState.vue';
 import { route } from '@/route';
 import { formatDate } from '@/utils/formatDate';
 import { useConfirm } from '@/Composables/useConfirm';
@@ -27,6 +28,7 @@ const columns = [
     {
         key: 'registration_number',
         label: 'Immatriculation',
+        sortKey: 'registration_number',
         type: 'link',
         getValue: (row) => row.registration_number ?? '—',
         href: (row) => route('vehicles.show', row.id),
@@ -44,6 +46,8 @@ const columns = [
 const queryParams = computed(() => ({
     search: props.filters?.search ?? '',
     per_page: props.vehicles?.per_page ?? 25,
+    sort: props.filters?.sort ?? 'created_at',
+    order: props.filters?.order ?? 'desc',
 }));
 
 const hasActiveFilters = computed(() => !!props.filters?.search);
@@ -89,6 +93,8 @@ function destroy(vehicle, label) {
                 class="rounded-lg border border-slate-200 px-3 py-2 text-sm w-full sm:w-72 focus:border-slate-400 focus:ring-1 focus:ring-slate-400 focus:outline-none"
             />
             <input type="hidden" name="per_page" :value="vehicles?.per_page ?? 25" />
+            <input type="hidden" name="sort" :value="filters?.sort ?? 'created_at'" />
+            <input type="hidden" name="order" :value="filters?.order ?? 'desc'" />
         </TableFilters>
 
         <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -111,9 +117,14 @@ function destroy(vehicle, label) {
                         <DataTableAction label="Supprimer" variant="danger" icon="trash" @click="destroy(row, (row.brand?.name + ' ' + row.model?.name) || row.registration_number)" />
                     </div>
                 </div>
-                <div v-if="!(vehicles?.data?.length)" class="py-10 px-4 text-center text-slate-500 text-sm">
-                    Aucun véhicule. Créez d'abord un client puis ajoutez un véhicule depuis sa fiche.
-                </div>
+                <EmptyState
+                    v-if="!(vehicles?.data?.length)"
+                    title="Aucun véhicule"
+                    description="Créez d'abord un client, puis ajoutez un véhicule depuis sa fiche ou ici."
+                    cta-label="Ajouter un véhicule"
+                    :cta-href="route('vehicles.create')"
+                    icon="sparkles"
+                />
             </div>
 
             <!-- Desktop : tableau -->
@@ -122,8 +133,21 @@ function destroy(vehicle, label) {
                 :data="vehicles.data ?? []"
                 :columns="columns"
                 row-key="id"
+                sort-base-url="/vehicles"
+                :sort-key="filters?.sort ?? 'created_at'"
+                :sort-order="filters?.order ?? 'desc'"
+                :sort-query-params="queryParams"
                 empty-message="Aucun véhicule. Créez d’abord un client puis ajoutez un véhicule depuis sa fiche."
             >
+                <template #empty>
+                    <EmptyState
+                        title="Aucun véhicule"
+                        description="Créez d'abord un client, puis ajoutez un véhicule depuis sa fiche ou ici."
+                        cta-label="Ajouter un véhicule"
+                        :cta-href="route('vehicles.create')"
+                        icon="sparkles"
+                    />
+                </template>
                 <template #actions="{ row }">
                     <DataTableAction label="Voir le détail" :to="route('vehicles.show', row.id)" icon="eye" />
                     <DataTableAction label="Modifier" :to="route('vehicles.edit', row.id)" icon="edit" />

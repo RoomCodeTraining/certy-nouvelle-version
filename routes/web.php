@@ -31,6 +31,7 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, '__invoke'])->name('dashboard');
     Route::get('/api/statistics', [\App\Http\Controllers\Api\StatisticsController::class, '__invoke'])->name('api.statistics');
+    Route::get('/api/search', [\App\Http\Controllers\Api\SearchController::class, '__invoke'])->name('api.search');
 
     // Certy IA — assistant (question/réponse sur clients, véhicules, contrats, bordereaux)
     Route::get('/certy-ia', [CertyIaController::class, 'index'])->name('certy-ia.index');

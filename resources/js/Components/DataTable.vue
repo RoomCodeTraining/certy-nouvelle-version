@@ -17,6 +17,10 @@ const props = defineProps({
         type: Array,
         required: true,
     },
+    sortKey: { type: String, default: null },
+    sortOrder: { type: String, default: 'desc' },
+    sortBaseUrl: { type: String, default: '' },
+    sortQueryParams: { type: Object, default: () => ({}) },
     rowKey: {
         type: [String, Function],
         default: 'id',
@@ -47,6 +51,19 @@ function getImageAlt(row, col) {
     if (col.getAlt && typeof col.getAlt === 'function') return col.getAlt(row);
     return '';
 }
+
+function buildSortUrl(col) {
+    if (!props.sortBaseUrl || !col.sortKey) return null;
+    const nextOrder = (props.sortKey === col.sortKey && props.sortOrder === 'desc') ? 'asc' : 'desc';
+    const params = { ...props.sortQueryParams, sort: col.sortKey, order: nextOrder };
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v != null && v !== '') qs.set(k, String(v)); });
+    return `${props.sortBaseUrl}?${qs.toString()}`;
+}
+
+function isSorted(col) {
+    return props.sortKey && col.sortKey === props.sortKey;
+}
 </script>
 
 <template>
@@ -73,9 +90,20 @@ function getImageAlt(row, col) {
                             :key="col.key"
                             scope="col"
                             class="h-11 px-4 text-left align-middle font-medium text-slate-600"
-                            :class="col.class ?? ''"
+                            :class="[col.class ?? '', col.sortKey && sortBaseUrl ? 'cursor-pointer select-none hover:text-slate-900 hover:bg-slate-100/80 rounded' : '']"
                         >
-                            {{ col.label }}
+                            <Link
+                                v-if="col.sortKey && sortBaseUrl"
+                                :href="buildSortUrl(col)"
+                                class="flex items-center gap-1"
+                                preserve-scroll
+                            >
+                                {{ col.label }}
+                                <span v-if="isSorted(col)" class="text-slate-400" aria-hidden="true">
+                                    {{ sortOrder === 'asc' ? '↑' : '↓' }}
+                                </span>
+                            </Link>
+                            <span v-else>{{ col.label }}</span>
                         </th>
                         <th v-if="$slots.actions" scope="col" class="h-11 w-[1%] min-w-[7rem] px-4 text-right align-middle font-medium text-slate-600 whitespace-nowrap">
                             <span class="sr-only">Actions</span>
