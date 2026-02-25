@@ -108,8 +108,8 @@ class ProductionController extends Controller
 
         $query = Contract::query()
             ->with(['createdBy:id,name'])
-            ->where('status', Contract::STATUS_ACTIVE)
-            ->whereNotNull('attestation_number')
+            // ->where('status', Contract::STATUS_ACTIVE)
+            // ->whereNotNull('attestation_number')
             // Production mensuelle basée sur la date de début de contrat
             ->whereBetween('start_date', [$start, $end]);
 
