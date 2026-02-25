@@ -111,11 +111,18 @@ const navItems = computed(() => {
         { href: "/contracts", label: "Contrats", icon: "credit" },
     ];
     if (isRoot.value) {
-        items.push({
-            href: "/bordereaux",
-            label: "Bordereaux",
-            icon: "documentText",
-        });
+        items.push(
+            {
+                href: "/bordereaux",
+                label: "Bordereaux",
+                icon: "documentText",
+            },
+            {
+                href: "/reports/production",
+                label: "Production",
+                icon: "chart",
+            },
+        );
     }
     if (certyIa.value?.enabled) {
         items.push({
@@ -208,6 +215,7 @@ const iconPaths = {
     menuAlt: "M4 6h16M4 12h16M4 18h16",
     documentText:
         "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+    chart: "M4 20h16M7 20V10m5 10V6m5 14V4",
 };
 </script>
 

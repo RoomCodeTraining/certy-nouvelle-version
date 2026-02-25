@@ -14,6 +14,7 @@ use App\Http\Controllers\Settings\OrganizationCompanyConfigController;
 use App\Http\Controllers\Settings\CertyIaSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\Reports\ProductionController;
 use Illuminate\Support\Facades\Route;
 
 // Point d'entrée : redirection vers login (invités) ou dashboard (connectés)
@@ -77,7 +78,7 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     Route::post('/contracts/{contract}/mark-attestation-issued', [ContractController::class, 'markAttestationIssued'])->name('contracts.mark-attestation-issued');
     Route::post('/contracts/{contract}/generate-attestation', [ContractController::class, 'generateAttestation'])->name('contracts.generate-attestation');
 
-    // Bordereaux (compagnie + période du -> au) — réservé aux utilisateurs root
+    // Bordereaux & Rapports — réservé aux utilisateurs root
     Route::middleware('root')->group(function () {
         Route::get('/bordereaux', [BordereauController::class, 'index'])->name('bordereaux.index');
         Route::get('/bordereaux/create', [BordereauController::class, 'create'])->name('bordereaux.create');
@@ -87,6 +88,10 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
         Route::delete('/bordereaux/{bordereau}', [BordereauController::class, 'destroy'])->name('bordereaux.destroy');
         Route::get('/bordereaux/{bordereau}/pdf', [BordereauController::class, 'pdf'])->name('bordereaux.pdf');
         Route::get('/bordereaux/{bordereau}/excel', [BordereauController::class, 'excel'])->name('bordereaux.excel');
+
+        // Rapports de production contrats
+        Route::get('/reports/production', [ProductionController::class, 'index'])->name('reports.production.index');
+        Route::get('/reports/production/export', [ProductionController::class, 'export'])->name('reports.production.export');
     });
 
     // Référentiel : Marques et Modèles véhicules
