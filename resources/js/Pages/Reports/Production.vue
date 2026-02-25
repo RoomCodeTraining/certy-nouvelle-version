@@ -39,25 +39,12 @@ const totals = computed(() => {
     const avgReductionPct =
         totalBefore > 0 ? Math.round((totalReduction / totalBefore) * 10000) / 100 : 0;
 
-    const typeTotals = rows.reduce(
-        (acc, r) => {
-            const t = r.types ?? {};
-            acc.VP += t.VP ?? 0;
-            acc.TPC += t.TPC ?? 0;
-            acc.TPM += t.TPM ?? 0;
-            acc.TWO_WHEELER += t.TWO_WHEELER ?? 0;
-            return acc;
-        },
-        { VP: 0, TPC: 0, TPM: 0, TWO_WHEELER: 0 },
-    );
-
     return {
         totalContracts,
         totalAmount,
         totalBefore,
         totalReduction,
         avgReductionPct,
-        typeTotals,
     };
 });
 
@@ -84,7 +71,7 @@ const exportUrl = computed(() => {
                         :href="exportUrl"
                         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium bg-white hover:bg-slate-50"
                     >
-                        Exporter CSV
+                        Exporter Excel
                     </a>
                 </template>
             </PageHeader>
@@ -187,7 +174,7 @@ const exportUrl = computed(() => {
             <section class="rounded-xl border border-slate-200 bg-white overflow-hidden">
                 <div class="px-4 py-3 border-b border-slate-200">
                     <h2 class="text-sm font-semibold text-slate-900">
-                        Détail par utilisateur
+                        Détail par utilisateur et type
                     </h2>
                 </div>
                 <div class="overflow-x-auto">
@@ -197,20 +184,11 @@ const exportUrl = computed(() => {
                                 <th class="text-left py-3 px-4 font-medium text-slate-600">
                                     Utilisateur
                                 </th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600">
+                                    Type
+                                </th>
                                 <th class="text-right py-3 px-4 font-medium text-slate-600">
                                     Nb contrats
-                                </th>
-                                <th class="text-right py-3 px-4 font-medium text-slate-600">
-                                    VP
-                                </th>
-                                <th class="text-right py-3 px-4 font-medium text-slate-600">
-                                    TPC
-                                </th>
-                                <th class="text-right py-3 px-4 font-medium text-slate-600">
-                                    TPM
-                                </th>
-                                <th class="text-right py-3 px-4 font-medium text-slate-600">
-                                    Deux roues
                                 </th>
                                 <th class="text-right py-3 px-4 font-medium text-slate-600">
                                     Montant total
@@ -235,20 +213,11 @@ const exportUrl = computed(() => {
                                 <td class="py-3 px-4 text-slate-900">
                                     {{ row.user_name }}
                                 </td>
+                                <td class="py-3 px-4 text-slate-700">
+                                    {{ row.type || '—' }}
+                                </td>
                                 <td class="py-3 px-4 text-right tabular-nums">
                                     {{ row.contracts_count }}
-                                </td>
-                                <td class="py-3 px-4 text-right tabular-nums">
-                                    {{ row.types?.VP ?? 0 }}
-                                </td>
-                                <td class="py-3 px-4 text-right tabular-nums">
-                                    {{ row.types?.TPC ?? 0 }}
-                                </td>
-                                <td class="py-3 px-4 text-right tabular-nums">
-                                    {{ row.types?.TPM ?? 0 }}
-                                </td>
-                                <td class="py-3 px-4 text-right tabular-nums">
-                                    {{ row.types?.TWO_WHEELER ?? 0 }}
                                 </td>
                                 <td class="py-3 px-4 text-right tabular-nums">
                                     {{ formatXOF(row.total_amount) }}

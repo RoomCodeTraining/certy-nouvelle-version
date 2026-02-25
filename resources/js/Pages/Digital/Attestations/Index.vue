@@ -19,7 +19,9 @@ const props = defineProps({
 const page = usePage();
 /** Erreur à afficher : prop (chargement liste), flash (redirect après 404), ou erreur locale (fetch download-url 404). */
 const displayError = ref(null);
-const errorToShow = computed(() => displayError.value ?? props.error ?? page.props.flash?.error ?? null);
+const errorToShow = computed(
+    () => displayError.value ?? props.error ?? page.props.flash?.error ?? null,
+);
 
 const list = Array.isArray(props.attestations)
     ? props.attestations
@@ -120,16 +122,24 @@ async function handleDownload(ref, source) {
         downloadingKey.value = key;
         displayError.value = null;
         try {
-            const res = await fetch(route("digital.attestations.download_url", ref) + "?source=autres", {
-                credentials: "same-origin",
-                method: "GET",
-            });
+            const res = await fetch(
+                route("digital.attestations.download_url", ref) +
+                    "?source=autres",
+                {
+                    credentials: "same-origin",
+                    method: "GET",
+                },
+            );
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.url && typeof data.url === "string") {
                 window.open(data.url, "_blank");
                 return;
             }
-            if (res.status === 404 && data.message && typeof data.message === "string") {
+            if (
+                res.status === 404 &&
+                data.message &&
+                typeof data.message === "string"
+            ) {
                 displayError.value = data.message;
                 return;
             }
@@ -189,12 +199,63 @@ function openViewModal(row, source) {
 
 /** Dropdown Actions par row (CIMA / Autres) */
 const actionMenuOpen = ref(null);
-function toggleActionMenu(row) {
-    const key = row.reference ?? row.id ?? row.reference_id;
-    actionMenuOpen.value = actionMenuOpen.value === key ? null : key;
+const actionMenuDirection = ref({});
+
+function getActionRowKey(row) {
+    return row.reference ?? row.id ?? row.reference_id;
+}
+
+function getActionMenuDirection(row) {
+    const key = getActionRowKey(row);
+    return actionMenuDirection.value[key] || "down";
+}
+
+function getActionMenuPositionClass(row) {
+    return getActionMenuDirection(row) === "up"
+        ? "bottom-full mb-2 origin-bottom-right"
+        : "top-full mt-2 origin-top-right";
+}
+
+function toggleActionMenu(row, event) {
+    const key = getActionRowKey(row);
+
+    // Si le menu est déjà ouvert pour cette ligne, on le ferme simplement
+    if (actionMenuOpen.value === key) {
+        actionMenuOpen.value = null;
+        return;
+    }
+
+    // Calculer la direction d'ouverture (haut/bas) en fonction de la place disponible
+    if (event?.currentTarget && typeof window !== "undefined") {
+        const triggerRect = event.currentTarget.getBoundingClientRect();
+        const viewportHeight =
+            window.innerHeight || document.documentElement.clientHeight || 0;
+
+        // Hauteur approximative du menu (en px) pour savoir s'il tiendra en dessous
+        const estimatedMenuHeight = 260;
+        const spaceBelow = viewportHeight - triggerRect.bottom;
+        const spaceAbove = triggerRect.top;
+
+        const direction =
+            spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow
+                ? "up"
+                : "down";
+
+        actionMenuDirection.value = {
+            ...actionMenuDirection.value,
+            [key]: direction,
+        };
+    } else {
+        actionMenuDirection.value = {
+            ...actionMenuDirection.value,
+            [key]: "down",
+        };
+    }
+
+    actionMenuOpen.value = key;
 }
 function isActionMenuOpen(row) {
-    const key = row.reference ?? row.id ?? row.reference_id;
+    const key = getActionRowKey(row);
     return actionMenuOpen.value === key;
 }
 function closeActionMenu() {
@@ -434,9 +495,8 @@ const columns = [
         </template>
 
         <p class="text-sm text-slate-600 mb-4">
-            Données issues de la plateforme ASACI. Consulter et télécharger :
-            <strong>CIMA</strong> (ASACI) ou <strong>Autres</strong> (API EATCI
-            BNICB).
+            Données issues de la plateforme ASACI. Consulter et télécharger les
+            attestations.
         </p>
 
         <div
@@ -450,8 +510,18 @@ const columns = [
                 aria-label="Fermer"
                 @click="displayError = null"
             >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                <svg
+                    class="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12"
+                    />
                 </svg>
             </button>
         </div>
@@ -791,7 +861,7 @@ const columns = [
                             >
                                 <button
                                     type="button"
-                                    @click.stop="toggleActionMenu(row)"
+                                    @click.stop="toggleActionMenu(row, $event)"
                                     class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 hover:border-slate-300 transition-colors"
                                     :aria-expanded="isActionMenuOpen(row)"
                                     aria-haspopup="true"
@@ -824,7 +894,10 @@ const columns = [
                                 >
                                     <div
                                         v-show="isActionMenuOpen(row)"
-                                        class="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 overflow-hidden"
+                                        :class="[
+                                            'absolute right-0 z-20 w-60 rounded-xl border border-slate-200 bg-white shadow-xl ring-1 ring-slate-900/5 overflow-hidden',
+                                            getActionMenuPositionClass(row),
+                                        ]"
                                     >
                                         <div
                                             class="bg-slate-50/80 px-3 py-2 border-b border-slate-100"
@@ -837,7 +910,9 @@ const columns = [
                                         <div class="p-1">
                                             <button
                                                 type="button"
-                                                @click="openViewModal(row, 'cima')"
+                                                @click="
+                                                    openViewModal(row, 'cima')
+                                                "
                                                 class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left"
                                             >
                                                 <span
@@ -949,10 +1024,7 @@ const columns = [
                                             <button
                                                 type="button"
                                                 @click="
-                                                    openViewModal(
-                                                        row,
-                                                        'autres',
-                                                    )
+                                                    openViewModal(row, 'autres')
                                                 "
                                                 class="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left"
                                             >

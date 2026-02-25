@@ -61,25 +61,19 @@ class ProductionController extends Controller
 
             fputcsv($out, [
                 'Utilisateur',
+                'Type',
                 'Nombre de contrats',
-                'Nb VP',
-                'Nb TPC',
-                'Nb TPM',
-                'Nb Deux roues',
                 'Montant total (FCFA)',
                 'Montant avant réductions (FCFA)',
-                'Total réductions (FCCA)',
+                'Total réductions (FCFA)',
                 'Réduction moyenne (%)',
             ], ';');
 
             foreach ($rows as $row) {
                 fputcsv($out, [
                     $row['user_name'],
+                    $row['type'],
                     $row['contracts_count'],
-                    $row['types']['VP'],
-                    $row['types']['TPC'],
-                    $row['types']['TPM'],
-                    $row['types']['TWO_WHEELER'],
                     $row['total_amount'],
                     $row['total_before_reduction'],
                     $row['total_reduction_amount'],
@@ -116,6 +110,7 @@ class ProductionController extends Controller
             ->with(['createdBy:id,name'])
             ->where('status', Contract::STATUS_ACTIVE)
             ->whereNotNull('attestation_number')
+            // Production mensuelle basée sur la date de début de contrat
             ->whereBetween('start_date', [$start, $end]);
 
         if ($request->filled('user_id')) {
@@ -124,13 +119,17 @@ class ProductionController extends Controller
 
         $contracts = $query->get();
 
-        $grouped = $contracts->groupBy('created_by_id');
+        // Regroupement par (utilisateur, type de contrat)
+        $grouped = $contracts->groupBy(function (Contract $c) {
+            return ($c->created_by_id ?: 0) . '|' . ($c->contract_type ?? '');
+        });
 
-        $rows = $grouped->map(function ($contracts, $userId) {
+        $rows = $grouped->map(function ($contracts, $key) {
             /** @var \Illuminate\Support\Collection $contracts */
             /** @var \App\Models\Contract $first */
             $first = $contracts->first();
             $creator = $first?->createdBy;
+            [$userId, $type] = explode('|', (string) $key, 2);
 
             $totalContracts = $contracts->count();
             $totalAmount = (int) $contracts->sum('total_amount');
@@ -138,21 +137,11 @@ class ProductionController extends Controller
             $totalReduction = (int) $contracts->sum(fn (Contract $c) => $c->total_reduction_amount ?? 0);
             $avgReductionPct = $totalBefore > 0 ? round($totalReduction / $totalBefore * 100, 2) : 0.0;
 
-            $countVp = $contracts->where('contract_type', Contract::TYPE_VP)->count();
-            $countTwo = $contracts->where('contract_type', Contract::TYPE_TWO_WHEELER)->count();
-            $countTpc = $contracts->where('contract_type', Contract::TYPE_TPC)->count();
-            $countTpm = $contracts->where('contract_type', Contract::TYPE_TPM)->count();
-
             return [
-                'user_id' => $userId,
+                'user_id' => (int) $userId ?: null,
                 'user_name' => $creator?->name ?? '—',
+                'type' => $type ?: null,
                 'contracts_count' => $totalContracts,
-                'types' => [
-                    'VP' => $countVp,
-                    'TPC' => $countTpc,
-                    'TPM' => $countTpm,
-                    'TWO_WHEELER' => $countTwo,
-                ],
                 'total_amount' => $totalAmount,
                 'total_before_reduction' => $totalBefore,
                 'total_reduction_amount' => $totalReduction,
