@@ -41,6 +41,8 @@ class DashboardController extends Controller
         return Inertia::render('Dashboard', [
             'organization' => $organization,
             'recentContracts' => $recentContracts,
+            // Bandeau d'information sur le nouveau rapport de production (uniquement pour le root)
+            'showProductionExportHint' => $user->isRoot(),
         ]);
     }
 }

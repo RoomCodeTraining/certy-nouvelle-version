@@ -1,6 +1,6 @@
 <script setup>
-import { ref, defineAsyncComponent } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { ref, computed, defineAsyncComponent, onMounted } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
 import DashboardLayout from '@/Layouts/DashboardLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 const DashboardCharts = defineAsyncComponent(() => import('@/Components/DashboardCharts.vue'));
@@ -11,11 +11,14 @@ import { useStatistics } from '@/Composables/useStatistics';
 import { formatDate } from '@/utils/formatDate';
 import { route } from '@/route';
 
-const breadcrumbs = [{ label: 'Tableau de bord' }];
-
 const props = defineProps({
     recentContracts: { type: Array, default: () => [] },
+    showProductionExportHint: { type: Boolean, default: false },
 });
+
+const page = usePage();
+
+const breadcrumbs = [{ label: 'Tableau de bord' }];
 
 const viewMode = ref('ensemble'); // 'ensemble' | 'detaillé'
 
@@ -56,6 +59,37 @@ function statusBadgeClass(status) {
     if (['cancelled', 'expired'].includes(s)) return 'bg-red-100 text-red-800';
     return 'bg-amber-100 text-amber-800';
 }
+
+const isRoot = computed(() => page.props.auth?.user?.is_root ?? false);
+
+const PRODUCTION_HINT_STORAGE_KEY = 'dashboard:production-report-hint-dismissed';
+const isProductionHintDismissed = ref(false);
+
+onMounted(() => {
+    if (typeof window !== 'undefined') {
+        try {
+            const stored = window.localStorage.getItem(PRODUCTION_HINT_STORAGE_KEY);
+            isProductionHintDismissed.value = stored === '1';
+        } catch (_) {
+            isProductionHintDismissed.value = false;
+        }
+    }
+});
+
+const showProductionHint = computed(
+    () => isRoot.value && props.showProductionExportHint && !isProductionHintDismissed.value,
+);
+
+function dismissProductionHint() {
+    isProductionHintDismissed.value = true;
+    if (typeof window !== 'undefined') {
+        try {
+            window.localStorage.setItem(PRODUCTION_HINT_STORAGE_KEY, '1');
+        } catch (_) {
+            // ignore
+        }
+    }
+}
 </script>
 
 <template>
@@ -94,8 +128,54 @@ function statusBadgeClass(status) {
             </div>
 
             <!-- Message d'erreur -->
-            <div v-if="error" class="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 p-3 sm:p-4 mb-4 sm:mb-6 text-sm">
+            <div v-if="error" class="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 p-3 sm:p-4 mb-4 sm:mb-3 text-sm">
                 {{ error }}
+            </div>
+
+            <!-- Bandeau info : nouveau rapport de production (root uniquement) -->
+            <div
+                v-if="showProductionHint && viewMode === 'ensemble'"
+                class="rounded-xl border border-sky-200 bg-sky-50 text-sky-900 p-3 sm:p-4 mb-4 sm:mb-6 text-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+            >
+                <div class="flex items-start gap-3">
+                    <div
+                        class="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100 text-sky-600 shrink-0"
+                        aria-hidden="true"
+                    >
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M12 3a9 9 0 100 18 9 9 0 000-18z"
+                            />
+                        </svg>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="text-sm font-semibold">
+                            Nouveau rapport de production contrats
+                        </p>
+                        <p class="text-xs sm:text-sm text-sky-800/90">
+                            Consultez, exportez en Excel et analysez la production de contrats par utilisateur, type de véhicule
+                            et réductions appliquées (détail par contrat compris).
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 sm:shrink-0">
+                    <Link
+                        :href="route('reports.production.index')"
+                        class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-sky-700"
+                    >
+                        Découvrir le rapport
+                    </Link>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs sm:text-sm font-medium text-sky-700 hover:bg-sky-100"
+                        @click="dismissProductionHint"
+                    >
+                        Ne plus afficher
+                    </button>
+                </div>
             </div>
 
             <!-- KPIs (Vue ensemble uniquement) -->
