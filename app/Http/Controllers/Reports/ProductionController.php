@@ -52,7 +52,7 @@ class ProductionController extends Controller
             abort(403);
         }
 
-        [$rows, $start] = $this->buildData($request, forExport: true);
+        [$rows, $start, $contracts] = $this->buildData($request, forExport: true);
 
         $contractTypeLabels = [
             'VP' => 'Véhicule particulier',
@@ -63,7 +63,7 @@ class ProductionController extends Controller
 
         $filename = 'production-contrats-' . $start->format('Y-m') . '.xlsx';
 
-        return new StreamedResponse(function () use ($rows, $contractTypeLabels, $filename) {
+        return new StreamedResponse(function () use ($rows, $contracts, $contractTypeLabels, $filename) {
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Production');
@@ -104,6 +104,78 @@ class ProductionController extends Controller
             // Auto width colonnes
             foreach ($columns as $columnLetter) {
                 $sheet->getColumnDimension($columnLetter)->setAutoSize(true);
+            }
+
+            /**
+             * Feuille 2 : détail des contrats avec infos et ATD.
+             */
+            $detailsSheet = $spreadsheet->createSheet();
+            $detailsSheet->setTitle('Contrats');
+
+            $detailHeaders = [
+                'Utilisateur',
+                'Référence contrat',
+                'Type',
+                'Client',
+                'Véhicule',
+                'Compagnie',
+                'Date début',
+                'Date fin',
+                'Durée (jours)',
+                'Montant total (FCFA)',
+                'Montant avant réductions (FCFA)',
+                'Total réductions (FCFA)',
+                'N° ATD',
+                'Date ATD',
+            ];
+
+            // En-têtes de la feuille "Contrats"
+            $detailsSheet->fromArray($detailHeaders, null, 'A1');
+
+            $detailRows = [];
+            foreach ($contracts as $c) {
+                /** @var \App\Models\Contract $c */
+                $vehicleLabel = $c->vehicle
+                    ? trim(
+                        ($c->vehicle->brand?->name ?? '') . ' ' .
+                        ($c->vehicle->model?->name ?? '') . ' ' .
+                        ($c->vehicle->registration_number ?? '')
+                    ) ?: ($c->vehicle->registration_number ?? '')
+                    : '';
+
+                $typeLabel = $c->contract_type
+                    ? ($contractTypeLabels[$c->contract_type] ?? $c->contract_type)
+                    : '';
+
+                $durationDays = ($c->start_date && $c->end_date)
+                    ? $c->start_date->diffInDays($c->end_date) + 1
+                    : null;
+
+                $detailRows[] = [
+                    $c->createdBy?->name ?? '',
+                    $c->reference ?? '',
+                    $typeLabel,
+                    $c->client?->full_name ?? '',
+                    $vehicleLabel,
+                    $c->company?->name ?? '',
+                    $c->start_date?->format('d/m/Y') ?? '',
+                    $c->end_date?->format('d/m/Y') ?? '',
+                    $durationDays,
+                    $c->total_amount ?? 0,
+                    $c->total_before_reduction ?? 0,
+                    $c->total_reduction_amount ?? 0,
+                    $c->attestation_number ?? '',
+                    $c->attestation_issued_at?->format('d/m/Y H:i') ?? '',
+                ];
+            }
+
+            if (! empty($detailRows)) {
+                $detailsSheet->fromArray($detailRows, null, 'A2');
+            }
+
+            // Auto width pour la feuille "Contrats"
+            foreach (range('A', 'N') as $columnLetter) {
+                $detailsSheet->getColumnDimension($columnLetter)->setAutoSize(true);
             }
 
             // Sortie XLSX
@@ -149,6 +221,16 @@ class ProductionController extends Controller
 
         $contracts = $query->get();
 
+        // Pour l'export Excel, on a besoin des relations pour la feuille "Contrats"
+        if ($forExport) {
+            $contracts->load([
+                'client.owner',
+                'vehicle.brand',
+                'vehicle.model',
+                'company',
+            ]);
+        }
+
         // Regroupement par (utilisateur, type de contrat)
         $grouped = $contracts->groupBy(function (Contract $c) {
             return ($c->created_by_id ?: 0) . '|' . ($c->contract_type ?? '');
@@ -180,7 +262,7 @@ class ProductionController extends Controller
         })->values()->all();
 
         if ($forExport) {
-            return [$rows, $start];
+            return [$rows, $start, $contracts];
         }
 
         $users = $contracts->pluck('createdBy')->filter()->unique('id')->values()->map(function ($u) {
