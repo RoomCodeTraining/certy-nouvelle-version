@@ -3,10 +3,10 @@
  * VP, TPC (Transport pour propre compte), TPM = codes métier ; TWO_WHEELER → "Deux roues".
  */
 const CONTRACT_TYPE_LABELS = {
-    VP: 'VP',
-    TPC: 'Transport pour propre compte',
-    TPM: 'TPM',
-    TWO_WHEELER: 'Deux roues',
+    VP: "Véhicule particulier",
+    TPC: "Transport pour propre compte",
+    TPM: "Transport privé de marchandises",
+    TWO_WHEELER: "Deux roues",
 };
 
 export function contractTypeLabel(value) {

@@ -3,6 +3,7 @@ import { computed } from "vue";
 import DashboardLayout from "@/Layouts/DashboardLayout.vue";
 import PageHeader from "@/Components/PageHeader.vue";
 import { route } from "@/route";
+import { contractTypeLabel } from "@/utils/contractTypes";
 
 const props = defineProps({
     rows: { type: Array, default: () => [] },
@@ -214,7 +215,7 @@ const exportUrl = computed(() => {
                                     {{ row.user_name }}
                                 </td>
                                 <td class="py-3 px-4 text-slate-700">
-                                    {{ row.type || '—' }}
+                                    {{ contractTypeLabel(row.type) }}
                                 </td>
                                 <td class="py-3 px-4 text-right tabular-nums">
                                     {{ row.contracts_count }}

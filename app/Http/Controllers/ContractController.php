@@ -235,9 +235,9 @@ class ContractController extends Controller
         $contracts = $query->latest()->get();
 
         $contractTypeLabels = [
-            'VP' => 'VP',
+            'VP' => 'Véhicule particulier',
             'TPC' => 'Transport pour propre compte',
-            'TPM' => 'TPM',
+            'TPM' => 'Transport privé de marchandises',
             'TWO_WHEELER' => 'Deux roues',
         ];
         $statusLabels = [

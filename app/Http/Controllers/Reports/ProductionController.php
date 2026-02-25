@@ -52,9 +52,16 @@ class ProductionController extends Controller
 
         [$rows, $start] = $this->buildData($request, forExport: true);
 
+        $contractTypeLabels = [
+            'VP' => 'Véhicule particulier',
+            'TPC' => 'Transport pour propre compte',
+            'TPM' => 'Transport privé de marchandises',
+            'TWO_WHEELER' => 'Deux roues',
+        ];
+
         $filename = 'production-contrats-' . $start->format('Y-m') . '.csv';
 
-        return new StreamedResponse(function () use ($rows) {
+        return new StreamedResponse(function () use ($rows, $contractTypeLabels) {
             $out = fopen('php://output', 'w');
             // BOM UTF-8 pour Excel
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
@@ -70,9 +77,12 @@ class ProductionController extends Controller
             ], ';');
 
             foreach ($rows as $row) {
+                $typeCode = $row['type'] ?? null;
+                $typeLabel = $typeCode ? ($contractTypeLabels[$typeCode] ?? $typeCode) : '';
+
                 fputcsv($out, [
                     $row['user_name'],
-                    $row['type'],
+                    $typeLabel,
                     $row['contracts_count'],
                     $row['total_amount'],
                     $row['total_before_reduction'],
