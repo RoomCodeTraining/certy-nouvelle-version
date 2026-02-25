@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import DashboardLayout from "@/Layouts/DashboardLayout.vue";
 import PageHeader from "@/Components/PageHeader.vue";
 import { route } from "@/route";
@@ -57,6 +57,30 @@ const exportUrl = computed(() => {
     const qs = params.toString();
     return qs ? `${base}?${qs}` : base;
 });
+
+const isExporting = ref(false);
+
+function handleExportClick() {
+    if (isExporting.value) return;
+    isExporting.value = true;
+
+    const url = exportUrl.value;
+
+    try {
+        const link = document.createElement("a");
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } finally {
+        // On laisse un petit délai pour éviter un flash si le téléchargement est très rapide
+        setTimeout(() => {
+            isExporting.value = false;
+        }, 2000);
+    }
+}
 </script>
 
 <template>
@@ -68,12 +92,35 @@ const exportUrl = computed(() => {
                     contrats <span class="font-semibold">actifs</span> avec n° d'attestation.
                 </template>
                 <template #actions>
-                    <a
-                        :href="exportUrl"
-                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium bg-white hover:bg-slate-50"
+                    <button
+                        type="button"
+                        :disabled="isExporting"
+                        @click="handleExportClick"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-wait"
                     >
-                        Exporter Excel
-                    </a>
+                        <svg
+                            v-if="isExporting"
+                            class="w-4 h-4 animate-spin text-slate-500"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            aria-hidden="true"
+                        >
+                            <circle
+                                class="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                stroke-width="4"
+                            />
+                            <path
+                                class="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            />
+                        </svg>
+                        <span>Exporter Excel</span>
+                    </button>
                 </template>
             </PageHeader>
         </template>

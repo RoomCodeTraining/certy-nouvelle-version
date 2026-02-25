@@ -35,6 +35,8 @@ export function route(name, ...params) {
         'contracts.mark-attestation-issued': (id) => `/contracts/${id}/mark-attestation-issued`,
         'contracts.generate-attestation': (id) => `/contracts/${id}/generate-attestation`,
         'contracts.destroy': (id) => `/contracts/${id}`,
+        'reports.production.index': () => '/reports/production',
+        'reports.production.export': () => '/reports/production/export',
         'referential.brands.index': () => '/referential/brands',
         'referential.brands.create': () => '/referential/brands/create',
         'referential.brands.store': () => '/referential/brands',

@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ProductionController extends Controller
 {
@@ -59,14 +61,15 @@ class ProductionController extends Controller
             'TWO_WHEELER' => 'Deux roues',
         ];
 
-        $filename = 'production-contrats-' . $start->format('Y-m') . '.csv';
+        $filename = 'production-contrats-' . $start->format('Y-m') . '.xlsx';
 
-        return new StreamedResponse(function () use ($rows, $contractTypeLabels) {
-            $out = fopen('php://output', 'w');
-            // BOM UTF-8 pour Excel
-            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+        return new StreamedResponse(function () use ($rows, $contractTypeLabels, $filename) {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Production');
 
-            fputcsv($out, [
+            // En-têtes
+            $headers = [
                 'Utilisateur',
                 'Type',
                 'Nombre de contrats',
@@ -74,30 +77,47 @@ class ProductionController extends Controller
                 'Montant avant réductions (FCFA)',
                 'Total réductions (FCFA)',
                 'Réduction moyenne (%)',
-            ], ';');
+            ];
 
+            $columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+            foreach ($headers as $index => $header) {
+                $sheet->setCellValue($columns[$index] . '1', $header);
+            }
+
+            // Données
+            $rowIndex = 2;
             foreach ($rows as $row) {
                 $typeCode = $row['type'] ?? null;
                 $typeLabel = $typeCode ? ($contractTypeLabels[$typeCode] ?? $typeCode) : '';
 
-                fputcsv($out, [
-                    $row['user_name'],
-                    $typeLabel,
-                    $row['contracts_count'],
-                    $row['total_amount'],
-                    $row['total_before_reduction'],
-                    $row['total_reduction_amount'],
-                    $row['avg_reduction_pct'],
-                ], ';');
+                $sheet->setCellValue("A{$rowIndex}", $row['user_name']);
+                $sheet->setCellValue("B{$rowIndex}", $typeLabel);
+                $sheet->setCellValue("C{$rowIndex}", $row['contracts_count']);
+                $sheet->setCellValue("D{$rowIndex}", $row['total_amount']);
+                $sheet->setCellValue("E{$rowIndex}", $row['total_before_reduction']);
+                $sheet->setCellValue("F{$rowIndex}", $row['total_reduction_amount']);
+                $sheet->setCellValue("G{$rowIndex}", $row['avg_reduction_pct']);
+
+                $rowIndex++;
             }
 
-            fclose($out);
-        }, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-            'Cache-Control' => 'no-store, no-cache, must-revalidate',
-            'Pragma' => 'no-cache',
-        ]);
+            // Auto width colonnes
+            foreach ($columns as $columnLetter) {
+                $sheet->getColumnDimension($columnLetter)->setAutoSize(true);
+            }
+
+            // Sortie XLSX
+            $writer = new Xlsx($spreadsheet);
+
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="'.$filename.'"');
+            header('Cache-Control: no-store, no-cache, must-revalidate');
+            header('Pragma: no-cache');
+
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+        });
     }
 
     /**
