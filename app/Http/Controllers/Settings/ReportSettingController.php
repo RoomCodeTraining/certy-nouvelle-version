@@ -35,7 +35,7 @@ class ReportSettingController extends Controller
     {
         $validated = $request->validate([
             'enabled' => ['boolean'],
-            'frequency' => ['required', 'string', 'in:quinzaine,daily,weekly,monthly'],
+            'frequency' => ['required', 'string', 'in:quinzaine,daily,weekly,monthly,test_5min'],
             'day_of_week' => ['nullable', 'integer', 'min:1', 'max:7'],
             'day_of_month' => ['nullable', 'integer', 'min:1', 'max:31'],
             'time' => ['required', 'string', 'regex:/^\d{2}:\d{2}$/'],

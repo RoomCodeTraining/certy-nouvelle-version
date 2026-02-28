@@ -8,5 +8,5 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Vérifie toutes les heures si un envoi est dû (selon paramètres ReportSetting)
-Schedule::command('report:send-export')->hourly();
+// Vérifie chaque minute si un envoi est dû (heure configurée par ReportSetting)
+Schedule::command('report:send-export')->everyMinute();

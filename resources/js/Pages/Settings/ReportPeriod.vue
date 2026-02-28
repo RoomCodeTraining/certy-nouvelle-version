@@ -31,6 +31,7 @@ const frequencyOptions = [
     { value: "daily", label: "Quotidien" },
     { value: "weekly", label: "Hebdomadaire" },
     { value: "monthly", label: "Mensuel" },
+    { value: "test_5min", label: "TEST : toutes les 5 min (jour précédent)" },
 ];
 
 const weekdays = [
@@ -54,6 +55,11 @@ const weekdays = [
             <p class="text-slate-600 text-sm mb-6">
                 Périodes et destinataires pour recevoir l'export des attestations
                 externes (Reporting) par email.
+            </p>
+            <p class="text-amber-700 text-sm mb-6 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
+                <strong>Important :</strong> L'export automatique utilise la session externe (ASACI) du compte root connecté.
+                Si le token expire, les exports échoueront et un email de notification sera envoyé. Connectez-vous régulièrement
+                pour maintenir la session à jour.
             </p>
             <div class="flex-1 w-full">
                 <form
@@ -115,6 +121,12 @@ const weekdays = [
                         <p class="text-sm text-slate-600">
                             Envoi automatique le 1er du mois (période 16-fin du mois précédent) et le
                             16 (période 1er-15 du mois en cours).
+                        </p>
+                    </template>
+                    <template v-if="form.frequency === 'test_5min'">
+                        <p class="text-sm text-amber-700 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2">
+                            Mode test : envoi toutes les 5 minutes avec la production du jour précédent.
+                            Utile pour vérifier que l'export et l'envoi par email fonctionnent.
                         </p>
                     </template>
 

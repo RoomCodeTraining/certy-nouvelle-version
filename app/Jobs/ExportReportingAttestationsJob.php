@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Mail\ReportExportFailedMail;
 use App\Mail\ReportingExportReadyMail;
 use App\Models\User;
 use App\Services\ExportAttestationsHelper;
@@ -41,6 +42,7 @@ class ExportReportingAttestationsJob implements ShouldQueue
         $user = User::find($this->userId);
         if (! $user || ! $user->external_token) {
             Log::warning('ExportReportingAttestationsJob: user or token missing', ['user_id' => $this->userId]);
+            $this->notifyFailure('Session externe manquante ou expirée.');
             return;
         }
 
@@ -62,6 +64,14 @@ class ExportReportingAttestationsJob implements ShouldQueue
                 'user_id' => $this->userId,
                 'errors' => $result['errors'],
             ]);
+            $firstErr = $result['errors'][0] ?? [];
+            $status = $firstErr['status'] ?? null;
+            $msg = $firstErr['title'] ?? ($firstErr['detail'] ?? 'Erreur API lors de la récupération des attestations.');
+            if ($status === 401 || $status === 403) {
+                $msg = 'Token expiré ou invalide. Veuillez vous reconnecter pour renouveler la session externe.';
+            }
+            $period = $this->dateFrom && $this->dateTo ? "{$this->dateFrom} → {$this->dateTo}" : null;
+            $this->notifyFailure($msg, $period);
             return;
         }
 
@@ -70,6 +80,8 @@ class ExportReportingAttestationsJob implements ShouldQueue
 
         if (! $path) {
             Log::error('ExportReportingAttestationsJob: failed to build Excel', ['user_id' => $this->userId]);
+            $period = $this->dateFrom && $this->dateTo ? "{$this->dateFrom} → {$this->dateTo}" : null;
+            $this->notifyFailure('Échec de la génération du fichier Excel.', $period);
             return;
         }
 
@@ -144,6 +156,20 @@ class ExportReportingAttestationsJob implements ShouldQueue
             ]);
 
             return null;
+        }
+    }
+
+    private function notifyFailure(string $reason, ?string $period = null): void
+    {
+        $recipients = $this->emails && count($this->emails) > 0
+            ? $this->emails
+            : [config('app.admin_email', 'dsieroger@gmail.com')];
+        $mailable = new ReportExportFailedMail($reason, $period);
+        foreach ($recipients as $email) {
+            $e = trim((string) $email);
+            if ($e !== '') {
+                Mail::to($e)->send($mailable);
+            }
         }
     }
 }
