@@ -189,4 +189,12 @@ return [
     */
     'eatci_cedeao_api_url' => rtrim(env('EATCI_CEDEAO_API_URL', 'https://eatci-api.bnicb.com'), '/'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Admin email
+    |--------------------------------------------------------------------------
+    | Email de l'admin pour les envois (ex: export Reporting par email).
+    */
+    'admin_email' => env('ADMIN_EMAIL', 'dsieroger@gmail.com'),
+
 ];

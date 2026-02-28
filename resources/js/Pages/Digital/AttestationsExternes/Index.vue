@@ -20,6 +20,7 @@ const displayError = ref(null);
 const errorToShow = computed(
     () => displayError.value ?? props.error ?? page.props.flash?.error ?? null,
 );
+const successMessage = computed(() => page.props.flash?.success ?? null);
 
 const list = Array.isArray(props.attestations)
     ? props.attestations
@@ -374,6 +375,7 @@ const exportUrl = computed(() => {
     if (dateFrom.value) params.set("date_from", dateFrom.value);
     if (dateTo.value) params.set("date_to", dateTo.value);
     if (perPage.value) params.set("per_page", String(perPage.value));
+    if (props.filters?.search) params.set("search", props.filters.search);
     const base = route("digital.attestations-externes.export");
     const qs = params.toString();
     return qs ? `${base}?${qs}` : base;
@@ -406,6 +408,12 @@ function handleExport() {
             Année-mois-jour).
         </p>
 
+        <div
+            v-if="successMessage"
+            class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 text-sm mb-6"
+        >
+            {{ successMessage }}
+        </div>
         <div
             v-if="errorToShow"
             class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm mb-6 flex items-start justify-between gap-3"

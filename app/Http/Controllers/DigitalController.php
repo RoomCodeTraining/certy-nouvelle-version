@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ExportReportingAttestationsJob;
 use App\Services\ExternalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -84,6 +85,8 @@ class DigitalController extends Controller
 
     /**
      * Export Excel des attestations externes sur une période.
+     * Si > 200 lignes : traitement en arrière-plan (Job) et envoi par email.
+     * Sinon : téléchargement direct (synchrone).
      */
     public function exportAttestationsExternes(Request $request)
     {
@@ -95,6 +98,7 @@ class DigitalController extends Controller
         $validated = $request->validate([
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'search' => ['nullable', 'string', 'max:255'],
         ]);
 
         $printedAt = null;
@@ -102,25 +106,40 @@ class DigitalController extends Controller
             $printedAt = $validated['date_from'].','.$validated['date_to'];
         }
 
-        $filters = [
-            'per_page' => 500,
-        ];
-        if ($printedAt) {
-            $filters['printed_at'] = $printedAt;
-        }
-        if ($request->filled('search')) {
-            $filters['search'] = $request->input('search');
-        }
+        // Requête de sondage : per_page=201 pour détecter si > 200 lignes
+        $probeRequest = new Request(array_filter([
+            'per_page' => 201,
+            'date_from' => $validated['date_from'] ?? null,
+            'date_to' => $validated['date_to'] ?? null,
+            'search' => $validated['search'] ?? null,
+        ], fn ($v) => $v !== null && $v !== ''));
 
-        $result = $this->externalService->getCertificatesExport($token, $filters);
-        if (isset($result['errors'])) {
-            $message = $result['errors'][0]['title'] ?? 'Erreur lors de l\'export des attestations.';
+        $probeResult = $this->externalService->getCertificates($token, $probeRequest);
+        if (isset($probeResult['errors'])) {
+            $message = $probeResult['errors'][0]['title'] ?? 'Erreur lors de l\'export des attestations.';
             return redirect()
                 ->route('digital.attestations-externes', $validated)
                 ->with('error', $message);
         }
 
-        $rows = $result['data'] ?? [];
+        $rows = isset($probeResult['data']) && is_array($probeResult['data']) ? $probeResult['data'] : [];
+        $hasMore = ! empty($probeResult['meta']['next_cursor'] ?? null);
+        $count = count($rows);
+        $useBackground = $count > 200 || $hasMore;
+
+        if ($useBackground) {
+            ExportReportingAttestationsJob::dispatch(
+                $request->user()->id,
+                $validated['date_from'] ?? null,
+                $validated['date_to'] ?? null,
+                $validated['search'] ?? null,
+            );
+
+            return redirect()
+                ->route('digital.attestations-externes', $validated)
+                ->with('success', 'Export en cours. Vous recevrez le fichier Excel par email à '.config('app.admin_email', 'dsieroger@gmail.com'));
+        }
+
         $filename = 'reporting-attestations-externes-'.now()->format('Y-m-d').'.xlsx';
 
         return new StreamedResponse(function () use ($rows, $filename) {
