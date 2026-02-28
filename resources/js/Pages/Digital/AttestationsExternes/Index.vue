@@ -22,11 +22,13 @@ const errorToShow = computed(
 );
 const successMessage = computed(() => page.props.flash?.success ?? null);
 
-const list = Array.isArray(props.attestations)
-    ? props.attestations
-    : Array.isArray(props.attestations?.data)
-      ? props.attestations.data
-      : [];
+const list = computed(() =>
+    Array.isArray(props.attestations)
+        ? props.attestations
+        : Array.isArray(props.attestations?.data)
+          ? props.attestations.data
+          : [],
+);
 
 const dateFrom = computed(() => props.filters?.date_from ?? "");
 const dateTo = computed(() => props.filters?.date_to ?? "");

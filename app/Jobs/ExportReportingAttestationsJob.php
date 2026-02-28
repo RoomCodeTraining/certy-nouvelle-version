@@ -39,7 +39,7 @@ class ExportReportingAttestationsJob implements ShouldQueue
         }
 
         $printedAt = ($this->dateFrom && $this->dateTo)
-            ? $this->dateFrom . ',' . $this->dateTo
+            ? $externalService->buildPrintedAtInclusive($this->dateFrom, $this->dateTo)
             : null;
 
         $filters = ['per_page' => 500];

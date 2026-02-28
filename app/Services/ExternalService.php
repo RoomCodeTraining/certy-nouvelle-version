@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Contract;
 use App\Services\PolicyNumberService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -378,6 +379,18 @@ class ExternalService
         return $response->json();
     }
 
+    /**
+     * Construit la plage printed_at pour l'API avec dates inclusives.
+     * L'API semble utiliser : date_from incluse, date_to exclue (>= from, < to).
+     * On ajoute 1 jour à date_to pour inclure la date de fin, sans modifier date_from.
+     */
+    public function buildPrintedAtInclusive(string $dateFrom, string $dateTo): string
+    {
+        $to = Carbon::parse($dateTo)->addDay()->format('Y-m-d');
+
+        return $dateFrom . ',' . $to;
+    }
+
     public function getCertificates(string $token, Request $request)
     {
         $queryParams = [];
@@ -386,8 +399,7 @@ class ExternalService
         if ($request->has('printed_at') && $request->printed_at !== null && $request->printed_at !== '') {
             $queryParams['printed_at'] = $request->printed_at;
         } elseif ($request->filled('date_from') && $request->filled('date_to')) {
-            // Période : format printed_at=YYYY-MM-DD,YYYY-MM-DD (ex: 2025-01-01,2025-01-31)
-            $queryParams['printed_at'] = $request->date_from . ',' . $request->date_to;
+            $queryParams['printed_at'] = $this->buildPrintedAtInclusive($request->date_from, $request->date_to);
         }
 
         if ($request->filled('cursor')) {
