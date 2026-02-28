@@ -525,6 +525,7 @@ class ExternalService
         ])->get($this->baseUrl.'/certificates/'.$reference);
 
 
+
         if ($response->failed()) {
             return [
                 'errors' => [

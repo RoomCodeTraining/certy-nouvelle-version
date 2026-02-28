@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Mail\ReportingExportReadyMail;
 use App\Models\User;
+use App\Services\ExportAttestationsHelper;
 use App\Services\ExternalService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -12,6 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
@@ -23,11 +25,15 @@ class ExportReportingAttestationsJob implements ShouldQueue
 
     public int $timeout = 600;
 
+    /**
+     * @param  list<string>|null  $emails  Si fourni, envoi à ces emails ; sinon admin_email
+     */
     public function __construct(
         public int $userId,
         public ?string $dateFrom,
         public ?string $dateTo,
         public ?string $search = null,
+        public ?array $emails = null,
     ) {}
 
     public function handle(ExternalService $externalService): void
@@ -68,8 +74,15 @@ class ExportReportingAttestationsJob implements ShouldQueue
         }
 
         try {
-            $adminEmail = config('app.admin_email', 'dsieroger@gmail.com');
-            Mail::to($adminEmail)->send(new ReportingExportReadyMail($path, $this->dateFrom, $this->dateTo, count($rows)));
+            $recipients = $this->emails && count($this->emails) > 0
+                ? $this->emails
+                : [config('app.admin_email', 'dsieroger@gmail.com')];
+            foreach ($recipients as $email) {
+                $e = trim((string) $email);
+                if ($e !== '') {
+                    Mail::to($e)->send(new ReportingExportReadyMail($path, $this->dateFrom, $this->dateTo, count($rows)));
+                }
+            }
         } finally {
             if (file_exists($path)) {
                 unlink($path);
@@ -92,69 +105,29 @@ class ExportReportingAttestationsJob implements ShouldQueue
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Reporting');
 
-            $headers = [
-                'Date d\'émission',
-                'Référence',
-                'Assuré',
-                'Plaque',
-                'Période début',
-                'Période fin',
-                'Organisation',
-                'Bureau',
-                'Type',
-                'État',
-            ];
-
-            $columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
-            foreach ($headers as $index => $header) {
-                $sheet->setCellValue($columns[$index] . '1', $header);
+            $activeCols = ExportAttestationsHelper::activeColumns($rows);
+            $defs = ExportAttestationsHelper::columnDefinitions();
+            $colIndex = 0;
+            foreach ($activeCols as $key) {
+                $col = Coordinate::stringFromColumnIndex($colIndex + 1);
+                $sheet->setCellValue($col . '1', $defs[$key] ?? $key);
+                $colIndex++;
             }
 
             $rowIndex = 2;
             foreach ($rows as $row) {
-                $printedAt = $row['printed_at'] ?? ($row['issued_at'] ?? ($row['created_at'] ?? null));
-                $start = $row['starts_at'] ?? ($row['start_date'] ?? ($row['period_start'] ?? ($row['effective_date'] ?? null)));
-                $end = $row['ends_at'] ?? ($row['end_date'] ?? ($row['period_end'] ?? ($row['expiry_date'] ?? null)));
-                $insured = $row['insured_name'] ?? ($row['assure'] ?? ($row['insured'] ?? ($row['policy_holder'] ?? '')));
-                $plaque = $row['licence_plate'] ?? ($row['plaque'] ?? ($row['registration_number'] ?? ($row['immat'] ?? '')));
-
-                $organization = '';
-                if (isset($row['organization']) && is_array($row['organization'])) {
-                    $organization = $row['organization']['name'] ?? ($row['organization']['code'] ?? '');
+                $values = ExportAttestationsHelper::rowToExportValues(is_array($row) ? $row : []);
+                $colIndex = 0;
+                foreach ($activeCols as $key) {
+                    $col = Coordinate::stringFromColumnIndex($colIndex + 1);
+                    $sheet->setCellValue($col . $rowIndex, $values[$key] ?? '');
+                    $colIndex++;
                 }
-                $office = '';
-                if (isset($row['office']) && is_array($row['office'])) {
-                    $office = $row['office']['name'] ?? ($row['office']['code'] ?? '');
-                }
-                $typeLabel = '';
-                if (isset($row['certificate_variant']) && is_array($row['certificate_variant'])) {
-                    $typeLabel = $row['certificate_variant']['name'] ?? ($row['certificate_variant']['code'] ?? '');
-                } elseif (isset($row['certificate_type']) && is_array($row['certificate_type'])) {
-                    $typeLabel = $row['certificate_type']['name'] ?? ($row['certificate_type']['code'] ?? '');
-                } else {
-                    $typeLabel = $row['type'] ?? '';
-                }
-                $etat = '';
-                if (isset($row['state']) && is_array($row['state'])) {
-                    $etat = $row['state']['label'] ?? ($row['state']['name'] ?? '');
-                } else {
-                    $etat = $row['status'] ?? ($row['etat'] ?? '');
-                }
-
-                $sheet->setCellValue("A{$rowIndex}", $printedAt);
-                $sheet->setCellValue("B{$rowIndex}", $row['reference'] ?? ($row['id'] ?? ''));
-                $sheet->setCellValue("C{$rowIndex}", $insured);
-                $sheet->setCellValue("D{$rowIndex}", $plaque);
-                $sheet->setCellValue("E{$rowIndex}", $start);
-                $sheet->setCellValue("F{$rowIndex}", $end);
-                $sheet->setCellValue("G{$rowIndex}", $organization);
-                $sheet->setCellValue("H{$rowIndex}", $office);
-                $sheet->setCellValue("I{$rowIndex}", $typeLabel);
-                $sheet->setCellValue("J{$rowIndex}", $etat);
                 $rowIndex++;
             }
 
-            foreach ($columns as $col) {
+            for ($i = 0; $i < count($activeCols); $i++) {
+                $col = Coordinate::stringFromColumnIndex($i + 1);
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 

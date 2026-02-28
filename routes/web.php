@@ -11,6 +11,7 @@ use App\Http\Controllers\Referential\VehicleModelController;
 use App\Http\Controllers\BordereauController;
 use App\Http\Controllers\CertyIaController;
 use App\Http\Controllers\Settings\OrganizationCompanyConfigController;
+use App\Http\Controllers\Settings\ReportSettingController;
 use App\Http\Controllers\Settings\CertyIaSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\VehicleController;
@@ -44,6 +45,8 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
         Route::get('/settings/config', [OrganizationCompanyConfigController::class, 'index'])->name('settings.config');
         Route::post('/settings/config', [OrganizationCompanyConfigController::class, 'update'])->name('settings.config.update');
         Route::delete('/settings/config/{config}', [OrganizationCompanyConfigController::class, 'destroy'])->name('settings.config.destroy');
+        Route::get('/settings/report-period', [ReportSettingController::class, 'edit'])->name('settings.report-period.edit');
+        Route::put('/settings/report-period', [ReportSettingController::class, 'update'])->name('settings.report-period.update');
         Route::get('/settings/certy-ia', [CertyIaSettingsController::class, 'edit'])->name('settings.certy-ia.edit');
         Route::put('/settings/certy-ia', [CertyIaSettingsController::class, 'update'])->name('settings.certy-ia.update');
     });

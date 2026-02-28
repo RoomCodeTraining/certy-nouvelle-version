@@ -178,6 +178,9 @@ const settingsItems = computed(() => {
         { href: "/settings/profile", label: "Profil", icon: "user" },
         { href: "/settings/config", label: "Config courtier", icon: "cog" },
     ];
+    if (isRoot.value) {
+        items.push({ href: "/settings/report-period", label: "Export production", icon: "documentText" });
+    }
     if (certyIa.value?.enabled && isRoot.value) {
         items.push({
             href: "/settings/certy-ia",
