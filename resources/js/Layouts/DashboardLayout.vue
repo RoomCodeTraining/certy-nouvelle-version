@@ -142,6 +142,11 @@ const digitalItems = computed(() => {
             label: "Attestations",
             icon: "credit",
         },
+        {
+            href: "/digital/attestations-externes",
+            label: "Reporting",
+            icon: "external",
+        },
     ];
     if (isRoot.value) {
         items.push(
@@ -192,6 +197,10 @@ const isSettingsActive = () =>
 
 const isActive = (href) => {
     if (href === "/dashboard") return page.url === "/dashboard";
+    // Attestations ne doit pas être actif quand on est sur Reporting (attestations-externes)
+    if (href === "/digital/attestations") {
+        return page.url.startsWith("/digital/attestations") && !page.url.startsWith("/digital/attestations-externes");
+    }
     return page.url.startsWith(href);
 };
 
@@ -404,7 +413,7 @@ const iconPaths = {
                                     :href="d.href"
                                     class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
                                     :class="
-                                        page.url.startsWith(d.href)
+                                        isActive(d.href)
                                             ? 'text-brand-primary bg-brand-primary/10 font-medium'
                                             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                                     "

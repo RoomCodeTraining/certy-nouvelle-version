@@ -50,6 +50,9 @@ export function route(name, ...params) {
         'referential.models.update': (id) => `/referential/models/${id}`,
         'referential.models.destroy': (id) => `/referential/models/${id}`,
         'digital.attestations': () => '/digital/attestations',
+        'digital.attestations-externes': () => '/digital/attestations-externes',
+        'digital.attestations-externes.export': () =>
+            '/digital/attestations-externes/export',
         'digital.attestations.download': (ref) => `/digital/attestations/${ref}/download`,
         'digital.attestations.download_url': (ref) => `/digital/attestations/${ref}/download-url`,
         'digital.attestations.view': (ref) => `/digital/attestations/${ref}/view`,

@@ -385,6 +385,9 @@ class ExternalService
 
         if ($request->has('printed_at') && $request->printed_at !== null && $request->printed_at !== '') {
             $queryParams['printed_at'] = $request->printed_at;
+        } elseif ($request->filled('date_from') && $request->filled('date_to')) {
+            // Période : format printed_at=YYYY-MM-DD,YYYY-MM-DD (ex: 2025-01-01,2025-01-31)
+            $queryParams['printed_at'] = $request->date_from . ',' . $request->date_to;
         }
 
         if ($request->filled('cursor')) {
@@ -417,6 +420,62 @@ class ExternalService
         }
 
         return $response->json();
+    }
+
+    /**
+     * Récupère toutes les attestations pour un export (boucle sur la pagination cursor).
+     *
+     * @param  array{printed_at?: string, search?: string, per_page?: int}  $filters
+     * @return array{data?: array<int, array>, errors?: array}
+     */
+    public function getCertificatesExport(string $token, array $filters = []): array
+    {
+        $baseParams = [];
+        $baseParams['per_page'] = $filters['per_page'] ?? 500;
+        if (! empty($filters['printed_at'])) {
+            $baseParams['printed_at'] = $filters['printed_at'];
+        }
+        if (! empty($filters['search'])) {
+            $baseParams['search'] = $filters['search'];
+        }
+
+        $all = [];
+        $nextCursor = $filters['cursor'] ?? null;
+
+        do {
+            $queryParams = $baseParams;
+            if ($nextCursor) {
+                $queryParams['cursor'] = $nextCursor;
+            }
+
+            $url = $this->baseUrl.'/certificates';
+            if (! empty($queryParams)) {
+                $url .= '?'.http_build_query($queryParams);
+            }
+
+            $response = Http::timeout(self::HTTP_TIMEOUT)->withHeaders([
+                'Authorization' => 'Bearer '.$token,
+            ])->get($url);
+
+            if ($response->failed()) {
+                return [
+                    'errors' => [
+                        [
+                            'status' => $response->status(),
+                            'title' => $response->json()['message'] ?? 'Oops. Something went wrong. Please try again or contact support',
+                            'detail' => $response->json()['errors'] ?? null,
+                        ],
+                    ],
+                ];
+            }
+
+            $data = $response->json();
+            $chunk = isset($data['data']) && is_array($data['data']) ? $data['data'] : [];
+            $all = array_merge($all, $chunk);
+            $nextCursor = $data['meta']['next_cursor'] ?? null;
+        } while ($nextCursor);
+
+        return ['data' => $all];
     }
 
     public function showCertificate(string $reference, string $token)

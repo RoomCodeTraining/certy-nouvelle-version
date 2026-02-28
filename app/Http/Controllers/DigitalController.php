@@ -9,6 +9,9 @@ use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class DigitalController extends Controller
 {
@@ -37,6 +40,180 @@ class DigitalController extends Controller
                 ->with('error', 'Session expirée ou non connectée au service ASACI. Veuillez vous reconnecter.');
         }
         return $token;
+    }
+
+    /**
+     * Attestations externes sur une période (date_from / date_to) au format Année-mois-jour (Y-m-d).
+     */
+    public function attestationsExternes(Request $request): Response|RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        if ($token instanceof RedirectResponse) {
+            return $token;
+        }
+
+        $request->validate([
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        $data = $this->externalService->getCertificates($token, $request);
+
+        if (isset($data['errors'])) {
+            return Inertia::render('Digital/AttestationsExternes/Index', [
+                'attestations' => [],
+                'links' => null,
+                'meta' => null,
+                'error' => $data['errors'][0]['title'] ?? 'Erreur lors du chargement des attestations externes.',
+                'filters' => $request->only(['per_page', 'date_from', 'date_to', 'cursor', 'search']),
+            ]);
+        }
+
+        $list = isset($data['data']) && is_array($data['data']) ? $data['data'] : [];
+        $links = $data['links'] ?? null;
+        $meta = $data['meta'] ?? null;
+
+        return Inertia::render('Digital/AttestationsExternes/Index', [
+            'attestations' => $list,
+            'links' => $links,
+            'meta' => $meta,
+            'error' => null,
+            'filters' => $request->only(['per_page', 'date_from', 'date_to', 'cursor', 'search']),
+        ]);
+    }
+
+    /**
+     * Export Excel des attestations externes sur une période.
+     */
+    public function exportAttestationsExternes(Request $request)
+    {
+        $token = $this->requireToken($request);
+        if ($token instanceof RedirectResponse) {
+            return $token;
+        }
+
+        $validated = $request->validate([
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        $printedAt = null;
+        if (! empty($validated['date_from']) && ! empty($validated['date_to'])) {
+            $printedAt = $validated['date_from'].','.$validated['date_to'];
+        }
+
+        $filters = [
+            'per_page' => 500,
+        ];
+        if ($printedAt) {
+            $filters['printed_at'] = $printedAt;
+        }
+        if ($request->filled('search')) {
+            $filters['search'] = $request->input('search');
+        }
+
+        $result = $this->externalService->getCertificatesExport($token, $filters);
+        if (isset($result['errors'])) {
+            $message = $result['errors'][0]['title'] ?? 'Erreur lors de l\'export des attestations.';
+            return redirect()
+                ->route('digital.attestations-externes', $validated)
+                ->with('error', $message);
+        }
+
+        $rows = $result['data'] ?? [];
+        $filename = 'reporting-attestations-externes-'.now()->format('Y-m-d').'.xlsx';
+
+        return new StreamedResponse(function () use ($rows, $filename) {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Reporting');
+
+            $headers = [
+                'Date d\'émission',
+                'Référence',
+                'Assuré',
+                'Plaque',
+                'Période début',
+                'Période fin',
+                'Organisation',
+                'Bureau',
+                'Type',
+                'État',
+            ];
+
+            $columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+            foreach ($headers as $index => $header) {
+                $sheet->setCellValue($columns[$index].'1', $header);
+            }
+
+            $rowIndex = 2;
+            foreach ($rows as $row) {
+                $printedAt = $row['printed_at'] ?? ($row['issued_at'] ?? ($row['created_at'] ?? null));
+
+                $start = $row['starts_at'] ?? ($row['start_date'] ?? ($row['period_start'] ?? ($row['effective_date'] ?? null)));
+                $end = $row['ends_at'] ?? ($row['end_date'] ?? ($row['period_end'] ?? ($row['expiry_date'] ?? null)));
+
+                $insured = $row['insured_name']
+                    ?? ($row['assure'] ?? ($row['insured'] ?? ($row['policy_holder'] ?? '')));
+
+                $plaque = $row['licence_plate']
+                    ?? ($row['plaque'] ?? ($row['registration_number'] ?? ($row['immat'] ?? '')));
+
+                $organization = '';
+                if (isset($row['organization']) && is_array($row['organization'])) {
+                    $organization = $row['organization']['name'] ?? ($row['organization']['code'] ?? '');
+                }
+
+                $office = '';
+                if (isset($row['office']) && is_array($row['office'])) {
+                    $office = $row['office']['name'] ?? ($row['office']['code'] ?? '');
+                }
+
+                $typeLabel = '';
+                if (isset($row['certificate_variant']) && is_array($row['certificate_variant'])) {
+                    $typeLabel = $row['certificate_variant']['name'] ?? ($row['certificate_variant']['code'] ?? '');
+                } elseif (isset($row['certificate_type']) && is_array($row['certificate_type'])) {
+                    $typeLabel = $row['certificate_type']['name'] ?? ($row['certificate_type']['code'] ?? '');
+                } else {
+                    $typeLabel = $row['type'] ?? '';
+                }
+
+                $etat = '';
+                if (isset($row['state']) && is_array($row['state'])) {
+                    $etat = $row['state']['label'] ?? ($row['state']['name'] ?? '');
+                } else {
+                    $etat = $row['status'] ?? ($row['etat'] ?? '');
+                }
+
+                $sheet->setCellValue("A{$rowIndex}", $printedAt);
+                $sheet->setCellValue("B{$rowIndex}", $row['reference'] ?? ($row['id'] ?? ''));
+                $sheet->setCellValue("C{$rowIndex}", $insured);
+                $sheet->setCellValue("D{$rowIndex}", $plaque);
+                $sheet->setCellValue("E{$rowIndex}", $start);
+                $sheet->setCellValue("F{$rowIndex}", $end);
+                $sheet->setCellValue("G{$rowIndex}", $organization);
+                $sheet->setCellValue("H{$rowIndex}", $office);
+                $sheet->setCellValue("I{$rowIndex}", $typeLabel);
+                $sheet->setCellValue("J{$rowIndex}", $etat);
+
+                $rowIndex++;
+            }
+
+            foreach ($columns as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            $writer = new Xlsx($spreadsheet);
+
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="'.$filename.'"');
+            header('Cache-Control: no-store, no-cache, must-revalidate');
+            header('Pragma: no-cache');
+
+            $writer->save('php://output');
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+        });
     }
 
     /**
