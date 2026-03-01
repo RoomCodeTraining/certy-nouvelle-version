@@ -443,7 +443,7 @@ class ExternalService
     public function getCertificatesExport(string $token, array $filters = []): array
     {
         $baseParams = [];
-        $baseParams['per_page'] = $filters['per_page'] ?? 500;
+        $baseParams['per_page'] = $filters['per_page'] ?? 1000;
         if (! empty($filters['printed_at'])) {
             $baseParams['printed_at'] = $filters['printed_at'];
         }
@@ -452,20 +452,26 @@ class ExternalService
         }
 
         $all = [];
-        $nextCursor = $filters['cursor'] ?? null;
+        $nextCursor = isset($filters['cursor']) && $filters['cursor'] !== '' ? $filters['cursor'] : null;
+        $nextUrl = null;
+        $perPage = (int) $baseParams['per_page'];
 
         do {
-            $queryParams = $baseParams;
-            if ($nextCursor) {
-                $queryParams['cursor'] = $nextCursor;
+            if ($nextUrl !== null) {
+                $url = $nextUrl;
+                $nextUrl = null;
+            } else {
+                $queryParams = $baseParams;
+                if ($nextCursor !== null && $nextCursor !== '') {
+                    $queryParams['cursor'] = $nextCursor;
+                }
+                $url = $this->baseUrl.'/certificates';
+                if (! empty($queryParams)) {
+                    $url .= '?'.http_build_query($queryParams);
+                }
             }
 
-            $url = $this->baseUrl.'/certificates';
-            if (! empty($queryParams)) {
-                $url .= '?'.http_build_query($queryParams);
-            }
-
-            $response = Http::timeout(self::HTTP_TIMEOUT)->withHeaders([
+            $response = Http::timeout(30)->withHeaders([
                 'Authorization' => 'Bearer '.$token,
             ])->get($url);
 
@@ -484,8 +490,25 @@ class ExternalService
             $data = $response->json();
             $chunk = isset($data['data']) && is_array($data['data']) ? $data['data'] : [];
             $all = array_merge($all, $chunk);
-            $nextCursor = $data['meta']['next_cursor'] ?? null;
-        } while ($nextCursor);
+
+            $links = $data['links'] ?? [];
+            $meta = $data['meta'] ?? [];
+
+            $nextUrl = $links['next'] ?? null;
+            $nextUrl = (is_string($nextUrl) && $nextUrl !== '') ? $nextUrl : null;
+
+            $nextCursor = $meta['next_cursor'] ?? null;
+            $nextCursor = ($nextCursor !== null && $nextCursor !== '') ? $nextCursor : null;
+
+            $expectedTotal = isset($meta['total']) ? (int) $meta['total'] : null;
+            if ($expectedTotal !== null && count($all) < $expectedTotal && $nextCursor === null && $nextUrl === null && count($chunk) >= $perPage) {
+                Log::warning('ExternalService getCertificatesExport: pagination may be incomplete', [
+                    'collected' => count($all),
+                    'expected_total' => $expectedTotal,
+                    'last_chunk_size' => count($chunk),
+                ]);
+            }
+        } while ($nextCursor !== null || $nextUrl !== null);
 
         return ['data' => $all];
     }
