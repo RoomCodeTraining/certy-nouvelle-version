@@ -12,6 +12,7 @@ use App\Models\Client;
 use App\Models\Color;
 use App\Models\Company;
 use App\Models\Contract;
+use App\Models\OptionalGuarantee;
 use App\Models\EnergySource;
 use App\Models\Vehicle;
 use App\Models\VehicleBrand;
@@ -372,9 +373,12 @@ class ContractController extends Controller
     {
         $user = $request->user();
         $clients = Client::accessibleBy($user)
-            ->with('vehicles:id,client_id,registration_number,pricing_type')
+            ->with('vehicles:id,client_id,registration_number,pricing_type,new_value,replacement_value')
             ->orderBy('full_name')
             ->get(['id', 'full_name']);
+        $optionalGuarantees = OptionalGuarantee::orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'code', 'label', 'rate', 'base', 'enabled', 'sort_order']);
         $companies = $this->companiesForUser($request);
 
         $parentContract = null;
@@ -406,6 +410,7 @@ class ContractController extends Controller
             'vehicleCategories' => VehicleCategory::orderBy('name')->get(['id', 'name']),
             'vehicleGenders' => VehicleGender::orderBy('name')->get(['id', 'name']),
             'colors' => Color::orderBy('name')->get(['id', 'name']),
+            'optionalGuaranteesConfig' => $optionalGuarantees,
         ]);
     }
 

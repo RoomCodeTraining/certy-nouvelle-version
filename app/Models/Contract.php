@@ -43,6 +43,7 @@ class Contract extends Model
         'reduction_on_profession_amount',
         'company_accessory',
         'agency_accessory',
+        'optional_guarantees_amount',
         'prime_ttc',
         'commission_amount',
         'reduction_bns_amount',
@@ -74,6 +75,7 @@ class Contract extends Model
             'reduction_on_profession_amount' => 'integer',
             'company_accessory' => 'integer',
             'agency_accessory' => 'integer',
+            'optional_guarantees_amount' => 'integer',
             'prime_ttc' => 'integer',
             'commission_amount' => 'integer',
             'reduction_bns_amount' => 'integer',
@@ -179,8 +181,15 @@ class Contract extends Model
     public function getTotalPremiumAttribute(): ?int
     {
         $fields = [
-            'base_amount', 'rc_amount', 'defence_appeal_amount', 'person_transport_amount',
-            'accessory_amount', 'taxes_amount', 'cedeao_amount', 'fga_amount',
+            'base_amount',
+            'rc_amount',
+            'defence_appeal_amount',
+            'person_transport_amount',
+            'accessory_amount',
+            'taxes_amount',
+            'cedeao_amount',
+            'fga_amount',
+            'optional_guarantees_amount',
         ];
         $total = 0;
         foreach ($fields as $field) {

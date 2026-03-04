@@ -28,6 +28,7 @@ const props = defineProps({
     vehicleCategories: { type: Array, default: () => [] },
     vehicleGenders: { type: Array, default: () => [] },
     colors: { type: Array, default: () => [] },
+    optionalGuaranteesConfig: { type: Array, default: () => [] },
 });
 
 const breadcrumbs = [
@@ -97,6 +98,27 @@ const recap = ref({
     amounts: {},
 });
 
+const optionalGuaranteeDefs = computed(() =>
+    (props.optionalGuaranteesConfig || []).filter((g) => g.enabled),
+);
+
+const optionalGuarantees = ref({});
+
+function initOptionalGuarantees() {
+    const map = {};
+    optionalGuaranteeDefs.value.forEach((def) => {
+        map[def.code] = { enabled: false, amount: 0 };
+    });
+    optionalGuarantees.value = map;
+}
+
+onMounted(() => {
+    initOptionalGuarantees();
+});
+
+const vehicleNewValue = ref(null);
+const vehicleVenaleValue = ref(null);
+
 /** Libellés des garanties de la grille pour le récap */
 const guaranteeLabels = {
     base_amount: "Prime de base",
@@ -129,6 +151,7 @@ const form = useForm({
     company_accessory: 0,
     agency_accessory: 0,
     commission_amount: 0,
+    optional_guarantees_amount: 0,
 });
 
 const selectedClient = computed(() =>
@@ -152,6 +175,15 @@ function onVehicleChange() {
         (vh) => String(vh.id) === String(form.vehicle_id),
     );
     form.contract_type = v?.pricing_type ?? "VP";
+    if (v) {
+        vehicleNewValue.value =
+            v.new_value != null ? Number(v.new_value) : null;
+        vehicleVenaleValue.value =
+            v.replacement_value != null ? Number(v.replacement_value) : null;
+    } else {
+        vehicleNewValue.value = null;
+        vehicleVenaleValue.value = null;
+    }
 }
 
 const vehicleQuickModels = computed(() => {
@@ -385,6 +417,60 @@ const canSaveDraft = computed(
 
 const PREVIEW_LOADER_MIN_MS = 3000;
 
+const optionalGuaranteesTotal = computed(() =>
+    optionalGuaranteeDefs.value.reduce((sum, def) => {
+        const g = optionalGuarantees.value[def.code];
+        if (!g?.enabled) return sum;
+        const amount = Number(g.amount) || 0;
+        return sum + amount;
+    }, 0),
+);
+
+const anyGuaranteeUsingNew = computed(() =>
+    optionalGuaranteeDefs.value.some(
+        (def) => def.base === "new" && optionalGuarantees.value[def.code]?.enabled,
+    ),
+);
+
+const anyGuaranteeUsingVenale = computed(() =>
+    optionalGuaranteeDefs.value.some(
+        (def) =>
+            def.base === "venale" &&
+            optionalGuarantees.value[def.code]?.enabled,
+    ),
+);
+
+const missingNewBase = computed(
+    () => anyGuaranteeUsingNew.value && !vehicleNewValue.value,
+);
+
+const missingVenaleBase = computed(
+    () => anyGuaranteeUsingVenale.value && !vehicleVenaleValue.value,
+);
+
+function recalcOptionalGuarantees() {
+    optionalGuaranteeDefs.value.forEach((def) => {
+        const state = optionalGuarantees.value[def.code];
+        if (!state?.enabled) {
+            state.amount = 0;
+            return;
+        }
+        let baseValue = 0;
+        if (def.base === "new") {
+            baseValue = Number(vehicleNewValue.value) || 0;
+        } else if (def.base === "venale") {
+            baseValue = Number(vehicleVenaleValue.value) || 0;
+        }
+        if (!baseValue || baseValue <= 0) {
+            state.amount = 0;
+            return;
+        }
+        const raw = (baseValue * def.rate) / 100;
+        state.amount = Math.round(raw);
+    });
+    form.optional_guarantees_amount = optionalGuaranteesTotal.value;
+}
+
 async function fetchPreview() {
     if (!canPreview.value) {
         recap.value = {
@@ -440,6 +526,8 @@ async function fetchPreview() {
             previewLoading.value = false;
         }
     }
+
+    recalcOptionalGuarantees();
 }
 
 /** Accessoire issu de la grille (non modifiable) */
@@ -461,7 +549,10 @@ const totalAccessoryDisplay = computed(
 
 /** Montant total avant toute réduction (prime + accessoires) = base du calcul des réductions */
 const totalBeforeReduction = computed(
-    () => (recap.value.prime_amount ?? 0) + totalAccessoryDisplay.value,
+    () =>
+        (recap.value.prime_amount ?? 0) +
+        totalAccessoryDisplay.value +
+        optionalGuaranteesTotal.value,
 );
 
 /** Réductions en montant (FCFA) appliquées au total avant réduction */
@@ -522,6 +613,19 @@ watch(
         applyDuration();
     },
     { deep: true },
+);
+
+watch(
+    () => [
+        vehicleNewValue.value,
+        vehicleVenaleValue.value,
+        ...optionalGuaranteeDefs.value.map(
+            (def) => optionalGuarantees.value[def.code]?.enabled,
+        ),
+    ],
+    () => {
+        recalcOptionalGuarantees();
+    },
 );
 
 const inputClass =
@@ -764,7 +868,7 @@ function submitDraft() {
                     </div>
                 </div>
 
-                <!-- Étape 2 : Accessoires et réductions (remplace l’étape 1) -->
+                <!-- Étape 2 : Accessoires, garanties optionnelles et réductions -->
                 <div
                     v-show="step === 2"
                     class="rounded-xl border border-slate-200 bg-white p-6 space-y-4"
@@ -772,7 +876,7 @@ function submitDraft() {
                     <h2
                         class="text-sm font-semibold text-slate-800 border-b border-slate-200 pb-2"
                     >
-                        Étape 2 — Accessoires & réductions
+                        Étape 2 — Accessoires, garanties optionnelles & réductions
                     </h2>
                     <p class="text-xs text-slate-500">
                         Accessoires compagnie et agence (FCFA). Réductions
@@ -823,6 +927,116 @@ function submitDraft() {
                                 class="mt-1 text-sm text-red-600"
                             >
                                 {{ form.errors.agency_accessory }}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="pt-2 border-t border-slate-200 space-y-3">
+                        <h3 class="text-sm font-medium text-slate-700">
+                            Garanties optionnelles
+                        </h3>
+                        <p class="text-xs text-slate-500">
+                            Cochez les garanties souhaitées. Les montants sont calculés
+                            à partir de la valeur neuve ou vénale du véhicule.
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div
+                                class="space-y-2"
+                                v-if="anyGuaranteeUsingNew"
+                            >
+                                <label
+                                    class="block text-sm font-medium text-slate-700 mb-1"
+                                >
+                                    Valeur neuve du véhicule (FCFA)
+                                </label>
+                                <input
+                                    v-model.number="vehicleNewValue"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    :class="inputClass"
+                                    placeholder="Ex. 10 000 000"
+                                />
+                                <p
+                                    v-if="missingNewBase"
+                                    class="text-xs text-amber-600"
+                                >
+                                    Requis pour les garanties basées sur la valeur neuve.
+                                </p>
+                            </div>
+                            <div
+                                class="space-y-2"
+                                v-if="anyGuaranteeUsingVenale"
+                            >
+                                <label
+                                    class="block text-sm font-medium text-slate-700 mb-1"
+                                >
+                                    Valeur vénale du véhicule (FCFA)
+                                </label>
+                                <input
+                                    v-model.number="vehicleVenaleValue"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    :class="inputClass"
+                                    placeholder="Ex. 8 000 000"
+                                />
+                                <p
+                                    v-if="missingVenaleBase"
+                                    class="text-xs text-amber-600"
+                                >
+                                    Requis pour les garanties basées sur la valeur vénale.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div
+                                v-for="def in optionalGuaranteeDefs"
+                                :key="def.key"
+                                class="flex items-center justify-between gap-3 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50"
+                            >
+                                <div class="flex items-start gap-2">
+                                    <input
+                                        v-model="optionalGuarantees[def.code].enabled"
+                                        type="checkbox"
+                                        class="mt-1 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                                    />
+                                    <div>
+                                        <p class="text-sm font-medium text-slate-800">
+                                            {{ def.label }}
+                                        </p>
+                                        <p class="text-xs text-slate-500">
+                                            {{ def.rate }} % de la
+                                            {{
+                                                def.base === "new"
+                                                    ? "valeur neuve"
+                                                    : "valeur vénale"
+                                            }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="text-right text-sm">
+                                    <p class="text-slate-400 text-xs">
+                                        Montant
+                                    </p>
+                                    <p class="font-medium text-slate-900">
+                                        {{
+                                            (optionalGuarantees[def.code].amount || 0).toLocaleString(
+                                                "fr-FR",
+                                            )
+                                        }}
+                                        FCFA
+                                    </p>
+                                </div>
+                            </div>
+                            <p
+                                v-if="optionalGuaranteesTotal > 0"
+                                class="text-xs text-slate-600 text-right"
+                            >
+                                Total garanties optionnelles :
+                                <span class="font-semibold">
+                                    {{ optionalGuaranteesTotal.toLocaleString("fr-FR") }}
+                                    FCFA
+                                </span>
                             </p>
                         </div>
                     </div>

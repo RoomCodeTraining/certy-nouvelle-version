@@ -14,6 +14,7 @@ use App\Http\Controllers\Settings\OrganizationCompanyConfigController;
 use App\Http\Controllers\Settings\ReportSettingController;
 use App\Http\Controllers\Settings\CertyIaSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\OptionalGuaranteeController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\Reports\ProductionController;
 use Illuminate\Support\Facades\Route;
@@ -49,6 +50,8 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
         Route::put('/settings/report-period', [ReportSettingController::class, 'update'])->name('settings.report-period.update');
         Route::get('/settings/certy-ia', [CertyIaSettingsController::class, 'edit'])->name('settings.certy-ia.edit');
         Route::put('/settings/certy-ia', [CertyIaSettingsController::class, 'update'])->name('settings.certy-ia.update');
+        Route::get('/settings/guarantees', [OptionalGuaranteeController::class, 'index'])->name('settings.guarantees.index');
+        Route::put('/settings/guarantees/{guarantee}', [OptionalGuaranteeController::class, 'update'])->name('settings.guarantees.update');
     });
 
     // CRUD Clients

@@ -36,6 +36,7 @@ class StoreContractAction
         $validated['company_accessory'] = (int) ($validated['company_accessory'] ?? 0);
         $validated['agency_accessory'] = (int) ($validated['agency_accessory'] ?? 0);
         $validated['commission_amount'] = (int) ($validated['commission_amount'] ?? 0);
+        $validated['optional_guarantees_amount'] = (int) ($validated['optional_guarantees_amount'] ?? 0);
         unset($validated['duration'], $validated['accessory_amount_override']);
         if (Schema::hasColumn('contracts', 'reference')) {
             $validated['reference'] = Contract::generateUniqueReference();

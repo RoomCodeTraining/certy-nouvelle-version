@@ -39,6 +39,7 @@ class StoreContractRequest extends FormRequest
             'company_accessory' => ['nullable', 'integer', 'min:0'],
             'agency_accessory' => ['nullable', 'integer', 'min:0'],
             'commission_amount' => ['nullable', 'integer', 'min:0'],
+            'optional_guarantees_amount' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

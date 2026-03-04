@@ -81,6 +81,8 @@ onMounted(() => {
     }
     if (digitalItems.value.some((item) => page.url.startsWith(item.href))) {
         digitalOpen.value = true;
+    } else if (isRoot.value) {
+        digitalOpen.value = true;
     }
     if (referentialItems.some((item) => page.url.startsWith(item.href))) {
         referentialOpen.value = true;
@@ -179,7 +181,16 @@ const settingsItems = computed(() => {
         { href: "/settings/config", label: "Config courtier", icon: "cog" },
     ];
     if (isRoot.value) {
-        items.push({ href: "/settings/report-period", label: "Export production", icon: "documentText" });
+        items.push({
+            href: "/settings/report-period",
+            label: "Export production",
+            icon: "documentText",
+        });
+        items.push({
+            href: "/settings/guarantees",
+            label: "Garanties optionnelles",
+            icon: "documentText",
+        });
     }
     if (certyIa.value?.enabled && isRoot.value) {
         items.push({
@@ -202,7 +213,10 @@ const isActive = (href) => {
     if (href === "/dashboard") return page.url === "/dashboard";
     // Attestations ne doit pas être actif quand on est sur Reporting (attestations-externes)
     if (href === "/digital/attestations") {
-        return page.url.startsWith("/digital/attestations") && !page.url.startsWith("/digital/attestations-externes");
+        return (
+            page.url.startsWith("/digital/attestations") &&
+            !page.url.startsWith("/digital/attestations-externes")
+        );
     }
     return page.url.startsWith(href);
 };

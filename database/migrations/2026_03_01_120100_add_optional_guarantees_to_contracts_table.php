@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('contracts', function (Blueprint $table) {
+            $table->integer('optional_guarantees_amount')
+                ->default(0)
+                ->after('agency_accessory');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('contracts', function (Blueprint $table) {
+            if (Schema::hasColumn('contracts', 'optional_guarantees_amount')) {
+                $table->dropColumn('optional_guarantees_amount');
+            }
+        });
+    }
+};
+
