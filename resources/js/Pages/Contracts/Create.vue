@@ -105,16 +105,22 @@ const optionalGuaranteeDefs = computed(() =>
 const optionalGuarantees = ref({});
 
 function initOptionalGuarantees() {
-    const map = {};
+    const current = optionalGuarantees.value || {};
+    const next = {};
     optionalGuaranteeDefs.value.forEach((def) => {
-        map[def.code] = { enabled: false, amount: 0 };
+        const existing = current[def.code];
+        next[def.code] = existing ?? { enabled: false, amount: 0 };
     });
-    optionalGuarantees.value = map;
+    optionalGuarantees.value = next;
 }
 
-onMounted(() => {
-    initOptionalGuarantees();
-});
+watch(
+    optionalGuaranteeDefs,
+    () => {
+        initOptionalGuarantees();
+    },
+    { immediate: true },
+);
 
 const vehicleNewValue = ref(null);
 const vehicleVenaleValue = ref(null);
@@ -152,6 +158,7 @@ const form = useForm({
     agency_accessory: 0,
     commission_amount: 0,
     optional_guarantees_amount: 0,
+    optional_guarantees_detail: [],
 });
 
 const selectedClient = computed(() =>
@@ -449,9 +456,13 @@ const missingVenaleBase = computed(
 );
 
 function recalcOptionalGuarantees() {
+    const detail = [];
     optionalGuaranteeDefs.value.forEach((def) => {
         const state = optionalGuarantees.value[def.code];
-        if (!state?.enabled) {
+        if (!state) {
+            return;
+        }
+        if (!state.enabled) {
             state.amount = 0;
             return;
         }
@@ -467,8 +478,18 @@ function recalcOptionalGuarantees() {
         }
         const raw = (baseValue * def.rate) / 100;
         state.amount = Math.round(raw);
+        if (state.amount > 0) {
+            detail.push({
+                code: def.code,
+                label: def.label,
+                rate: def.rate,
+                base: def.base,
+                amount: state.amount,
+            });
+        }
     });
     form.optional_guarantees_amount = optionalGuaranteesTotal.value;
+    form.optional_guarantees_detail = detail;
 }
 
 async function fetchPreview() {
@@ -868,7 +889,7 @@ function submitDraft() {
                     </div>
                 </div>
 
-                <!-- Étape 2 : Accessoires, garanties optionnelles et réductions -->
+                <!-- Étape 2 : Accessoires, garanties et réductions -->
                 <div
                     v-show="step === 2"
                     class="rounded-xl border border-slate-200 bg-white p-6 space-y-4"
@@ -876,7 +897,7 @@ function submitDraft() {
                     <h2
                         class="text-sm font-semibold text-slate-800 border-b border-slate-200 pb-2"
                     >
-                        Étape 2 — Accessoires, garanties optionnelles & réductions
+                        Étape 2 — Accessoires, garanties & réductions
                     </h2>
                     <p class="text-xs text-slate-500">
                         Accessoires compagnie et agence (FCFA). Réductions
@@ -932,7 +953,7 @@ function submitDraft() {
                     </div>
                     <div class="pt-2 border-t border-slate-200 space-y-3">
                         <h3 class="text-sm font-medium text-slate-700">
-                            Garanties optionnelles
+                            Garanties
                         </h3>
                         <p class="text-xs text-slate-500">
                             Cochez les garanties souhaitées. Les montants sont calculés
@@ -990,8 +1011,8 @@ function submitDraft() {
                         </div>
                         <div class="space-y-2">
                             <div
-                                v-for="def in optionalGuaranteeDefs"
-                                :key="def.key"
+                                v-for="(def, idx) in optionalGuaranteeDefs"
+                                :key="def?.code || idx"
                                 class="flex items-center justify-between gap-3 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50"
                             >
                                 <div class="flex items-start gap-2">
@@ -1216,6 +1237,40 @@ function submitDraft() {
                                     </dd>
                                 </div>
                             </dl>
+                            <div
+                                v-if="
+                                    optionalGuaranteesTotal > 0 &&
+                                    (form.optional_guarantees_detail || []).length
+                                "
+                                class="pt-2 border-t border-slate-200 mt-1"
+                            >
+                                <h4
+                                    class="text-xs font-semibold text-slate-600 uppercase tracking-wide"
+                                >
+                                    Autres garanties
+                                </h4>
+                                <dl class="space-y-1.5 text-sm">
+                                    <div
+                                        v-for="g in form.optional_guarantees_detail"
+                                        :key="g.code"
+                                        class="flex justify-between gap-2"
+                                    >
+                                        <dt class="text-slate-600 truncate">
+                                            {{ g.label || "Autre garantie" }}
+                                        </dt>
+                                        <dd
+                                            class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
+                                        >
+                                            {{
+                                                Number(
+                                                    g.amount ?? 0,
+                                                ).toLocaleString("fr-FR")
+                                            }}
+                                            FCFA
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </div>
                         </div>
                         <dl
                             class="space-y-2 text-sm border-t border-slate-200 pt-3"

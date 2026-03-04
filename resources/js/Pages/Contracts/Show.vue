@@ -50,12 +50,19 @@ const guaranteeFields = [
     { key: "taxes_amount", label: "Taxes" },
     { key: "cedeao_amount", label: "CEDEAO" },
     { key: "fga_amount", label: "FGA" },
+    { key: "optional_guarantees_amount", label: "Garanties" },
 ];
 
 const hasPremiumData = computed(
     () =>
         props.contract?.base_amount != null ||
         props.contract?.total_premium != null,
+);
+
+const optionalGuaranteesList = computed(() =>
+    Array.isArray(props.contract?.metadata?.optional_guarantees)
+        ? props.contract.metadata.optional_guarantees
+        : [],
 );
 
 const totalDisplay = computed(() =>
@@ -483,6 +490,26 @@ function markAttestationIssued(contract) {
                                         </dd>
                                     </div>
                                 </template>
+                                <template
+                                    v-if="(contract.optional_guarantees_amount || 0) > 0"
+                                >
+                                    <div class="sm:col-span-2 pt-4 mt-4 border-t border-slate-100">
+                                        <dt class="text-slate-500 font-medium mb-1">
+                                            Garanties
+                                        </dt>
+                                        <dd class="text-sm text-slate-700">
+                                            Montant des garanties : 
+                                            <span class="font-semibold text-slate-900">
+                                                {{
+                                                    Number(
+                                                        contract.optional_guarantees_amount,
+                                                    ).toLocaleString("fr-FR")
+                                                }}
+                                                FCFA
+                                            </span>
+                                        </dd>
+                                    </div>
+                                </template>
                             </dl>
                         </div>
                     </section>
@@ -644,6 +671,54 @@ function markAttestationIssued(contract) {
                                         </dd>
                                     </div>
                                 </dl>
+                            </div>
+                            <div
+                                v-if="optionalGuaranteesList.length"
+                                class="space-y-1.5 pt-3 border-t border-slate-200"
+                            >
+                                <p
+                                    class="text-xs font-medium text-slate-500 uppercase tracking-wide"
+                                >
+                                    Autres garanties
+                                </p>
+                                <dl class="space-y-1.5 text-sm">
+                                    <div
+                                        v-for="g in optionalGuaranteesList"
+                                        :key="g.code"
+                                        class="flex justify-between gap-2"
+                                    >
+                                        <dt class="text-slate-600 truncate">
+                                            {{ g.label || "Autre garantie" }}
+                                        </dt>
+                                        <dd
+                                            class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
+                                        >
+                                            {{
+                                                Number(
+                                                    g.amount ?? 0,
+                                                ).toLocaleString("fr-FR")
+                                            }}
+                                            FCFA
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </div>
+                            <div
+                                v-if="(contract.optional_guarantees_amount || 0) > 0"
+                                class="flex justify-between text-sm"
+                            >
+                                <span class="text-slate-600"
+                                    >Garanties</span
+                                >
+                                <span
+                                    class="font-medium text-slate-900 tabular-nums"
+                                    >{{
+                                        Number(
+                                            contract.optional_guarantees_amount,
+                                        ).toLocaleString("fr-FR")
+                                    }}
+                                    FCFA</span
+                                >
                             </div>
                             <div
                                 v-if="(contract.company_accessory || 0) > 0"

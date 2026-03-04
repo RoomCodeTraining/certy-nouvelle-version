@@ -37,7 +37,11 @@ class StoreContractAction
         $validated['agency_accessory'] = (int) ($validated['agency_accessory'] ?? 0);
         $validated['commission_amount'] = (int) ($validated['commission_amount'] ?? 0);
         $validated['optional_guarantees_amount'] = (int) ($validated['optional_guarantees_amount'] ?? 0);
-        unset($validated['duration'], $validated['accessory_amount_override']);
+        $optionalDetail = $validated['optional_guarantees_detail'] ?? null;
+        unset($validated['duration'], $validated['accessory_amount_override'], $validated['optional_guarantees_detail']);
+        if (is_array($optionalDetail) && $optionalDetail !== []) {
+            $validated['metadata']['optional_guarantees'] = $optionalDetail;
+        }
         if (Schema::hasColumn('contracts', 'reference')) {
             $validated['reference'] = Contract::generateUniqueReference();
         }

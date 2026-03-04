@@ -124,6 +124,11 @@ const navItems = computed(() => {
                 label: "Production",
                 icon: "chart",
             },
+            {
+                href: "/settings/guarantees",
+                label: "Garanties",
+                icon: "documentText",
+            },
         );
     }
     if (certyIa.value?.enabled) {
@@ -184,11 +189,6 @@ const settingsItems = computed(() => {
         items.push({
             href: "/settings/report-period",
             label: "Export production",
-            icon: "documentText",
-        });
-        items.push({
-            href: "/settings/guarantees",
-            label: "Garanties optionnelles",
             icon: "documentText",
         });
     }

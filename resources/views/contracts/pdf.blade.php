@@ -270,6 +270,12 @@ function contractTypeLabel($type) {
                 </div>
             </div>
             <div class="col-right">
+                @php
+                    $optionalFromMeta = [];
+                    if (is_array($contract->metadata ?? null) && ! empty($contract->metadata['optional_guarantees'])) {
+                        $optionalFromMeta = $contract->metadata['optional_guarantees'];
+                    }
+                @endphp
                 <div class="block">
                     <div class="section-title">Garanties</div>
                     <table class="section-table">
@@ -288,7 +294,7 @@ function contractTypeLabel($type) {
                             </tr>
                             <tr>
                                 <td>DR</td>
-                                <td>Défence et Recours</td>
+                                <td>Défense et Recours</td>
                                 <td class="text-right font-bold">{{ number_format($contract->defence_appeal_amount ?? 0, 0, ',', ' ') }}</td>
                             </tr>
                             <tr>
@@ -296,9 +302,36 @@ function contractTypeLabel($type) {
                                 <td>Transport de personnes</td>
                                 <td class="text-right font-bold">{{ number_format($contract->person_transport_amount ?? 0, 0, ',', ' ') }}</td>
                             </tr>
+                            @if(!empty($optionalFromMeta))
+                                @foreach($optionalFromMeta as $g)
+                                    <tr>
+                                        <td>{{ $g['code'] ?? 'AG' }}</td>
+                                        <td>{{ $g['label'] ?? 'Autre garantie' }}</td>
+                                        <td class="text-right font-bold">
+                                            {{ number_format($g['amount'] ?? 0, 0, ',', ' ') }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            @elseif(($contract->optional_guarantees_amount ?? 0) > 0)
+                                <tr>
+                                    <td>AG</td>
+                                    <td>Autres garanties</td>
+                                    <td class="text-right font-bold">{{ number_format($contract->optional_guarantees_amount ?? 0, 0, ',', ' ') }}</td>
+                                </tr>
+                            @endif
                             <tr class="font-bold">
                                 <td colspan="2" class="text-right">Sous-total</td>
-                                <td class="text-right">{{ number_format(($contract->rc_amount ?? 0) + ($contract->defence_appeal_amount ?? 0) + ($contract->person_transport_amount ?? 0), 0, ',', ' ') }}</td>
+                                <td class="text-right">
+                                    {{ number_format(
+                                        ($contract->rc_amount ?? 0)
+                                        + ($contract->defence_appeal_amount ?? 0)
+                                        + ($contract->person_transport_amount ?? 0)
+                                        + ($contract->optional_guarantees_amount ?? 0),
+                                        0,
+                                        ',',
+                                        ' '
+                                    ) }}
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -310,6 +343,12 @@ function contractTypeLabel($type) {
                             <th>Prime Nette</th>
                             <td class="text-right">{{ number_format($contract->base_amount ?? 0, 0, ',', ' ') }}</td>
                         </tr>
+                        @if(($contract->optional_guarantees_amount ?? 0) > 0)
+                            <tr>
+                                <th>Garanties</th>
+                                <td class="text-right">{{ number_format($contract->optional_guarantees_amount ?? 0, 0, ',', ' ') }}</td>
+                            </tr>
+                        @endif
                         <tr>
                             <th>Accessoire</th>
                             <td class="text-right">{{ number_format($contract->accessory_amount ?? 0, 0, ',', ' ') }}</td>

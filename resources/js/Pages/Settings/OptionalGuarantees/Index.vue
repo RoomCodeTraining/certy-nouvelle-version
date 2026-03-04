@@ -11,7 +11,7 @@ const props = defineProps({
 const breadcrumbs = [
     { label: "Tableau de bord", href: "/dashboard" },
     { label: "Paramètres", href: "/settings/profile" },
-    { label: "Garanties optionnelles" },
+    { label: "Garanties" },
 ];
 
 const baseOptions = [
@@ -40,32 +40,37 @@ const inputErrorClass = "border-red-400 focus:border-red-400 focus:ring-red-400"
 <template>
     <DashboardLayout>
         <template #header>
-            <PageHeader :breadcrumbs="breadcrumbs" title="Garanties optionnelles" />
+            <PageHeader :breadcrumbs="breadcrumbs" title="Garanties" />
         </template>
 
         <div class="min-h-[80vh] flex flex-col w-full">
-            <p class="text-slate-600 text-sm mb-4">
-                Configurer les garanties optionnelles disponibles lors de la création d'un
-                contrat. Ces garanties sont proposées au producteur sur l'écran de
-                souscription et calculées en pourcentage de la valeur du véhicule.
-            </p>
-            <p class="text-xs text-slate-500 mb-6">
-                Seul l'administrateur principal (root) peut modifier ces paramètres.
-            </p>
+            <div class="mb-6 space-y-2">
+                <h2 class="text-base font-semibold text-slate-900">
+                    Paramétrage des garanties
+                </h2>
+                <p class="text-slate-600 text-sm">
+                    Configurez les garanties proposées sur la page de création de contrat
+                    (taux, base de calcul et activation). Les montants sont calculés en
+                    fonction de la valeur du véhicule.
+                </p>
+                <p class="text-xs text-slate-500">
+                    Seul l'administrateur principal (root) peut modifier ces paramètres.
+                </p>
+            </div>
 
             <div class="flex-1 w-full">
                 <div
-                    class="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100"
+                    class="rounded-2xl border border-slate-200 bg-white p-4 md:p-6 space-y-4"
                 >
                     <div
                         v-for="g in guarantees"
                         :key="g.id"
-                        class="p-4 md:p-5 flex flex-col gap-3 md:flex-row md:items-center md:gap-6"
+                        class="rounded-xl border border-slate-100 bg-slate-50/60 p-4 md:p-5 flex flex-col gap-4 md:flex-row md:items-start md:gap-6 shadow-sm"
                     >
                         <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2 mb-1">
+                            <div class="flex items-center gap-2 mb-2">
                                 <span
-                                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                                     :class="
                                         g.enabled
                                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -84,14 +89,18 @@ const inputErrorClass = "border-red-400 focus:border-red-400 focus:ring-red-400"
                                     Désactivé
                                 </span>
                             </div>
-                            <p class="text-sm font-medium text-slate-900 truncate">
+                            <p class="text-sm font-semibold text-slate-900 truncate">
                                 {{ g.label }}
+                            </p>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                {{ g.base === 'new' ? 'Calculée sur la valeur neuve' : 'Calculée sur la valeur vénale' }}
+                                – {{ Number(g.rate).toLocaleString('fr-FR') }} %
                             </p>
                         </div>
 
                         <form
                             v-if="forms[g.id]"
-                            class="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
+                            class="flex-1 grid grid-cols-1 sm:grid-cols-5 gap-3 items-end"
                             @submit.prevent="
                                 forms[g.id].put(
                                     `/settings/guarantees/${g.id}`,
@@ -195,7 +204,7 @@ const inputErrorClass = "border-red-400 focus:border-red-400 focus:ring-red-400"
                         </form>
                     </div>
                     <div v-if="!guarantees.length" class="p-6 text-sm text-slate-500">
-                        Aucune garantie optionnelle configurée.
+                        Aucune garantie configurée.
                     </div>
                 </div>
             </div>
