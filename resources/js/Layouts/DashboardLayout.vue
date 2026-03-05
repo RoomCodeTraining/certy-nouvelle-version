@@ -124,14 +124,12 @@ const navItems = computed(() => {
                 label: "Production",
                 icon: "chart",
             },
-        );
-        if (page.props.app?.optional_guarantees_enabled) {
-            items.push({
+            {
                 href: "/settings/guarantees",
                 label: "Garanties",
                 icon: "documentText",
-            });
-        }
+            },
+        );
     }
     if (certyIa.value?.enabled) {
         items.push({
