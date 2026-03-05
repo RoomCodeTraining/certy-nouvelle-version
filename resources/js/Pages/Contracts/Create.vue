@@ -29,6 +29,7 @@ const props = defineProps({
     vehicleGenders: { type: Array, default: () => [] },
     colors: { type: Array, default: () => [] },
     optionalGuaranteesConfig: { type: Array, default: () => [] },
+    optionalGuaranteesEnabled: { type: Boolean, default: true },
 });
 
 const breadcrumbs = [
@@ -99,12 +100,20 @@ const recap = ref({
 });
 
 const optionalGuaranteeDefs = computed(() =>
-    (props.optionalGuaranteesConfig || []).filter((g) => g.enabled),
+    props.optionalGuaranteesEnabled
+        ? (props.optionalGuaranteesConfig || []).filter((g) => g.enabled)
+        : [],
 );
 
 const optionalGuarantees = ref({});
 
 function initOptionalGuarantees() {
+    if (!props.optionalGuaranteesEnabled) {
+        optionalGuarantees.value = {};
+        form.optional_guarantees_amount = 0;
+        form.optional_guarantees_detail = [];
+        return;
+    }
     const current = optionalGuarantees.value || {};
     const next = {};
     optionalGuaranteeDefs.value.forEach((def) => {
@@ -115,11 +124,18 @@ function initOptionalGuarantees() {
 }
 
 watch(
-    optionalGuaranteeDefs,
+    () => props.optionalGuaranteesEnabled,
     () => {
         initOptionalGuarantees();
     },
     { immediate: true },
+);
+
+watch(
+    optionalGuaranteeDefs,
+    () => {
+        initOptionalGuarantees();
+    },
 );
 
 const vehicleNewValue = ref(null);
@@ -425,26 +441,34 @@ const canSaveDraft = computed(
 const PREVIEW_LOADER_MIN_MS = 3000;
 
 const optionalGuaranteesTotal = computed(() =>
-    optionalGuaranteeDefs.value.reduce((sum, def) => {
-        const g = optionalGuarantees.value[def.code];
-        if (!g?.enabled) return sum;
-        const amount = Number(g.amount) || 0;
-        return sum + amount;
-    }, 0),
+    props.optionalGuaranteesEnabled
+        ? optionalGuaranteeDefs.value.reduce((sum, def) => {
+              const g = optionalGuarantees.value[def.code];
+              if (!g?.enabled) return sum;
+              const amount = Number(g.amount) || 0;
+              return sum + amount;
+          }, 0)
+        : 0,
 );
 
 const anyGuaranteeUsingNew = computed(() =>
-    optionalGuaranteeDefs.value.some(
-        (def) => def.base === "new" && optionalGuarantees.value[def.code]?.enabled,
-    ),
+    props.optionalGuaranteesEnabled
+        ? optionalGuaranteeDefs.value.some(
+              (def) =>
+                  def.base === "new" &&
+                  optionalGuarantees.value[def.code]?.enabled,
+          )
+        : false,
 );
 
 const anyGuaranteeUsingVenale = computed(() =>
-    optionalGuaranteeDefs.value.some(
-        (def) =>
-            def.base === "venale" &&
-            optionalGuarantees.value[def.code]?.enabled,
-    ),
+    props.optionalGuaranteesEnabled
+        ? optionalGuaranteeDefs.value.some(
+              (def) =>
+                  def.base === "venale" &&
+                  optionalGuarantees.value[def.code]?.enabled,
+          )
+        : false,
 );
 
 const missingNewBase = computed(

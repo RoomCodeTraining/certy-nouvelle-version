@@ -61,6 +61,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Garanties optionnelles (autres garanties)
+    |--------------------------------------------------------------------------
+    |
+    | Permet d'activer ou désactiver l'affichage des garanties optionnelles
+    | (autres garanties) sur l'interface de souscription.
+    |
+    | OPTIONAL_GUARANTEES_ENABLED=true  => visibles (par défaut)
+    | OPTIONAL_GUARANTEES_ENABLED=false => masquées
+    |
+    */
+
+    'optional_guarantees_enabled' => env('OPTIONAL_GUARANTEES_ENABLED', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

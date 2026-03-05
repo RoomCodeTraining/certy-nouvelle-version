@@ -46,6 +46,7 @@ class HandleInertiaRequests extends Middleware
             'app' => [
                 'name' => config('app.name', 'Certy'),
                 'logo' => config('app.logo') ? asset(config('app.logo')) : null,
+                'optional_guarantees_enabled' => (bool) config('app.optional_guarantees_enabled', true),
             ],
             'flash' => [
                 'error' => $this->formatFlashError($request->session()->get('error')),
