@@ -350,14 +350,19 @@ function contractTypeLabel($type) {
                         $profPct = (float) ($contract->reduction_on_profession_percent ?? 0);
                         $bnsAmount = $bnsPct > 0 ? (int) round($primeNette * ($bnsPct / 100)) : 0;
                         $commAmount = $commPct > 0 ? (int) round($primeNette * ($commPct / 100)) : 0;
-                        $profAmount = (int) ($contract->reduction_on_profession_amount_stored ?? $contract->reduction_on_profession_amount ?? 0);
-                        if ($profPct > 0 && $profAmount === 0) {
+                        // Toujours calculer depuis le % si défini (même logique que Contract model)
+                        if ($profPct > 0) {
                             $profAmount = (int) round($primeNette * ($profPct / 100));
+                        } else {
+                            $profAmount = (int) ($contract->reduction_on_profession_amount_stored ?? $contract->reduction_on_profession_amount ?? 0);
                         }
                         $montantReduction = $bnsAmount + $commAmount + $profAmount;
-                        $profPctUsed = $profPct > 0 ? $profPct : ($primeNette > 0 && $profAmount > 0 ? round($profAmount / $primeNette * 100, 1) : 0);
-                        $reductionPctTotal = round($bnsPct + $commPct + $profPctUsed, 1);
                         $montantApresReduction = $primeNette - $montantReduction;
+                        $primeTtc = $montantApresReduction
+                            + ($contract->accessory_amount ?? 0)
+                            + ($contract->taxes_amount ?? 0)
+                            + ($contract->fga_amount ?? 0)
+                            + ($contract->cedeao_amount ?? 0);
                     @endphp
                     <table class="section-table">
                         <tr class="row-highlight">
@@ -367,31 +372,19 @@ function contractTypeLabel($type) {
                         @if($bnsPct > 0)
                             <tr>
                                 <th>Réduction BNS</th>
-                                <td class="text-right">{{ number_format($bnsPct, 1, ',', ' ') }} % = {{ number_format($bnsAmount, 0, ',', ' ') }}</td>
+                                <td class="text-right">{{ number_format($bnsPct, 1, ',', ' ') }} %</td>
                             </tr>
                         @endif
                         @if($commPct > 0)
                             <tr>
                                 <th>Réduction commission</th>
-                                <td class="text-right">{{ number_format($commPct, 1, ',', ' ') }} % = {{ number_format($commAmount, 0, ',', ' ') }}</td>
+                                <td class="text-right">{{ number_format($commPct, 1, ',', ' ') }} %</td>
                             </tr>
                         @endif
                         @if($profAmount > 0)
                             <tr>
                                 <th>Réduction profession</th>
-                                <td class="text-right">
-                                    @if($profPct > 0)
-                                        {{ number_format($profPct, 1, ',', ' ') }} % = {{ number_format($profAmount, 0, ',', ' ') }}
-                                    @else
-                                        {{ number_format($profAmount, 0, ',', ' ') }}
-                                    @endif
-                                </td>
-                            </tr>
-                        @endif
-                        @if($montantReduction > 0)
-                            <tr class="row-highlight">
-                                <th>Total réduction</th>
-                                <td class="text-right">{{ number_format($reductionPctTotal, 1, ',', ' ') }} % = {{ number_format($montantReduction, 0, ',', ' ') }}</td>
+                                <td class="text-right">{{ number_format($profPct > 0 ? $profPct : round($profAmount / $primeNette * 100, 1), 1, ',', ' ') }} %</td>
                             </tr>
                         @endif
                         <tr class="row-highlight">
@@ -414,9 +407,21 @@ function contractTypeLabel($type) {
                             <th>CEDEAO</th>
                             <td class="text-right">{{ number_format($contract->cedeao_amount ?? 0, 0, ',', ' ') }}</td>
                         </tr>
+                        @if(($contract->agency_accessory ?? 0) > 0)
+                            <tr>
+                                <th>Accessoire agence</th>
+                                <td class="text-right">{{ number_format($contract->agency_accessory ?? 0, 0, ',', ' ') }}</td>
+                            </tr>
+                        @endif
+                        @if(($contract->company_accessory ?? 0) > 0)
+                            <tr>
+                                <th>Accessoire compagnie</th>
+                                <td class="text-right">{{ number_format($contract->company_accessory ?? 0, 0, ',', ' ') }}</td>
+                            </tr>
+                        @endif
                         <tr class="row-total">
                             <th>Prime TTC</th>
-                            <td class="text-right">{{ number_format($contract->total_amount ?? 0, 0, ',', ' ') }} FCFA</td>
+                            <td class="text-right">{{ number_format($primeTtc ?? 0, 0, ',', ' ') }} FCFA</td>
                         </tr>
                     </table>
                 </div>

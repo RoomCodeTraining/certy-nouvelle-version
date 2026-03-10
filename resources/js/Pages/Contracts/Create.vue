@@ -631,18 +631,46 @@ const totalReduction = computed(
         reductionOtherAmount.value,
 );
 
-/** Commission (FCFA) — ajoutée au total */
-const commissionDisplay = computed(() => Number(form.commission_amount) || 0);
-
-/** Total à payer = Prime TTC + Commission - Réductions */
-const displayTotal = computed(() =>
-    Math.max(
-        0,
-        totalBeforeReduction.value +
-            commissionDisplay.value -
-            totalReduction.value,
-    ),
+/** Prime nette = RC + DR + TP + optional (comme sur le PDF) */
+const primeNetteCreate = computed(
+    () =>
+        (recap.value.amounts?.rc_amount ?? 0) +
+        (recap.value.amounts?.defence_appeal_amount ?? 0) +
+        (recap.value.amounts?.person_transport_amount ?? 0) +
+        optionalGuaranteesTotal.value,
 );
+
+/** Réductions appliquées sur la prime nette (comme le PDF) */
+const reductionOnPrimeNette = computed(() => {
+    const pctBns = Number(form.reduction_bns) || 0;
+    const pctComm = Number(form.reduction_on_commission) || 0;
+    const pctProf = Number(form.reduction_on_profession_percent) || 0;
+    const amtProf = Number(form.reduction_on_profession_amount) || 0;
+    const pn = primeNetteCreate.value;
+    const bns = pctBns > 0 ? Math.round(pn * pctBns / 100) : 0;
+    const comm = pctComm > 0 ? Math.round(pn * pctComm / 100) : 0;
+    const prof = pctProf > 0 ? Math.round(pn * pctProf / 100) : amtProf;
+    return bns + comm + prof + reductionOtherAmount.value;
+});
+
+/** Montant après réduction (comme le PDF) */
+const montantApresReductionCreate = computed(() =>
+    Math.max(0, primeNetteCreate.value - reductionOnPrimeNette.value),
+);
+
+/** Prime TTC = Montant après réduction + Accessoire + Taxes + FGA + CEDEAO (comme le PDF) */
+const displayTotal = computed(() =>
+    montantApresReductionCreate.value +
+    (recap.value.amounts?.accessory_amount ?? recap.value.accessory_amount ?? 0) +
+    (recap.value.amounts?.taxes_amount ?? 0) +
+    (recap.value.amounts?.fga_amount ?? 0) +
+    (recap.value.amounts?.cedeao_amount ?? 0),
+);
+
+/** Pourcentages de réduction (affichage) */
+const reductionBnsPct = computed(() => Number(form.reduction_bns) || 0);
+const reductionCommPct = computed(() => Number(form.reduction_on_commission) || 0);
+const reductionProfPct = computed(() => Number(form.reduction_on_profession_percent) || 0);
 
 watch(
     () => [form.vehicle_id, form.contract_type, form.start_date, form.end_date],
@@ -1225,226 +1253,180 @@ function submitDraft() {
                         </div>
                     </template>
                     <template v-else-if="recap.total_premium != null">
-                        <!-- Garanties et montants (grille) -->
+                        <!-- Garanties (comme sur le PDF) -->
                         <div
-                            v-if="
-                                guaranteeKeys.some(
-                                    (k) => recap.amounts[k] != null,
-                                )
-                            "
+                            v-if="primeNetteCreate > 0"
                             class="space-y-2"
                         >
                             <h4
                                 class="text-xs font-semibold text-slate-600 uppercase tracking-wide"
                             >
-                                Garanties et montants (grille)
+                                Garanties
                             </h4>
                             <dl class="space-y-1.5 text-sm">
                                 <div
-                                    v-for="key in guaranteeKeys"
-                                    :key="key"
-                                    v-show="recap.amounts[key] != null"
+                                    v-if="(recap.amounts?.rc_amount ?? 0) > 0"
                                     class="flex justify-between gap-2"
                                 >
-                                    <dt class="text-slate-600 truncate">
-                                        {{ guaranteeLabels[key] }}
-                                    </dt>
-                                    <dd
-                                        class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
-                                    >
-                                        {{
-                                            Number(
-                                                recap.amounts[key],
-                                            ).toLocaleString("fr-FR")
-                                        }}
-                                        FCFA
+                                    <dt class="text-slate-600">Responsabilité Civile</dt>
+                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                        {{ Number(recap.amounts.rc_amount).toLocaleString("fr-FR") }} FCFA
                                     </dd>
                                 </div>
-                            </dl>
-                            <div
-                                v-if="
-                                    optionalGuaranteesTotal > 0 &&
-                                    (form.optional_guarantees_detail || []).length
-                                "
-                                class="pt-2 border-t border-slate-200 mt-1"
-                            >
-                                <h4
-                                    class="text-xs font-semibold text-slate-600 uppercase tracking-wide"
+                                <div
+                                    v-if="(recap.amounts?.defence_appeal_amount ?? 0) > 0"
+                                    class="flex justify-between gap-2"
                                 >
-                                    Autres garanties
-                                </h4>
-                                <dl class="space-y-1.5 text-sm">
+                                    <dt class="text-slate-600">Défense et Recours</dt>
+                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                        {{ Number(recap.amounts.defence_appeal_amount).toLocaleString("fr-FR") }} FCFA
+                                    </dd>
+                                </div>
+                                <div
+                                    v-if="(recap.amounts?.person_transport_amount ?? 0) > 0"
+                                    class="flex justify-between gap-2"
+                                >
+                                    <dt class="text-slate-600">Transport de personnes</dt>
+                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                        {{ Number(recap.amounts.person_transport_amount).toLocaleString("fr-FR") }} FCFA
+                                    </dd>
+                                </div>
+                                <template v-if="(form.optional_guarantees_detail || []).length">
                                     <div
                                         v-for="g in form.optional_guarantees_detail"
                                         :key="g.code"
                                         class="flex justify-between gap-2"
                                     >
-                                        <dt class="text-slate-600 truncate">
-                                            {{ g.label || "Autre garantie" }}
-                                        </dt>
-                                        <dd
-                                            class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
-                                        >
-                                            {{
-                                                Number(
-                                                    g.amount ?? 0,
-                                                ).toLocaleString("fr-FR")
-                                            }}
-                                            FCFA
+                                        <dt class="text-slate-600 truncate">{{ g.label || "Autre garantie" }}</dt>
+                                        <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                            {{ Number(g.amount ?? 0).toLocaleString("fr-FR") }} FCFA
                                         </dd>
                                     </div>
-                                </dl>
-                            </div>
+                                </template>
+                                <div class="flex justify-between gap-2 pt-1.5 border-t border-slate-200">
+                                    <dt class="text-slate-700 font-medium">Prime nette</dt>
+                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                        {{ primeNetteCreate.toLocaleString("fr-FR") }} FCFA
+                                    </dd>
+                                </div>
+                            </dl>
                         </div>
-                        <dl
-                            class="space-y-2 text-sm border-t border-slate-200 pt-3"
-                        >
-                            <div class="flex justify-between gap-2">
-                                <dt class="text-slate-600 min-w-0">
-                                    Montant prime
-                                </dt>
-                                <dd
-                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
-                                >
-                                    {{
-                                        (
-                                            recap.prime_amount ?? 0
-                                        ).toLocaleString("fr-FR")
-                                    }}
-                                    FCFA
-                                </dd>
-                            </div>
+                        <!-- Résumé financier (comme sur le PDF) -->
+                        <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide pt-3">
+                            Résumé financier
+                        </h4>
+                        <dl class="space-y-2 text-sm">
                             <div
-                                v-if="companyAccessoryDisplay > 0"
+                                v-if="primeNetteCreate > 0"
                                 class="flex justify-between gap-2"
                             >
-                                <dt class="text-slate-600 min-w-0">
-                                    Accessoire compagnie
-                                </dt>
-                                <dd
-                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
-                                >
-                                    {{
-                                        companyAccessoryDisplay.toLocaleString(
-                                            "fr-FR",
-                                        )
-                                    }}
-                                    FCFA
+                                <dt class="text-slate-600">Prime nette</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ primeNetteCreate.toLocaleString("fr-FR") }} FCFA
                                 </dd>
                             </div>
-                            <div
-                                v-if="agencyAccessoryDisplay > 0"
-                                class="flex justify-between gap-2"
-                            >
-                                <dt class="text-slate-600 min-w-0">
-                                    Accessoire agence
-                                </dt>
-                                <dd
-                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
-                                >
-                                    {{
-                                        agencyAccessoryDisplay.toLocaleString(
-                                            "fr-FR",
-                                        )
-                                    }}
-                                    FCFA
-                                </dd>
-                            </div>
-                            <div
-                                class="flex justify-between gap-2 pt-2 border-t border-slate-200"
-                            >
-                                <dt class="font-medium text-slate-700 min-w-0">
-                                    Prime TTC
-                                </dt>
-                                <dd
-                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
-                                >
-                                    {{
-                                        totalBeforeReduction.toLocaleString(
-                                            "fr-FR",
-                                        )
-                                    }}
-                                    FCFA
-                                </dd>
-                            </div>
-                            <template v-if="totalReduction > 0">
+                            <template v-if="reductionOnPrimeNette > 0">
                                 <div
-                                    v-if="reductionBnsAmount > 0"
-                                    class="flex justify-between text-red-600"
+                                    v-if="reductionBnsPct > 0"
+                                    class="flex justify-between gap-2"
                                 >
-                                    <dt class="text-slate-600">
-                                        (%) Réduction BNS
-                                    </dt>
-                                    <dd class="font-medium">
-                                        −
-                                        {{
-                                            reductionBnsAmount.toLocaleString(
-                                                "fr-FR",
-                                            )
-                                        }}
-                                        FCFA
+                                    <dt class="text-slate-600">Réduction BNS</dt>
+                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                        {{ reductionBnsPct.toLocaleString("fr-FR", { minimumFractionDigits: 1 }) }} %
                                     </dd>
                                 </div>
                                 <div
-                                    v-if="reductionCommissionAmount > 0"
-                                    class="flex justify-between text-red-600"
+                                    v-if="reductionCommPct > 0"
+                                    class="flex justify-between gap-2"
                                 >
-                                    <dt class="text-slate-600">
-                                        (%) Réduction commission
-                                    </dt>
-                                    <dd class="font-medium">
-                                        −
-                                        {{
-                                            reductionCommissionAmount.toLocaleString(
-                                                "fr-FR",
-                                            )
-                                        }}
-                                        FCFA
+                                    <dt class="text-slate-600">Réduction commission</dt>
+                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                        {{ reductionCommPct.toLocaleString("fr-FR", { minimumFractionDigits: 1 }) }} %
                                     </dd>
                                 </div>
                                 <div
-                                    v-if="reductionProfessionPercentAmount > 0"
-                                    class="flex justify-between text-red-600"
+                                    v-if="reductionProfPct > 0"
+                                    class="flex justify-between gap-2"
                                 >
-                                    <dt class="text-slate-600">
-                                        (%) Réduction profession
-                                    </dt>
-                                    <dd class="font-medium">
-                                        −
-                                        {{
-                                            reductionProfessionPercentAmount.toLocaleString(
-                                                "fr-FR",
-                                            )
-                                        }}
-                                        FCFA
-                                    </dd>
-                                </div>
-                                <div
-                                    class="flex justify-between gap-2 font-medium text-red-600"
-                                >
-                                    <dt class="min-w-0">Total réductions</dt>
-                                    <dd class="shrink-0 whitespace-nowrap">
-                                        −
-                                        {{
-                                            totalReduction.toLocaleString(
-                                                "fr-FR",
-                                            )
-                                        }}
-                                        FCFA
+                                    <dt class="text-slate-600">Réduction profession</dt>
+                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                        {{ reductionProfPct.toLocaleString("fr-FR", { minimumFractionDigits: 1 }) }} %
                                     </dd>
                                 </div>
                             </template>
+                            <div class="flex justify-between gap-2">
+                                <dt class="text-slate-600 font-medium">Montant après réduction</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ montantApresReductionCreate.toLocaleString("fr-FR") }} FCFA
+                                </dd>
+                            </div>
                             <div
+                                v-if="(recap.amounts?.accessory_amount ?? recap.accessory_amount ?? 0) > 0"
+                                class="flex justify-between gap-2"
+                            >
+                                <dt class="text-slate-600">Accessoire</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ Number(recap.amounts?.accessory_amount ?? recap.accessory_amount ?? 0).toLocaleString("fr-FR") }} FCFA
+                                </dd>
+                            </div>
+                            <div
+                                v-if="(recap.amounts?.taxes_amount ?? 0) > 0"
+                                class="flex justify-between gap-2"
+                            >
+                                <dt class="text-slate-600">Taxes</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ Number(recap.amounts.taxes_amount).toLocaleString("fr-FR") }} FCFA
+                                </dd>
+                            </div>
+                            <div
+                                v-if="(recap.amounts?.fga_amount ?? 0) > 0"
+                                class="flex justify-between gap-2"
+                            >
+                                <dt class="text-slate-600">Taxe FGA</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ Number(recap.amounts.fga_amount).toLocaleString("fr-FR") }} FCFA
+                                </dd>
+                            </div>
+                            <div
+                                v-if="(recap.amounts?.cedeao_amount ?? 0) > 0"
+                                class="flex justify-between gap-2"
+                            >
+                                <dt class="text-slate-600">CEDEAO</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ Number(recap.amounts.cedeao_amount).toLocaleString("fr-FR") }} FCFA
+                                </dd>
+                            </div>
+                            <div class="flex justify-between gap-2 pt-2 border-t-2 border-slate-200">
+                                <dt class="font-semibold text-slate-800 min-w-0">Prime TTC</dt>
+                                <dd class="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ displayTotal.toLocaleString("fr-FR") }} FCFA
+                                </dd>
+                            </div>
+                            <div
+                                v-if="(form.agency_accessory ?? 0) > 0"
+                                class="flex justify-between gap-2"
+                            >
+                                <dt class="text-slate-600">Accessoire agence</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ Number(form.agency_accessory).toLocaleString("fr-FR") }} FCFA
+                                </dd>
+                            </div>
+                            <div
+                                v-if="(form.company_accessory ?? 0) > 0"
+                                class="flex justify-between gap-2"
+                            >
+                                <dt class="text-slate-600">Accessoire compagnie</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ Number(form.company_accessory).toLocaleString("fr-FR") }} FCFA
+                                </dd>
+                            </div>
+                            <div
+                                v-if="(form.agency_accessory ?? 0) > 0 || (form.company_accessory ?? 0) > 0"
                                 class="flex justify-between gap-2 pt-2 border-t border-slate-200"
                             >
-                                <dt class="font-medium text-slate-800 min-w-0">
-                                    Total (TTC − réductions)
-                                </dt>
-                                <dd
-                                    class="font-semibold text-slate-900 shrink-0 whitespace-nowrap"
-                                >
-                                    {{ displayTotal.toLocaleString("fr-FR") }}
-                                    FCFA
+                                <dt class="font-semibold text-slate-800 min-w-0">Montant à payer</dt>
+                                <dd class="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
+                                    {{ (displayTotal + Number(form.agency_accessory ?? 0) + Number(form.company_accessory ?? 0)).toLocaleString("fr-FR") }} FCFA
                                 </dd>
                             </div>
                         </dl>

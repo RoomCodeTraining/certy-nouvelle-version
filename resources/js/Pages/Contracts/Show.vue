@@ -41,21 +41,15 @@ const statusConfig = computed(() => {
     return { label: CONTRACT_STATUS_LABELS[s] ?? s, class: (map[s] ?? map.draft).class };
 });
 
-const guaranteeFields = [
-    { key: "base_amount", label: "Prime de base" },
-    { key: "rc_amount", label: "RC" },
-    { key: "defence_appeal_amount", label: "Défense & recours" },
-    { key: "person_transport_amount", label: "Transport de personnes" },
-    { key: "accessory_amount", label: "Accessoire grille" },
-    { key: "taxes_amount", label: "Taxes" },
-    { key: "cedeao_amount", label: "CEDEAO" },
-    { key: "fga_amount", label: "FGA" },
-    { key: "optional_guarantees_amount", label: "Garanties" },
+const guaranteeFieldsPdf = [
+    { code: "RC", key: "rc_amount", label: "Responsabilité Civile" },
+    { code: "DR", key: "defence_appeal_amount", label: "Défense et Recours" },
+    { code: "TP", key: "person_transport_amount", label: "Transport de personnes" },
 ];
 
 const hasPremiumData = computed(
     () =>
-        props.contract?.base_amount != null ||
+        props.contract?.rc_amount != null ||
         props.contract?.total_premium != null,
 );
 
@@ -65,14 +59,47 @@ const optionalGuaranteesList = computed(() =>
         : [],
 );
 
-const totalDisplay = computed(() =>
-    Number(
-        props.contract?.total_amount ??
-            props.contract?.total_after_reduction ??
-            props.contract?.total_premium ??
-            0,
-    ),
+const primeNette = computed(() =>
+    (props.contract?.rc_amount ?? 0) +
+    (props.contract?.defence_appeal_amount ?? 0) +
+    (props.contract?.person_transport_amount ?? 0) +
+    (props.contract?.optional_guarantees_amount ?? 0),
 );
+
+const montantReduction = computed(() => {
+    const c = props.contract;
+    const pctBns = Number(c?.reduction_bns ?? 0);
+    const pctComm = Number(c?.reduction_on_commission ?? 0);
+    const pctProf = Number(c?.reduction_on_profession_percent ?? 0);
+    const amtProf = Number(c?.reduction_on_profession_amount_stored ?? c?.reduction_on_profession_amount ?? 0);
+    const bnsAmt = pctBns > 0 ? Math.round(primeNette.value * pctBns / 100) : 0;
+    const commAmt = pctComm > 0 ? Math.round(primeNette.value * pctComm / 100) : 0;
+    const profAmt = pctProf > 0 ? Math.round(primeNette.value * pctProf / 100) : amtProf;
+    return bnsAmt + commAmt + profAmt;
+});
+
+const montantApresReduction = computed(() =>
+    Math.max(0, primeNette.value - montantReduction.value),
+);
+
+const totalDisplay = computed(() =>
+    montantApresReduction.value +
+    (props.contract?.accessory_amount ?? 0) +
+    (props.contract?.taxes_amount ?? 0) +
+    (props.contract?.fga_amount ?? 0) +
+    (props.contract?.cedeao_amount ?? 0),
+);
+
+const reductionBnsPct = computed(() => Number(props.contract?.reduction_bns ?? 0));
+const reductionCommPct = computed(() => Number(props.contract?.reduction_on_commission ?? 0));
+const reductionProfPct = computed(() => {
+    const c = props.contract;
+    const pct = Number(c?.reduction_on_profession_percent ?? 0);
+    if (pct > 0) return pct;
+    const amt = Number(c?.reduction_on_profession_amount_stored ?? c?.reduction_on_profession_amount ?? 0);
+    if (primeNette.value > 0 && amt > 0) return Math.round((amt / primeNette.value) * 1000) / 10;
+    return 0;
+});
 
 const canEdit = computed(() => props.contract?.status === "draft");
 const canCancel = computed(() =>
@@ -639,195 +666,136 @@ function markAttestationIssued(contract) {
                             </h2>
                         </div>
                         <div class="p-6 space-y-4">
-                            <!-- Garanties détaillées (repliables visuellement) -->
-                            <div
-                                v-if="contract.base_amount != null"
-                                class="space-y-2"
-                            >
-                                <p
-                                    class="text-xs font-medium text-slate-500 uppercase tracking-wide"
-                                >
-                                    Garanties (grille)
+                            <!-- Garanties : Code | Désignation | Primes (FCFA) -->
+                            <div v-if="primeNette > 0" class="space-y-2 overflow-x-auto">
+                                <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                                    Garanties
                                 </p>
-                                <dl class="space-y-1.5 text-sm">
-                                    <div
-                                        v-for="f in guaranteeFields"
-                                        :key="f.key"
-                                        v-show="contract[f.key] != null"
-                                        class="flex justify-between gap-2"
-                                    >
-                                        <dt class="text-slate-600">
-                                            {{ f.label }}
-                                        </dt>
-                                        <dd
-                                            class="font-medium text-slate-900 tabular-nums"
+                                <table class="w-full min-w-[240px] text-sm border border-slate-200 rounded-lg overflow-hidden">
+                                    <thead>
+                                        <tr class="bg-slate-900 text-white">
+                                            <th class="px-2 py-2 text-left font-semibold text-xs">Désignation</th>
+                                            <th class="w-28 px-2 py-2 text-right font-semibold text-xs shrink-0">Primes (FCFA)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr
+                                            v-for="f in guaranteeFieldsPdf"
+                                            :key="f.key"
+                                            v-show="(contract[f.key] ?? 0) > 0"
+                                            class="border-t border-slate-100"
                                         >
-                                            {{
-                                                Number(
-                                                    contract[f.key],
-                                                ).toLocaleString("fr-FR")
-                                            }}
-                                            FCFA
-                                        </dd>
-                                    </div>
-                                </dl>
-                            </div>
-                            <div
-                                v-if="optionalGuaranteesList.length"
-                                class="space-y-1.5 pt-3 border-t border-slate-200"
-                            >
-                                <p
-                                    class="text-xs font-medium text-slate-500 uppercase tracking-wide"
-                                >
-                                    Autres garanties
-                                </p>
-                                <dl class="space-y-1.5 text-sm">
-                                    <div
-                                        v-for="g in optionalGuaranteesList"
-                                        :key="g.code"
-                                        class="flex justify-between gap-2"
-                                    >
-                                        <dt class="text-slate-600 truncate">
-                                            {{ g.label || "Autre garantie" }}
-                                        </dt>
-                                        <dd
-                                            class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
+                                            <td class="px-2 py-2 text-slate-700">{{ f.label }}</td>
+                                            <td class="w-28 px-2 py-2 text-right font-medium text-slate-900 tabular-nums shrink-0 whitespace-nowrap">
+                                                {{ Number(contract[f.key]).toLocaleString("fr-FR") }}
+                                            </td>
+                                        </tr>
+                                        <tr
+                                            v-for="g in optionalGuaranteesList"
+                                            :key="g.code"
+                                            class="border-t border-slate-100"
                                         >
-                                            {{
-                                                Number(
-                                                    g.amount ?? 0,
-                                                ).toLocaleString("fr-FR")
-                                            }}
-                                            FCFA
-                                        </dd>
-                                    </div>
-                                </dl>
-                            </div>
-                            <div
-                                v-if="(contract.optional_guarantees_amount || 0) > 0"
-                                class="flex justify-between text-sm"
-                            >
-                                <span class="text-slate-600"
-                                    >Garanties</span
-                                >
-                                <span
-                                    class="font-medium text-slate-900 tabular-nums"
-                                    >{{
-                                        Number(
-                                            contract.optional_guarantees_amount,
-                                        ).toLocaleString("fr-FR")
-                                    }}
-                                    FCFA</span
-                                >
-                            </div>
-                            <div
-                                v-if="(contract.company_accessory || 0) > 0"
-                                class="flex justify-between text-sm"
-                            >
-                                <span class="text-slate-600"
-                                    >Accessoire compagnie</span
-                                >
-                                <span
-                                    class="font-medium text-slate-900 tabular-nums"
-                                    >{{
-                                        Number(
-                                            contract.company_accessory,
-                                        ).toLocaleString("fr-FR")
-                                    }}
-                                    FCFA</span
-                                >
-                            </div>
-                            <div
-                                v-if="(contract.agency_accessory || 0) > 0"
-                                class="flex justify-between text-sm"
-                            >
-                                <span class="text-slate-600"
-                                    >Accessoire agence</span
-                                >
-                                <span
-                                    class="font-medium text-slate-900 tabular-nums"
-                                    >{{
-                                        Number(
-                                            contract.agency_accessory,
-                                        ).toLocaleString("fr-FR")
-                                    }}
-                                    FCFA</span
-                                >
+                                            <td class="px-2 py-2 text-slate-700">{{ g.label || "Autre garantie" }}</td>
+                                            <td class="w-28 px-2 py-2 text-right font-medium text-slate-900 tabular-nums shrink-0 whitespace-nowrap">
+                                                {{ Number(g.amount ?? 0).toLocaleString("fr-FR") }}
+                                            </td>
+                                        </tr>
+                                        <tr
+                                            v-if="!optionalGuaranteesList.length && (contract.optional_guarantees_amount ?? 0) > 0"
+                                            class="border-t border-slate-100"
+                                        >
+                                            <td class="px-2 py-2 text-slate-700">Autres garanties</td>
+                                            <td class="w-28 px-2 py-2 text-right font-medium text-slate-900 tabular-nums shrink-0 whitespace-nowrap">
+                                                {{ Number(contract.optional_guarantees_amount).toLocaleString("fr-FR") }}
+                                            </td>
+                                        </tr>
+                                        <tr class="border-t border-slate-200 bg-slate-50 font-semibold">
+                                            <td class="px-2 py-2 text-slate-700 text-right">Prime nette</td>
+                                            <td class="w-28 px-2 py-2 text-right text-slate-900 tabular-nums shrink-0 whitespace-nowrap">
+                                                {{ primeNette.toLocaleString("fr-FR") }}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
 
-                            <div
-                                class="pt-4 border-t border-slate-200 space-y-2"
-                            >
-                                <div
-                                    v-if="
-                                        contract.prime_ttc != null ||
-                                        contract.total_before_reduction != null
-                                    "
-                                    class="flex justify-between text-sm"
-                                >
-                                    <span class="text-slate-600"
-                                        >Prime TTC</span
-                                    >
-                                    <span
-                                        class="font-medium text-slate-900 tabular-nums"
-                                    >
-                                        {{
-                                            Number(
-                                                contract.prime_ttc ??
-                                                    contract.total_before_reduction,
-                                            ).toLocaleString("fr-FR")
-                                        }}
-                                        FCFA
-                                    </span>
+                            <!-- Résumé financier -->
+                            <p class="text-xs font-medium text-slate-500 uppercase tracking-wide pt-2">
+                                Résumé Financier
+                            </p>
+                            <dl class="space-y-2 text-sm">
+                                <div class="flex justify-between gap-2">
+                                    <dt class="text-slate-600">Prime nette</dt>
+                                    <dd class="font-medium text-slate-900 tabular-nums text-right">
+                                        {{ primeNette.toLocaleString("fr-FR") }}
+                                    </dd>
                                 </div>
                                 <div
-                                    v-if="(contract.commission_amount || 0) > 0"
-                                    class="flex justify-between text-sm"
+                                    v-if="reductionBnsPct > 0"
+                                    class="flex justify-between gap-2"
                                 >
-                                    <span class="text-slate-600"
-                                        >Commission</span
-                                    >
-                                    <span
-                                        class="font-medium text-emerald-600 tabular-nums"
-                                        >+
-                                        {{
-                                            Number(
-                                                contract.commission_amount,
-                                            ).toLocaleString("fr-FR")
-                                        }}
-                                        FCFA</span
-                                    >
+                                    <dt class="text-slate-600">Réduction BNS</dt>
+                                    <dd class="font-medium text-slate-900 tabular-nums text-right">
+                                        {{ reductionBnsPct.toLocaleString("fr-FR", { minimumFractionDigits: 1 }) }} %
+                                    </dd>
                                 </div>
                                 <div
-                                    v-if="
-                                        (contract.total_reduction_amount || 0) >
-                                        0
-                                    "
-                                    class="flex justify-between text-sm"
+                                    v-if="reductionCommPct > 0"
+                                    class="flex justify-between gap-2"
                                 >
-                                    <span class="text-slate-600"
-                                        >Réductions</span
-                                    >
-                                    <span
-                                        class="font-medium text-red-600 tabular-nums"
-                                        >−
-                                        {{
-                                            Number(
-                                                contract.total_reduction_amount,
-                                            ).toLocaleString("fr-FR")
-                                        }}
-                                        FCFA</span
-                                    >
+                                    <dt class="text-slate-600">Réduction commission</dt>
+                                    <dd class="font-medium text-slate-900 tabular-nums text-right">
+                                        {{ reductionCommPct.toLocaleString("fr-FR", { minimumFractionDigits: 1 }) }} %
+                                    </dd>
                                 </div>
-                            </div>
+                                <div
+                                    v-if="reductionProfPct > 0"
+                                    class="flex justify-between gap-2"
+                                >
+                                    <dt class="text-slate-600">Réduction profession</dt>
+                                    <dd class="font-medium text-slate-900 tabular-nums text-right">
+                                        {{ reductionProfPct.toLocaleString("fr-FR", { minimumFractionDigits: 1 }) }} %
+                                    </dd>
+                                </div>
+                                <div class="flex justify-between gap-2">
+                                    <dt class="text-slate-600">Montant après réduction</dt>
+                                    <dd class="font-medium text-slate-900 tabular-nums text-right">
+                                        {{ montantApresReduction.toLocaleString("fr-FR") }}
+                                    </dd>
+                                </div>
+                                <div class="flex justify-between gap-2">
+                                    <dt class="text-slate-600">Accessoire</dt>
+                                    <dd class="font-medium text-slate-900 tabular-nums text-right">
+                                        {{ Number(contract.accessory_amount ?? 0).toLocaleString("fr-FR") }}
+                                    </dd>
+                                </div>
+                                <div class="flex justify-between gap-2">
+                                    <dt class="text-slate-600">Taxes</dt>
+                                    <dd class="font-medium text-slate-900 tabular-nums text-right">
+                                        {{ Number(contract.taxes_amount ?? 0).toLocaleString("fr-FR") }}
+                                    </dd>
+                                </div>
+                                <div class="flex justify-between gap-2">
+                                    <dt class="text-slate-600">Taxe FGA</dt>
+                                    <dd class="font-medium text-slate-900 tabular-nums text-right">
+                                        {{ Number(contract.fga_amount ?? 0).toLocaleString("fr-FR") }}
+                                    </dd>
+                                </div>
+                                <div class="flex justify-between gap-2">
+                                    <dt class="text-slate-600">CEDEAO</dt>
+                                    <dd class="font-medium text-slate-900 tabular-nums text-right">
+                                        {{ Number(contract.cedeao_amount ?? 0).toLocaleString("fr-FR") }}
+                                    </dd>
+                                </div>
+                            </dl>
 
-                            <div class="pt-4 border-t-2 border-slate-200">
+                            <div class="pt-4 border-t-2 border-slate-200 space-y-2">
                                 <div
                                     class="flex justify-between items-baseline gap-2"
                                 >
                                     <span
                                         class="text-sm font-semibold text-slate-700"
-                                        >Total à payer</span
+                                        >Prime TTC</span
                                     >
                                     <span
                                         class="text-xl font-bold text-slate-900 tabular-nums"
@@ -835,6 +803,34 @@ function markAttestationIssued(contract) {
                                         {{
                                             totalDisplay.toLocaleString("fr-FR")
                                         }}
+                                        FCFA
+                                    </span>
+                                </div>
+                                <div
+                                    v-if="(contract.agency_accessory ?? 0) > 0"
+                                    class="flex justify-between gap-2 text-sm"
+                                >
+                                    <dt class="text-slate-600">Accessoire agence</dt>
+                                    <dd class="font-medium text-slate-900 tabular-nums text-right">
+                                        {{ Number(contract.agency_accessory).toLocaleString("fr-FR") }}
+                                    </dd>
+                                </div>
+                                <div
+                                    v-if="(contract.company_accessory ?? 0) > 0"
+                                    class="flex justify-between gap-2 text-sm"
+                                >
+                                    <dt class="text-slate-600">Accessoire compagnie</dt>
+                                    <dd class="font-medium text-slate-900 tabular-nums text-right">
+                                        {{ Number(contract.company_accessory).toLocaleString("fr-FR") }}
+                                    </dd>
+                                </div>
+                                <div
+                                    v-if="(contract.agency_accessory ?? 0) > 0 || (contract.company_accessory ?? 0) > 0"
+                                    class="flex justify-between items-baseline gap-2 pt-2 border-t border-slate-200"
+                                >
+                                    <span class="text-sm font-semibold text-slate-800">Montant à payer</span>
+                                    <span class="text-lg font-bold text-slate-900 tabular-nums">
+                                        {{ (totalDisplay + Number(contract.agency_accessory ?? 0) + Number(contract.company_accessory ?? 0)).toLocaleString("fr-FR") }}
                                         FCFA
                                     </span>
                                 </div>

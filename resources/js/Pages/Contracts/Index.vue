@@ -38,6 +38,32 @@ function dealTypeBadgeClass(row) {
     return row.parent_id ? 'bg-violet-100 text-violet-800' : 'bg-emerald-100 text-emerald-800';
 }
 
+/** Prime nette = RC + DR + TP + optional_guarantees (identique à la vue détails) */
+function primeNette(row) {
+    const v = (row.rc_amount ?? 0) + (row.defence_appeal_amount ?? 0)
+        + (row.person_transport_amount ?? 0) + (row.optional_guarantees_amount ?? 0);
+    return v > 0 ? v : null;
+}
+
+/** Prime TTC = montant après réduction + accessory + taxes + fga + cedao (identique à la vue détails) */
+function primeTtc(row) {
+    const pn = primeNette(row) ?? 0;
+    const pctBns = Number(row.reduction_bns ?? 0);
+    const pctComm = Number(row.reduction_on_commission ?? 0);
+    const pctProf = Number(row.reduction_on_profession_percent ?? 0);
+    const amtProf = Number(row.reduction_on_profession_amount_stored ?? row.reduction_on_profession_amount ?? 0);
+    const bnsAmt = pctBns > 0 ? Math.round(pn * pctBns / 100) : 0;
+    const commAmt = pctComm > 0 ? Math.round(pn * pctComm / 100) : 0;
+    const profAmt = pctProf > 0 ? Math.round(pn * pctProf / 100) : amtProf;
+    const montantReduction = bnsAmt + commAmt + profAmt;
+    const montantApresReduction = Math.max(0, pn - montantReduction);
+    return montantApresReduction
+        + (row.accessory_amount ?? 0)
+        + (row.taxes_amount ?? 0)
+        + (row.fga_amount ?? 0)
+        + (row.cedeao_amount ?? 0);
+}
+
 const columns = [
     { key: 'created_at', label: 'Date de création', sortKey: 'created_at', getValue: (row) => formatDate(row.created_at) },
     {
@@ -68,10 +94,22 @@ const columns = [
     { key: 'start_date', label: 'Date début', sortKey: 'start_date', getValue: (row) => formatDate(row.start_date) },
     { key: 'end_date', label: 'Date fin', sortKey: 'end_date', getValue: (row) => formatDate(row.end_date) },
     {
-        key: 'prime',
-        label: 'Prime',
+        key: 'prime_nette',
+        label: 'Prime nette',
+        getValue: (row) => primeNette(row) != null ? Number(primeNette(row)).toLocaleString('fr-FR') + ' FCFA' : '—',
+        class: 'text-right',
+        cellClass: 'tabular-nums text-right',
+    },
+    {
+        key: 'prime_ttc',
+        label: 'Prime TTC',
         sortKey: 'total_amount',
-        getValue: (row) => row.total_amount != null ? Number(row.total_amount).toLocaleString('fr-FR') + ' FCFA' : '—',
+        getValue: (row) => {
+            const val = primeTtc(row);
+            return val > 0 ? Number(val).toLocaleString('fr-FR') + ' FCFA' : '—';
+        },
+        class: 'text-right',
+        cellClass: 'tabular-nums text-right',
     },
     {
         key: 'status',
@@ -236,7 +274,14 @@ function cancel(contract, label) {
                             >
                                 {{ statusLabelFor(row.status) }}
                             </span>
-                            <span class="text-sm font-medium text-slate-900">{{ row.total_amount != null ? Number(row.total_amount).toLocaleString('fr-FR') + ' FCFA' : '—' }}</span>
+                            <div class="text-right text-sm tabular-nums">
+                                <div v-if="primeNette(row) != null" class="text-slate-600">
+                                    Nette : {{ Number(primeNette(row)).toLocaleString('fr-FR') }} FCFA
+                                </div>
+                                <div class="font-medium text-slate-900">
+                                    {{ primeTtc(row) > 0 ? Number(primeTtc(row)).toLocaleString('fr-FR') + ' FCFA (TTC)' : '—' }}
+                                </div>
+                            </div>
                         </div>
                     </Link>
                     <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-100">

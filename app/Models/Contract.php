@@ -230,40 +230,44 @@ class Contract extends Model
     }
 
     /**
-     * Total de toutes les réductions en FCFA.
-     * Utilise la valeur stockée total_reduction_amount si présente, sinon calcule à partir des %.
+     * Total de toutes les réductions en FCFA (appliquées sur prime nette).
+     * Utilise la valeur stockée total_reduction_amount si présente, sinon calcule.
      */
     public function getTotalReductionAmountAttribute(): int
     {
         $stored = $this->getRawOriginal('total_reduction_amount');
-        if ($stored !== null && (int) $stored > 0) {
+        if ($stored !== null && (int) $stored >= 0) {
             return (int) $stored;
         }
-        $before = $this->getTotalBeforeReductionAttribute();
-        if ($before === null || $before <= 0) {
+        $primeNette = (int) ($this->rc_amount ?? 0)
+            + (int) ($this->defence_appeal_amount ?? 0)
+            + (int) ($this->person_transport_amount ?? 0)
+            + (int) ($this->optional_guarantees_amount ?? 0);
+        if ($primeNette <= 0) {
             return 0;
         }
         $r = 0;
         $bns = (float) ($this->reduction_bns ?? 0);
         if ($bns > 0) {
-            $r += (int) round($before * ($bns / 100));
+            $r += (int) round($primeNette * ($bns / 100));
         }
         $comm = (float) ($this->reduction_on_commission ?? 0);
         if ($comm > 0) {
-            $r += (int) round($before * ($comm / 100));
+            $r += (int) round($primeNette * ($comm / 100));
         }
         $profPct = (float) ($this->reduction_on_profession_percent ?? 0);
         if ($profPct > 0) {
-            $r += (int) round($before * ($profPct / 100));
+            $r += (int) round($primeNette * ($profPct / 100));
+        } else {
+            $r += (int) ($this->reduction_on_profession_amount ?? 0);
         }
-        $r += (int) ($this->reduction_on_profession_amount ?? 0);
         $r += (int) ($this->reduction_amount ?? 0);
 
         return $r;
     }
 
     /**
-     * Montant total final = prime TTC + commission - réductions.
+     * Montant total final (Prime TTC) = montant_apres_reduction + accessory + taxes + fga + cedao.
      * Utilise la valeur stockée total_amount si présente, sinon calcule.
      */
     public function getTotalAfterReductionAttribute(): ?int
@@ -272,47 +276,57 @@ class Contract extends Model
         if ($stored !== null) {
             return max(0, (int) $stored);
         }
-        $before = $this->getTotalBeforeReductionAttribute();
-        if ($before === null) {
-            return null;
-        }
-        $commission = (int) ($this->commission_amount ?? 0);
-        return max(0, $before + $commission - $this->getTotalReductionAmountAttribute());
+        $primeNette = (int) ($this->rc_amount ?? 0)
+            + (int) ($this->defence_appeal_amount ?? 0)
+            + (int) ($this->person_transport_amount ?? 0)
+            + (int) ($this->optional_guarantees_amount ?? 0);
+        $totalReduction = $this->getTotalReductionAmountAttribute();
+        $montantApresReduction = max(0, $primeNette - $totalReduction);
+        return $montantApresReduction
+            + (int) ($this->accessory_amount ?? 0)
+            + (int) ($this->taxes_amount ?? 0)
+            + (int) ($this->fga_amount ?? 0)
+            + (int) ($this->cedeao_amount ?? 0);
     }
 
     /**
-     * Calcule et remplit tous les montants stockés : prime_ttc, réductions en FCFA, total_reduction_amount, total_amount.
-     * Formule : total_amount = prime_ttc + commission_amount - total_reduction_amount.
+     * Calcule et remplit tous les montants stockés selon la formule du PDF.
+     * Formule : prime_nette = RC + DR + TP + optional ; réductions sur prime_nette ;
+     * montant_apres_reduction = prime_nette - réductions ;
+     * total_amount (Prime TTC) = montant_apres_reduction + accessory + taxes + fga + cedao.
+     * Les accessoires agence et compagnie ne sont pas inclus dans total_amount.
      */
     public function computeAndFillStoredAmounts(): void
     {
-        $prime = $this->total_premium;
-        if ($prime === null) {
-            return;
-        }
-        $company = (int) ($this->company_accessory ?? 0);
-        $agency = (int) ($this->agency_accessory ?? 0);
-        $primeTtc = $prime + $company + $agency;
-        $commission = (int) ($this->commission_amount ?? 0);
+        $primeNette = (int) ($this->rc_amount ?? 0)
+            + (int) ($this->defence_appeal_amount ?? 0)
+            + (int) ($this->person_transport_amount ?? 0)
+            + (int) ($this->optional_guarantees_amount ?? 0);
 
         $bnsPct = (float) ($this->reduction_bns ?? 0);
-        $reductionBnsAmount = $bnsPct > 0 ? (int) round($primeTtc * ($bnsPct / 100)) : 0;
+        $reductionBnsAmount = $bnsPct > 0 ? (int) round($primeNette * ($bnsPct / 100)) : 0;
 
         $commPct = (float) ($this->reduction_on_commission ?? 0);
-        $reductionOnCommissionAmount = $commPct > 0 ? (int) round($primeTtc * ($commPct / 100)) : 0;
+        $reductionOnCommissionAmount = $commPct > 0 ? (int) round($primeNette * ($commPct / 100)) : 0;
 
         $profPct = (float) ($this->reduction_on_profession_percent ?? 0);
         $profFixed = (int) ($this->reduction_on_profession_amount ?? 0);
         $reductionOnProfAmount = $profPct > 0
-            ? (int) round($primeTtc * ($profPct / 100))
+            ? (int) round($primeNette * ($profPct / 100))
             : $profFixed;
 
         $reductionOther = (int) ($this->reduction_amount ?? 0);
         $totalReduction = $reductionBnsAmount + $reductionOnCommissionAmount + $reductionOnProfAmount + $reductionOther;
-        $totalAmount = max(0, $primeTtc + $commission - $totalReduction);
+        $montantApresReduction = max(0, $primeNette - $totalReduction);
+
+        $totalAmount = $montantApresReduction
+            + (int) ($this->accessory_amount ?? 0)
+            + (int) ($this->taxes_amount ?? 0)
+            + (int) ($this->fga_amount ?? 0)
+            + (int) ($this->cedeao_amount ?? 0);
 
         $this->forceFill([
-            'prime_ttc' => $primeTtc,
+            'prime_ttc' => $totalAmount,
             'reduction_bns_amount' => $reductionBnsAmount,
             'reduction_on_commission_amount' => $reductionOnCommissionAmount,
             'reduction_on_profession_amount_stored' => $reductionOnProfAmount,
