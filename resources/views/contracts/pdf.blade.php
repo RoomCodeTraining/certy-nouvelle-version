@@ -123,6 +123,8 @@ function contractTypeLabel($type) {
         }
         .text-right { text-align: right; }
         .font-bold { font-weight: bold; }
+        .row-highlight { font-weight: bold; background: #f1f5f9 !important; }
+        .row-total { font-weight: bold; background: #e2e8f0 !important; font-size: 10px; }
     </style>
 </head>
 <body>
@@ -320,7 +322,7 @@ function contractTypeLabel($type) {
                                 </tr>
                             @endif
                             <tr class="font-bold">
-                                <td colspan="2" class="text-right">Sous-total</td>
+                                <td colspan="2" class="text-right">Prime nette</td>
                                 <td class="text-right">
                                     {{ number_format(
                                         ($contract->rc_amount ?? 0)
@@ -338,17 +340,64 @@ function contractTypeLabel($type) {
                 </div>
                 <div class="block">
                     <div class="section-title">Résumé Financier</div>
+                    @php
+                        $primeNette = ($contract->rc_amount ?? 0)
+                            + ($contract->defence_appeal_amount ?? 0)
+                            + ($contract->person_transport_amount ?? 0)
+                            + ($contract->optional_guarantees_amount ?? 0);
+                        $bnsPct = (float) ($contract->reduction_bns ?? 0);
+                        $commPct = (float) ($contract->reduction_on_commission ?? 0);
+                        $profPct = (float) ($contract->reduction_on_profession_percent ?? 0);
+                        $bnsAmount = $bnsPct > 0 ? (int) round($primeNette * ($bnsPct / 100)) : 0;
+                        $commAmount = $commPct > 0 ? (int) round($primeNette * ($commPct / 100)) : 0;
+                        $profAmount = (int) ($contract->reduction_on_profession_amount_stored ?? $contract->reduction_on_profession_amount ?? 0);
+                        if ($profPct > 0 && $profAmount === 0) {
+                            $profAmount = (int) round($primeNette * ($profPct / 100));
+                        }
+                        $montantReduction = $bnsAmount + $commAmount + $profAmount;
+                        $profPctUsed = $profPct > 0 ? $profPct : ($primeNette > 0 && $profAmount > 0 ? round($profAmount / $primeNette * 100, 1) : 0);
+                        $reductionPctTotal = round($bnsPct + $commPct + $profPctUsed, 1);
+                        $montantApresReduction = $primeNette - $montantReduction;
+                    @endphp
                     <table class="section-table">
-                        <tr>
-                            <th>Prime Nette</th>
-                            <td class="text-right">{{ number_format($contract->base_amount ?? 0, 0, ',', ' ') }}</td>
+                        <tr class="row-highlight">
+                            <th>Prime nette</th>
+                            <td class="text-right">{{ number_format($primeNette, 0, ',', ' ') }}</td>
                         </tr>
-                        @if(($contract->optional_guarantees_amount ?? 0) > 0)
+                        @if($bnsPct > 0)
                             <tr>
-                                <th>Garanties</th>
-                                <td class="text-right">{{ number_format($contract->optional_guarantees_amount ?? 0, 0, ',', ' ') }}</td>
+                                <th>Réduction BNS</th>
+                                <td class="text-right">{{ number_format($bnsPct, 1, ',', ' ') }} % = {{ number_format($bnsAmount, 0, ',', ' ') }}</td>
                             </tr>
                         @endif
+                        @if($commPct > 0)
+                            <tr>
+                                <th>Réduction commission</th>
+                                <td class="text-right">{{ number_format($commPct, 1, ',', ' ') }} % = {{ number_format($commAmount, 0, ',', ' ') }}</td>
+                            </tr>
+                        @endif
+                        @if($profAmount > 0)
+                            <tr>
+                                <th>Réduction profession</th>
+                                <td class="text-right">
+                                    @if($profPct > 0)
+                                        {{ number_format($profPct, 1, ',', ' ') }} % = {{ number_format($profAmount, 0, ',', ' ') }}
+                                    @else
+                                        {{ number_format($profAmount, 0, ',', ' ') }}
+                                    @endif
+                                </td>
+                            </tr>
+                        @endif
+                        @if($montantReduction > 0)
+                            <tr class="row-highlight">
+                                <th>Total réduction</th>
+                                <td class="text-right">{{ number_format($reductionPctTotal, 1, ',', ' ') }} % = {{ number_format($montantReduction, 0, ',', ' ') }}</td>
+                            </tr>
+                        @endif
+                        <tr class="row-highlight">
+                            <th>Montant après réduction</th>
+                            <td class="text-right">{{ number_format($montantApresReduction, 0, ',', ' ') }}</td>
+                        </tr>
                         <tr>
                             <th>Accessoire</th>
                             <td class="text-right">{{ number_format($contract->accessory_amount ?? 0, 0, ',', ' ') }}</td>
@@ -358,24 +407,16 @@ function contractTypeLabel($type) {
                             <td class="text-right">{{ number_format($contract->taxes_amount ?? 0, 0, ',', ' ') }}</td>
                         </tr>
                         <tr>
-                            <th>Réduction BNS</th>
-                            <td class="text-right">{{ number_format($contract->reduction_bns_amount ?? 0, 0, ',', ' ') }}</td>
-                        </tr>
-                        <tr>
-                            <th>Réduction Com.</th>
-                            <td class="text-right">{{ number_format($contract->reduction_on_commission_amount ?? 0, 0, ',', ' ') }}</td>
-                        </tr>
-                        <tr>
                             <th>Taxe FGA</th>
                             <td class="text-right">{{ number_format($contract->fga_amount ?? 0, 0, ',', ' ') }}</td>
                         </tr>
                         <tr>
-                            <th>Cedeao</th>
+                            <th>CEDEAO</th>
                             <td class="text-right">{{ number_format($contract->cedeao_amount ?? 0, 0, ',', ' ') }}</td>
                         </tr>
-                        <tr class="font-bold" style="background:#f3f4f6;">
-                            <th>Net à Payer</th>
-                            <td class="text-right">{{ number_format($contract->total_amount ?? 0, 0, ',', ' ') }}</td>
+                        <tr class="row-total">
+                            <th>Prime TTC</th>
+                            <td class="text-right">{{ number_format($contract->total_amount ?? 0, 0, ',', ' ') }} FCFA</td>
                         </tr>
                     </table>
                 </div>
