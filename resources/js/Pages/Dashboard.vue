@@ -65,7 +65,7 @@ function statusBadgeClass(status) {
         return "bg-emerald-100 text-emerald-800";
     if (["cancelled", "expired"].includes(s)) return "bg-red-100 text-red-800";
     return "bg-amber-100 text-amber-800";
-}x
+}
 
 const isRoot = computed(() => page.props.auth?.user?.is_root ?? false);
 
