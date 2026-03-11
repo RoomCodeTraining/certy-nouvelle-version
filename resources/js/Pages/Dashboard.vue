@@ -65,7 +65,7 @@ function statusBadgeClass(status) {
         return "bg-emerald-100 text-emerald-800";
     if (["cancelled", "expired"].includes(s)) return "bg-red-100 text-red-800";
     return "bg-amber-100 text-amber-800";
-}
+}x
 
 const isRoot = computed(() => page.props.auth?.user?.is_root ?? false);
 
@@ -219,7 +219,9 @@ function dismissProductionHint() {
                         <p class="text-sm text-slate-500 mb-0.5">
                             Revenus totaux générés
                         </p>
-                        <p class="text-xl font-semibold text-slate-900 tabular-nums whitespace-nowrap">
+                        <p
+                            class="text-xl font-semibold text-slate-900 tabular-nums whitespace-nowrap"
+                        >
                             {{ formatXOF(revenusTotaux) }}
                         </p>
                     </div>
@@ -411,7 +413,8 @@ function dismissProductionHint() {
                                 <p class="text-sm font-medium text-slate-900">
                                     {{
                                         row.prime_ttc != null
-                                            ? formatXOF(row.prime_ttc) + " (TTC)"
+                                            ? formatXOF(row.prime_ttc) +
+                                              " (TTC)"
                                             : "—"
                                     }}
                                 </p>
@@ -433,28 +436,44 @@ function dismissProductionHint() {
                     <table class="w-full text-sm">
                         <thead class="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600">
+                                <th
+                                    class="text-left py-3 px-4 font-medium text-slate-600"
+                                >
                                     Date
                                 </th>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600">
+                                <th
+                                    class="text-left py-3 px-4 font-medium text-slate-600"
+                                >
                                     Référence
                                 </th>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600">
+                                <th
+                                    class="text-left py-3 px-4 font-medium text-slate-600"
+                                >
                                     Client
                                 </th>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600">
+                                <th
+                                    class="text-left py-3 px-4 font-medium text-slate-600"
+                                >
                                     Véhicule
                                 </th>
-                                <th class="text-right py-3 px-4 font-medium text-slate-600">
+                                <th
+                                    class="text-right py-3 px-4 font-medium text-slate-600"
+                                >
                                     Prime nette
                                 </th>
-                                <th class="text-right py-3 px-4 font-medium text-slate-600">
+                                <th
+                                    class="text-right py-3 px-4 font-medium text-slate-600"
+                                >
                                     Prime TTC
                                 </th>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600">
+                                <th
+                                    class="text-left py-3 px-4 font-medium text-slate-600"
+                                >
                                     Statut
                                 </th>
-                                <th class="text-right py-3 px-4 font-medium text-slate-600">
+                                <th
+                                    class="text-right py-3 px-4 font-medium text-slate-600"
+                                >
                                     Actions
                                 </th>
                             </tr>
@@ -477,14 +496,18 @@ function dismissProductionHint() {
                                 <td class="py-3 px-4 text-slate-700">
                                     {{ row.vehicle }}
                                 </td>
-                                <td class="py-3 px-4 text-right tabular-nums text-slate-700">
+                                <td
+                                    class="py-3 px-4 text-right tabular-nums text-slate-700"
+                                >
                                     {{
                                         row.prime_nette != null
                                             ? formatXOF(row.prime_nette)
                                             : "—"
                                     }}
                                 </td>
-                                <td class="py-3 px-4 text-right tabular-nums text-slate-900 font-medium">
+                                <td
+                                    class="py-3 px-4 text-right tabular-nums text-slate-900 font-medium"
+                                >
                                     {{
                                         row.prime_ttc != null
                                             ? formatXOF(row.prime_ttc)

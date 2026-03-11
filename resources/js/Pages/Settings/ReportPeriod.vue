@@ -1,5 +1,5 @@
 <script setup>
-import { useForm, Link } from "@inertiajs/vue3";
+import { useForm, Link, usePage } from "@inertiajs/vue3";
 import DashboardLayout from "@/Layouts/DashboardLayout.vue";
 import PageHeader from "@/Components/PageHeader.vue";
 
@@ -13,6 +13,11 @@ const breadcrumbs = [
     { label: "Export production" },
 ];
 
+const page = usePage();
+const authUser = page.props.auth?.user ?? {};
+const defaultExternalEmail =
+    authUser.external_username || authUser.email || "";
+
 const form = useForm({
     enabled: props.setting?.enabled ?? false,
     frequency: props.setting?.frequency ?? "quinzaine",
@@ -20,6 +25,8 @@ const form = useForm({
     day_of_month: props.setting?.day_of_month ?? 16,
     time: props.setting?.time ?? "08:00",
     emails: props.setting?.emails ?? "",
+    external_email: defaultExternalEmail,
+    external_password: "",
 });
 
 const inputClass =
@@ -96,6 +103,65 @@ const weekdays = [
                         <p v-if="form.errors.emails" class="mt-1 text-sm text-red-600">
                             {{ form.errors.emails }}
                         </p>
+                    </div>
+
+                    <div class="border-t border-slate-100 pt-4 mt-2 space-y-3">
+                        <p class="text-sm text-slate-700 font-medium">
+                            Identifiants session externe (ASACI) pour l'export automatique
+                        </p>
+                        <p class="text-xs text-slate-500">
+                            Ces identifiants seront utilisés uniquement pour générer un token dédié à
+                            l'export automatique des attestations externes. Le mot de passe n'est jamais
+                            stocké, seul le token généré est conservé.
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label
+                                    for="external_email"
+                                    class="block text-sm font-medium text-slate-700 mb-1"
+                                >
+                                    Email (compte ASACI)
+                                </label>
+                                <input
+                                    id="external_email"
+                                    v-model="form.external_email"
+                                    type="email"
+                                    :class="[
+                                        inputClass,
+                                        form.errors.external_email && inputErrorClass,
+                                    ]"
+                                    placeholder="adresse@exemple.com"
+                                    autocomplete="off"
+                                />
+                                <p v-if="form.errors.external_email" class="mt-1 text-sm text-red-600">
+                                    {{ form.errors.external_email }}
+                                </p>
+                            </div>
+                            <div>
+                                <label
+                                    for="external_password"
+                                    class="block text-sm font-medium text-slate-700 mb-1"
+                                >
+                                    Mot de passe
+                                </label>
+                                <input
+                                    id="external_password"
+                                    v-model="form.external_password"
+                                    type="password"
+                                    :class="[
+                                        inputClass,
+                                        form.errors.external_password && inputErrorClass,
+                                    ]"
+                                    autocomplete="new-password"
+                                />
+                                <p
+                                    v-if="form.errors.external_password"
+                                    class="mt-1 text-sm text-red-600"
+                                >
+                                    {{ form.errors.external_password }}
+                                </p>
+                            </div>
+                        </div>
                     </div>
 
                     <div>

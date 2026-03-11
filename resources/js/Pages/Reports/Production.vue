@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import DashboardLayout from "@/Layouts/DashboardLayout.vue";
 import PageHeader from "@/Components/PageHeader.vue";
 import { route } from "@/route";
@@ -13,11 +13,23 @@ const props = defineProps({
     users: { type: Array, default: () => [] },
 });
 
+const PRODUCTION_HINT_STORAGE_KEY = "dashboard:production-report-hint-dismissed";
+
 const breadcrumbs = [
     { label: "Tableau de bord", href: "/dashboard" },
     { label: "Rapports", href: "/reports/production" },
     { label: "Production contrats" },
 ];
+
+onMounted(() => {
+    if (typeof window !== "undefined") {
+        try {
+            window.localStorage.setItem(PRODUCTION_HINT_STORAGE_KEY, "1");
+        } catch (_) {
+            // ignore
+        }
+    }
+});
 
 function formatXOF(value) {
     if (value == null) return "—";
