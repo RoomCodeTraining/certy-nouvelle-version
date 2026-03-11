@@ -23,11 +23,15 @@ class StatisticsController extends Controller
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        // Montants : exclure brouillons (en attente) et annulés — uniquement validé, actif, expiré
+        // Revenus totaux = somme des primes TTC de tous les contrats validés
         $revenusTotaux = (int) Contract::accessibleBy($user)
-            ->whereIn('status', [Contract::STATUS_VALIDATED, Contract::STATUS_ACTIVE, Contract::STATUS_EXPIRED])
+            ->where('status', Contract::STATUS_VALIDATED)
             ->sum('total_amount');
-        $totalContrats = (int) Contract::accessibleBy($user)->count();
+
+        // Total des contrats = uniquement contrats validés
+        $totalContrats = (int) Contract::accessibleBy($user)
+            ->where('status', Contract::STATUS_VALIDATED)
+            ->count();
         $clients = (int) Client::accessibleBy($user)->count();
         $vehicules = (int) Vehicle::accessibleBy($user)->count();
 
@@ -58,7 +62,10 @@ class StatisticsController extends Controller
             $contratsInMonth = $contratsByMonth->get($mois) ?? collect();
             $contratsData[] = $contratsInMonth->count();
             $clientsData[] = ($clientsByMonth->get($mois) ?? collect())->count();
-            $revenusData[] = (int) $contratsInMonth->whereIn('status', [Contract::STATUS_VALIDATED, Contract::STATUS_ACTIVE, Contract::STATUS_EXPIRED])->sum('total_amount');
+            // Revenus mensuels = somme des primes TTC des contrats validés du mois
+            $revenusData[] = (int) $contratsInMonth
+                ->where('status', Contract::STATUS_VALIDATED)
+                ->sum('total_amount');
         }
 
         return response()->json([

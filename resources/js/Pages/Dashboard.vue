@@ -1,15 +1,17 @@
 <script setup>
-import { ref, computed, defineAsyncComponent, onMounted } from 'vue';
-import { Link, usePage } from '@inertiajs/vue3';
-import DashboardLayout from '@/Layouts/DashboardLayout.vue';
-import PageHeader from '@/Components/PageHeader.vue';
-const DashboardCharts = defineAsyncComponent(() => import('@/Components/DashboardCharts.vue'));
-import SkeletonKpi from '@/Components/SkeletonKpi.vue';
-import ChartSkeleton from '@/Components/ChartSkeleton.vue';
-import EmptyState from '@/Components/EmptyState.vue';
-import { useStatistics } from '@/Composables/useStatistics';
-import { formatDate } from '@/utils/formatDate';
-import { route } from '@/route';
+import { ref, computed, defineAsyncComponent, onMounted } from "vue";
+import { Link, usePage } from "@inertiajs/vue3";
+import DashboardLayout from "@/Layouts/DashboardLayout.vue";
+import PageHeader from "@/Components/PageHeader.vue";
+const DashboardCharts = defineAsyncComponent(
+    () => import("@/Components/DashboardCharts.vue"),
+);
+import SkeletonKpi from "@/Components/SkeletonKpi.vue";
+import ChartSkeleton from "@/Components/ChartSkeleton.vue";
+import EmptyState from "@/Components/EmptyState.vue";
+import { useStatistics } from "@/Composables/useStatistics";
+import { formatDate } from "@/utils/formatDate";
+import { route } from "@/route";
 
 const props = defineProps({
     recentContracts: { type: Array, default: () => [] },
@@ -18,9 +20,9 @@ const props = defineProps({
 
 const page = usePage();
 
-const breadcrumbs = [{ label: 'Tableau de bord' }];
+const breadcrumbs = [{ label: "Tableau de bord" }];
 
-const viewMode = ref('ensemble'); // 'ensemble' | 'detaillé'
+const viewMode = ref("ensemble"); // 'ensemble' | 'detaillé'
 
 const {
     revenusTotaux,
@@ -36,40 +38,48 @@ const {
 } = useStatistics();
 
 function formatXOF(value) {
-    return new Intl.NumberFormat('fr-FR', {
-        style: 'decimal',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(value) + ' F CFA';
+    return (
+        new Intl.NumberFormat("fr-FR", {
+            style: "decimal",
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(value) + " F CFA"
+    );
 }
 
 const statusLabels = {
-    draft: 'En attente',
-    validated: 'Validé',
-    active: 'Actif',
-    cancelled: 'Annulé',
-    expired: 'Expiré',
+    draft: "En attente",
+    validated: "Validé",
+    active: "Actif",
+    cancelled: "Annulé",
+    expired: "Expiré",
 };
 function statusLabel(status) {
-    return status && statusLabels[status] ? statusLabels[status] : status ?? '—';
+    return status && statusLabels[status]
+        ? statusLabels[status]
+        : (status ?? "—");
 }
 function statusBadgeClass(status) {
-    const s = String(status ?? '').toLowerCase();
-    if (['active', 'validated'].includes(s)) return 'bg-emerald-100 text-emerald-800';
-    if (['cancelled', 'expired'].includes(s)) return 'bg-red-100 text-red-800';
-    return 'bg-amber-100 text-amber-800';
+    const s = String(status ?? "").toLowerCase();
+    if (["active", "validated"].includes(s))
+        return "bg-emerald-100 text-emerald-800";
+    if (["cancelled", "expired"].includes(s)) return "bg-red-100 text-red-800";
+    return "bg-amber-100 text-amber-800";
 }
 
 const isRoot = computed(() => page.props.auth?.user?.is_root ?? false);
 
-const PRODUCTION_HINT_STORAGE_KEY = 'dashboard:production-report-hint-dismissed';
+const PRODUCTION_HINT_STORAGE_KEY =
+    "dashboard:production-report-hint-dismissed";
 const isProductionHintDismissed = ref(false);
 
 onMounted(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
         try {
-            const stored = window.localStorage.getItem(PRODUCTION_HINT_STORAGE_KEY);
-            isProductionHintDismissed.value = stored === '1';
+            const stored = window.localStorage.getItem(
+                PRODUCTION_HINT_STORAGE_KEY,
+            );
+            isProductionHintDismissed.value = stored === "1";
         } catch (_) {
             isProductionHintDismissed.value = false;
         }
@@ -77,14 +87,17 @@ onMounted(() => {
 });
 
 const showProductionHint = computed(
-    () => isRoot.value && props.showProductionExportHint && !isProductionHintDismissed.value,
+    () =>
+        isRoot.value &&
+        props.showProductionExportHint &&
+        !isProductionHintDismissed.value,
 );
 
 function dismissProductionHint() {
     isProductionHintDismissed.value = true;
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
         try {
-            window.localStorage.setItem(PRODUCTION_HINT_STORAGE_KEY, '1');
+            window.localStorage.setItem(PRODUCTION_HINT_STORAGE_KEY, "1");
         } catch (_) {
             // ignore
         }
@@ -107,7 +120,7 @@ function dismissProductionHint() {
                         'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
                         viewMode === 'ensemble'
                             ? 'border-slate-900 text-slate-900'
-                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300',
                     ]"
                     @click="viewMode = 'ensemble'"
                 >
@@ -119,7 +132,7 @@ function dismissProductionHint() {
                         'px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
                         viewMode === 'detaillé'
                             ? 'border-slate-900 text-slate-900'
-                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300',
                     ]"
                     @click="viewMode = 'detaillé'"
                 >
@@ -128,7 +141,10 @@ function dismissProductionHint() {
             </div>
 
             <!-- Message d'erreur -->
-            <div v-if="error" class="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 p-3 sm:p-4 mb-4 sm:mb-3 text-sm">
+            <div
+                v-if="error"
+                class="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 p-3 sm:p-4 mb-4 sm:mb-3 text-sm"
+            >
                 {{ error }}
             </div>
 
@@ -142,7 +158,12 @@ function dismissProductionHint() {
                         class="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100 text-sky-600 shrink-0"
                         aria-hidden="true"
                     >
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <svg
+                            class="w-4 h-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                        >
                             <path
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
@@ -156,8 +177,10 @@ function dismissProductionHint() {
                             Nouveau rapport de production contrats
                         </p>
                         <p class="text-xs sm:text-sm text-sky-800/90">
-                            Consultez, exportez en Excel et analysez la production de contrats par utilisateur, type de véhicule
-                            et réductions appliquées (détail par contrat compris).
+                            Consultez, exportez en Excel et analysez la
+                            production de contrats par utilisateur, type de
+                            véhicule et réductions appliquées (détail par
+                            contrat compris).
                         </p>
                     </div>
                 </div>
@@ -179,7 +202,10 @@ function dismissProductionHint() {
             </div>
 
             <!-- KPIs (Vue ensemble uniquement) -->
-            <div v-if="viewMode === 'ensemble'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+            <div
+                v-if="viewMode === 'ensemble'"
+                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6"
+            >
                 <template v-if="loading">
                     <SkeletonKpi label="Revenus totaux générés" />
                     <SkeletonKpi label="Total des contrats" />
@@ -187,21 +213,45 @@ function dismissProductionHint() {
                     <SkeletonKpi label="Total des véhicules" />
                 </template>
                 <template v-else>
-                    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                        <p class="text-sm text-slate-500 mb-0.5">Revenus totaux générés</p>
-                        <p class="text-xl font-semibold text-slate-900">{{ formatXOF(revenusTotaux) }}</p>
+                    <div
+                        class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
+                    >
+                        <p class="text-sm text-slate-500 mb-0.5">
+                            Revenus totaux générés
+                        </p>
+                        <p class="text-xl font-semibold text-slate-900 tabular-nums whitespace-nowrap">
+                            {{ formatXOF(revenusTotaux) }}
+                        </p>
                     </div>
-                    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                        <p class="text-sm text-slate-500 mb-0.5">Total des contrats</p>
-                        <p class="text-xl font-semibold text-slate-900">{{ contratsActifs }}</p>
+                    <div
+                        class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
+                    >
+                        <p class="text-sm text-slate-500 mb-0.5">
+                            Total des contrats
+                        </p>
+                        <p class="text-xl font-semibold text-slate-900">
+                            {{ contratsActifs }}
+                        </p>
                     </div>
-                    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                        <p class="text-sm text-slate-500 mb-0.5">Total des clients</p>
-                        <p class="text-xl font-semibold text-slate-900">{{ clients }}</p>
+                    <div
+                        class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
+                    >
+                        <p class="text-sm text-slate-500 mb-0.5">
+                            Total des clients
+                        </p>
+                        <p class="text-xl font-semibold text-slate-900">
+                            {{ clients }}
+                        </p>
                     </div>
-                    <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                        <p class="text-sm text-slate-500 mb-0.5">Total des véhicules</p>
-                        <p class="text-xl font-semibold text-slate-900">{{ vehicules }}</p>
+                    <div
+                        class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
+                    >
+                        <p class="text-sm text-slate-500 mb-0.5">
+                            Total des véhicules
+                        </p>
+                        <p class="text-xl font-semibold text-slate-900">
+                            {{ vehicules }}
+                        </p>
                     </div>
                 </template>
             </div>
@@ -220,20 +270,41 @@ function dismissProductionHint() {
             </div>
 
             <!-- Actions rapides (Vue ensemble uniquement) -->
-            <div v-if="viewMode === 'ensemble'" class="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-6 md:p-8 mb-4 sm:mb-6">
+            <div
+                v-if="viewMode === 'ensemble'"
+                class="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-6 md:p-8 mb-4 sm:mb-6"
+            >
                 <div class="flex flex-col gap-4">
                     <div>
-                        <h2 class="text-base sm:text-lg font-semibold text-slate-900">Actions rapides</h2>
-                        <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Accédez rapidement aux fonctionnalités principales</p>
+                        <h2
+                            class="text-base sm:text-lg font-semibold text-slate-900"
+                        >
+                            Actions rapides
+                        </h2>
+                        <p class="text-xs sm:text-sm text-slate-500 mt-0.5">
+                            Accédez rapidement aux fonctionnalités principales
+                        </p>
                     </div>
                     <!-- Mobile : boutons en colonne, pleine largeur, zone de touch 44px -->
-                    <div class="grid grid-cols-1 sm:flex sm:flex-wrap sm:gap-3 gap-2">
+                    <div
+                        class="grid grid-cols-1 sm:flex sm:flex-wrap sm:gap-3 gap-2"
+                    >
                         <Link
                             :href="route('contracts.create')"
                             class="inline-flex items-center justify-center gap-2.5 px-4 py-3.5 sm:py-2.5 bg-sky-600 text-white text-sm font-medium rounded-xl sm:rounded-lg hover:bg-sky-700 active:bg-sky-800 transition-colors min-h-[44px] sm:min-h-0"
                         >
-                            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            <svg
+                                class="w-5 h-5 shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                />
                             </svg>
                             Nouveau contrat
                         </Link>
@@ -241,8 +312,18 @@ function dismissProductionHint() {
                             :href="route('clients.create')"
                             class="inline-flex items-center justify-center gap-2.5 px-4 py-3.5 sm:py-2.5 border border-slate-200 bg-white text-slate-700 text-sm font-medium rounded-xl sm:rounded-lg hover:bg-slate-50 active:bg-slate-100 transition-colors min-h-[44px] sm:min-h-0"
                         >
-                            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            <svg
+                                class="w-5 h-5 shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                />
                             </svg>
                             Nouveau client
                         </Link>
@@ -250,8 +331,18 @@ function dismissProductionHint() {
                             :href="route('vehicles.create')"
                             class="inline-flex items-center justify-center gap-2.5 px-4 py-3.5 sm:py-2.5 border border-slate-200 bg-white text-slate-700 text-sm font-medium rounded-xl sm:rounded-lg hover:bg-slate-50 active:bg-slate-100 transition-colors min-h-[44px] sm:min-h-0"
                         >
-                            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            <svg
+                                class="w-5 h-5 shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                                />
                             </svg>
                             Nouveau véhicule
                         </Link>
@@ -260,10 +351,19 @@ function dismissProductionHint() {
             </div>
 
             <!-- Contrats récents (Vue ensemble uniquement) -->
-            <div v-if="viewMode === 'ensemble'" class="rounded-xl border border-slate-200 bg-white overflow-hidden mb-4 sm:mb-6">
+            <div
+                v-if="viewMode === 'ensemble'"
+                class="rounded-xl border border-slate-200 bg-white overflow-hidden mb-4 sm:mb-6"
+            >
                 <div class="p-3 sm:p-4 md:p-6 border-b border-slate-200">
-                    <h2 class="text-base sm:text-lg font-semibold text-slate-900">Contrats récents</h2>
-                    <p class="text-xs sm:text-sm text-slate-500 mt-0.5">15 derniers contrats</p>
+                    <h2
+                        class="text-base sm:text-lg font-semibold text-slate-900"
+                    >
+                        Contrats récents
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-500 mt-0.5">
+                        15 derniers contrats
+                    </p>
                 </div>
 
                 <!-- Mobile : liste en cartes -->
@@ -276,19 +376,44 @@ function dismissProductionHint() {
                     >
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0 flex-1">
-                                <p class="font-mono text-sm font-medium text-slate-900">{{ row.reference ?? '—' }}</p>
-                                <p class="text-xs text-slate-500 mt-0.5">{{ formatDate(row.created_at) }}</p>
-                                <p class="text-sm text-slate-700 mt-1 truncate">{{ row.client }}</p>
-                                <p class="text-xs text-slate-500 mt-0.5">{{ row.vehicle }}</p>
+                                <p
+                                    class="font-mono text-sm font-medium text-slate-900"
+                                >
+                                    {{ row.reference ?? "—" }}
+                                </p>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    {{ formatDate(row.created_at) }}
+                                </p>
+                                <p class="text-sm text-slate-700 mt-1 truncate">
+                                    {{ row.client }}
+                                </p>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    {{ row.vehicle }}
+                                </p>
                             </div>
-                            <div class="flex flex-col items-end gap-1.5 shrink-0">
+                            <div
+                                class="flex flex-col items-end gap-1.5 shrink-0 text-right tabular-nums"
+                            >
                                 <span
-                                    :class="['inline-flex px-2.5 py-1 rounded-full text-xs font-medium', statusBadgeClass(row.status)]"
+                                    :class="[
+                                        'inline-flex px-2.5 py-1 rounded-full text-xs font-medium',
+                                        statusBadgeClass(row.status),
+                                    ]"
                                 >
                                     {{ statusLabel(row.status) }}
                                 </span>
+                                <p
+                                    v-if="row.prime_nette != null"
+                                    class="text-xs text-slate-600"
+                                >
+                                    Nette : {{ formatXOF(row.prime_nette) }}
+                                </p>
                                 <p class="text-sm font-medium text-slate-900">
-                                    {{ row.total_amount != null ? formatXOF(row.total_amount) : '—' }}
+                                    {{
+                                        row.prime_ttc != null
+                                            ? formatXOF(row.prime_ttc) + " (TTC)"
+                                            : "—"
+                                    }}
                                 </p>
                             </div>
                         </div>
@@ -308,13 +433,30 @@ function dismissProductionHint() {
                     <table class="w-full text-sm">
                         <thead class="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600">Date</th>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600">Référence</th>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600">Client</th>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600">Véhicule</th>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600">Montant</th>
-                                <th class="text-left py-3 px-4 font-medium text-slate-600">Statut</th>
-                                <th class="text-right py-3 px-4 font-medium text-slate-600">Actions</th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600">
+                                    Date
+                                </th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600">
+                                    Référence
+                                </th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600">
+                                    Client
+                                </th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600">
+                                    Véhicule
+                                </th>
+                                <th class="text-right py-3 px-4 font-medium text-slate-600">
+                                    Prime nette
+                                </th>
+                                <th class="text-right py-3 px-4 font-medium text-slate-600">
+                                    Prime TTC
+                                </th>
+                                <th class="text-left py-3 px-4 font-medium text-slate-600">
+                                    Statut
+                                </th>
+                                <th class="text-right py-3 px-4 font-medium text-slate-600">
+                                    Actions
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -323,16 +465,38 @@ function dismissProductionHint() {
                                 :key="row.id"
                                 class="border-b border-slate-100 hover:bg-slate-50/50"
                             >
-                                <td class="py-3 px-4 text-slate-700">{{ formatDate(row.created_at) }}</td>
-                                <td class="py-3 px-4 font-mono text-slate-900">{{ row.reference ?? '—' }}</td>
-                                <td class="py-3 px-4 text-slate-900">{{ row.client }}</td>
-                                <td class="py-3 px-4 text-slate-700">{{ row.vehicle }}</td>
+                                <td class="py-3 px-4 text-slate-700">
+                                    {{ formatDate(row.created_at) }}
+                                </td>
+                                <td class="py-3 px-4 font-mono text-slate-900">
+                                    {{ row.reference ?? "—" }}
+                                </td>
                                 <td class="py-3 px-4 text-slate-900">
-                                    {{ row.total_amount != null ? formatXOF(row.total_amount) : '—' }}
+                                    {{ row.client }}
+                                </td>
+                                <td class="py-3 px-4 text-slate-700">
+                                    {{ row.vehicle }}
+                                </td>
+                                <td class="py-3 px-4 text-right tabular-nums text-slate-700">
+                                    {{
+                                        row.prime_nette != null
+                                            ? formatXOF(row.prime_nette)
+                                            : "—"
+                                    }}
+                                </td>
+                                <td class="py-3 px-4 text-right tabular-nums text-slate-900 font-medium">
+                                    {{
+                                        row.prime_ttc != null
+                                            ? formatXOF(row.prime_ttc)
+                                            : "—"
+                                    }}
                                 </td>
                                 <td class="py-3 px-4">
                                     <span
-                                        :class="['inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', statusBadgeClass(row.status)]"
+                                        :class="[
+                                            'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium',
+                                            statusBadgeClass(row.status),
+                                        ]"
                                     >
                                         {{ statusLabel(row.status) }}
                                     </span>
@@ -343,9 +507,24 @@ function dismissProductionHint() {
                                         class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                                         title="Voir le contrat"
                                     >
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        <svg
+                                            class="w-5 h-5"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="2"
+                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                            />
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="2"
+                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                            />
                                         </svg>
                                     </Link>
                                 </td>
