@@ -108,13 +108,17 @@ class ContractPricingService
             return [];
         }
 
+        $primeNette = $row->rc_amount + $row->defence_appeal_amount + $row->person_transport_amount
+            + (int) ($contract->optional_guarantees_amount ?? 0);
+        $taxesAmount = (int) round($primeNette * 0.145);
+
         return [
             'base_amount' => $row->base_amount,
             'rc_amount' => $row->rc_amount,
             'defence_appeal_amount' => $row->defence_appeal_amount,
             'person_transport_amount' => $row->person_transport_amount,
             'accessory_amount' => $row->accessory_amount,
-            'taxes_amount' => $row->taxes_amount,
+            'taxes_amount' => $taxesAmount,
             'cedeao_amount' => $row->cedeao_amount,
             'fga_amount' => $row->fga_amount,
         ];
@@ -175,13 +179,17 @@ class ContractPricingService
             return [];
         }
 
+        $primeNette = $row->rc_amount + $row->defence_appeal_amount + $row->person_transport_amount
+            + (int) ($contract->optional_guarantees_amount ?? 0);
+        $taxesAmount = (int) round($primeNette * 0.145);
+
         return [
             'base_amount' => $row->base_amount,
             'rc_amount' => $row->rc_amount,
             'defence_appeal_amount' => $row->defence_appeal_amount,
             'person_transport_amount' => $row->person_transport_amount,
             'accessory_amount' => $row->accessory_amount,
-            'taxes_amount' => $row->taxes_amount,
+            'taxes_amount' => $taxesAmount,
             'cedeao_amount' => $row->cedeao_amount,
             'fga_amount' => $row->fga_amount,
         ];
@@ -230,13 +238,17 @@ class ContractPricingService
             return [];
         }
 
+        $primeNette = $row->rc_amount + $row->defence_appeal_amount + $row->person_transport_amount
+            + (int) ($contract->optional_guarantees_amount ?? 0);
+        $taxesAmount = (int) round($primeNette * 0.145);
+
         return [
             'base_amount' => $row->base_amount,
             'rc_amount' => $row->rc_amount,
             'defence_appeal_amount' => $row->defence_appeal_amount,
             'person_transport_amount' => $row->person_transport_amount,
             'accessory_amount' => $row->accessory_amount,
-            'taxes_amount' => $row->taxes_amount,
+            'taxes_amount' => $taxesAmount,
             'cedeao_amount' => $row->cedeao_amount,
             'fga_amount' => $row->fga_amount,
         ];
@@ -279,13 +291,17 @@ class ContractPricingService
             return [];
         }
 
+        $primeNette = $row->rc_amount + $row->defence_appeal_amount + $row->person_transport_amount
+            + (int) ($contract->optional_guarantees_amount ?? 0);
+        $taxesAmount = (int) round($primeNette * 0.145);
+
         return [
             'base_amount' => $row->base_amount,
             'rc_amount' => $row->rc_amount,
             'defence_appeal_amount' => $row->defence_appeal_amount,
             'person_transport_amount' => $row->person_transport_amount,
             'accessory_amount' => $row->accessory_amount,
-            'taxes_amount' => $row->taxes_amount,
+            'taxes_amount' => $taxesAmount,
             'cedeao_amount' => $row->cedeao_amount,
             'fga_amount' => $row->fga_amount,
         ];

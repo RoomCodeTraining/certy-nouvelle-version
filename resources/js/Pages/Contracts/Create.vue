@@ -658,11 +658,16 @@ const montantApresReductionCreate = computed(() =>
     Math.max(0, primeNetteCreate.value - reductionOnPrimeNette.value),
 );
 
+/** Taxe = Prime nette × 14,5 % */
+const taxesAmountCreate = computed(() =>
+    Math.round(primeNetteCreate.value * 0.145),
+);
+
 /** Prime TTC = Montant après réduction + Accessoire + Taxes + FGA + CEDEAO (comme le PDF) */
 const displayTotal = computed(() =>
     montantApresReductionCreate.value +
     (recap.value.amounts?.accessory_amount ?? recap.value.accessory_amount ?? 0) +
-    (recap.value.amounts?.taxes_amount ?? 0) +
+    taxesAmountCreate.value +
     (recap.value.amounts?.fga_amount ?? 0) +
     (recap.value.amounts?.cedeao_amount ?? 0),
 );
@@ -1370,12 +1375,12 @@ function submitDraft() {
                                 </dd>
                             </div>
                             <div
-                                v-if="(recap.amounts?.taxes_amount ?? 0) > 0"
+                                v-if="taxesAmountCreate > 0"
                                 class="flex justify-between gap-2"
                             >
                                 <dt class="text-slate-600">Taxes</dt>
                                 <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                    {{ Number(recap.amounts.taxes_amount).toLocaleString("fr-FR") }} FCFA
+                                    {{ taxesAmountCreate.toLocaleString("fr-FR") }} FCFA
                                 </dd>
                             </div>
                             <div

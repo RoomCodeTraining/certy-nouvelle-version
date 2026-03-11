@@ -104,11 +104,16 @@ const montantApresReduction = computed(() =>
     Math.max(0, primeNette.value - montantReduction.value),
 );
 
+/** Taxe = Prime nette × 14,5 % */
+const taxesAmount = computed(() =>
+    Math.round(primeNette.value * 0.145),
+);
+
 const totalDisplay = computed(
     () =>
         montantApresReduction.value +
         (props.contract?.accessory_amount ?? 0) +
-        (props.contract?.taxes_amount ?? 0) +
+        taxesAmount.value +
         (props.contract?.fga_amount ?? 0) +
         (props.contract?.cedeao_amount ?? 0),
 );
@@ -1036,11 +1041,7 @@ function markAttestationIssued(contract) {
                                     <dd
                                         class="font-medium text-slate-900 tabular-nums text-right"
                                     >
-                                        {{
-                                            Number(
-                                                contract.taxes_amount ?? 0,
-                                            ).toLocaleString("fr-FR")
-                                        }}
+                                        {{ taxesAmount.toLocaleString("fr-FR") }}
                                     </dd>
                                 </div>
                                 <div class="flex justify-between gap-2">

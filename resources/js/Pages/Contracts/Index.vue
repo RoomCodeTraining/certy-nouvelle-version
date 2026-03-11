@@ -45,7 +45,7 @@ function primeNette(row) {
     return v > 0 ? v : null;
 }
 
-/** Prime TTC = montant après réduction + accessory + taxes + fga + cedao (identique à la vue détails) */
+/** Prime TTC = montant après réduction + accessory + taxes (14,5 % prime nette) + fga + cedao (identique à la vue détails) */
 function primeTtc(row) {
     const pn = primeNette(row) ?? 0;
     const pctBns = Number(row.reduction_bns ?? 0);
@@ -57,9 +57,10 @@ function primeTtc(row) {
     const profAmt = pctProf > 0 ? Math.round(pn * pctProf / 100) : amtProf;
     const montantReduction = bnsAmt + commAmt + profAmt;
     const montantApresReduction = Math.max(0, pn - montantReduction);
+    const taxesAmount = Math.round(pn * 0.145);
     return montantApresReduction
         + (row.accessory_amount ?? 0)
-        + (row.taxes_amount ?? 0)
+        + taxesAmount
         + (row.fga_amount ?? 0)
         + (row.cedeao_amount ?? 0);
 }

@@ -358,9 +358,10 @@ function contractTypeLabel($type) {
                         }
                         $montantReduction = $bnsAmount + $commAmount + $profAmount;
                         $montantApresReduction = $primeNette - $montantReduction;
+                        $taxesAmount = (int) round($primeNette * 0.145);
                         $primeTtc = $montantApresReduction
                             + ($contract->accessory_amount ?? 0)
-                            + ($contract->taxes_amount ?? 0)
+                            + $taxesAmount
                             + ($contract->fga_amount ?? 0)
                             + ($contract->cedeao_amount ?? 0);
                     @endphp
@@ -397,7 +398,7 @@ function contractTypeLabel($type) {
                         </tr>
                         <tr>
                             <th>Taxes</th>
-                            <td class="text-right">{{ number_format($contract->taxes_amount ?? 0, 0, ',', ' ') }}</td>
+                            <td class="text-right">{{ number_format($taxesAmount ?? 0, 0, ',', ' ') }}</td>
                         </tr>
                         <tr>
                             <th>Taxe FGA</th>
