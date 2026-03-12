@@ -102,6 +102,9 @@ function onLogoError() {
 }
 
 const isRoot = computed(() => !!auth?.user?.is_root);
+const canManageUtilisateurs = computed(
+    () => !!auth?.user?.can_manage_utilisateurs,
+);
 
 const certyIa = computed(() => page.props.certy_ia ?? null);
 
@@ -164,12 +167,14 @@ const digitalItems = computed(() => {
                 icon: "building",
             },
             { href: "/digital/stock", label: "Stock", icon: "info" },
-            {
-                href: "/digital/utilisateurs",
-                label: "Utilisateurs",
-                icon: "users",
-            },
         );
+    }
+    if (canManageUtilisateurs.value) {
+        items.push({
+            href: "/digital/utilisateurs",
+            label: "Utilisateurs",
+            icon: "users",
+        });
     }
     return items;
 });

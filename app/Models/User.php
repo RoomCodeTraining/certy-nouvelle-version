@@ -50,6 +50,21 @@ class User extends Authenticatable
             || str_contains($name, 'main_office_admin');
     }
 
+    /**
+     * office_admin = Administrateur Représentation (ASACI).
+     * Peut gérer la liste des utilisateurs (créer, modifier, activer/désactiver).
+     */
+    public function isOfficeAdmin(): bool
+    {
+        $code = is_string($this->user_role_code) ? strtolower(trim($this->user_role_code)) : '';
+        $name = is_string($this->user_role_name) ? strtolower(trim($this->user_role_name)) : '';
+
+        return $code === 'office_admin'
+            || $name === 'office_admin'
+            || str_contains($code, 'office_admin')
+            || str_contains($name, 'office_admin');
+    }
+
     public function organizations(): BelongsToMany
     {
         return $this->belongsToMany(Organization::class, 'organization_user')

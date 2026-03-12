@@ -136,6 +136,9 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
         Route::put('/digital/bureaux/{id}', [DigitalController::class, 'updateBureau'])->name('digital.bureaux.update');
         Route::post('/digital/bureaux/{id}/enable', [DigitalController::class, 'enableBureau'])->name('digital.bureaux.enable');
         Route::post('/digital/bureaux/{id}/disable', [DigitalController::class, 'disableBureau'])->name('digital.bureaux.disable');
+    });
+    // Utilisateurs : root ou office_admin (liste, création, modification, activer/désactiver)
+    Route::middleware('can.manage.utilisateurs')->group(function () {
         Route::get('/digital/utilisateurs', [DigitalController::class, 'utilisateurs'])->name('digital.utilisateurs');
         Route::get('/digital/utilisateurs/create', [DigitalController::class, 'createUtilisateur'])->name('digital.utilisateurs.create');
         Route::post('/digital/utilisateurs', [DigitalController::class, 'storeUtilisateur'])->name('digital.utilisateurs.store');

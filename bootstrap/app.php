@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
             'ensure.organization' => \App\Http\Middleware\EnsureUserHasOrganization::class,
             'root' => \App\Http\Middleware\EnsureUserIsRoot::class,
+            'can.manage.utilisateurs' => \App\Http\Middleware\EnsureUserCanManageUtilisateurs::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
