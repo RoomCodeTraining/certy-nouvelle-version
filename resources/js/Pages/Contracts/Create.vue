@@ -658,9 +658,9 @@ const montantApresReductionCreate = computed(() =>
     Math.max(0, primeNetteCreate.value - reductionOnPrimeNette.value),
 );
 
-/** Taxe = Prime nette × 14,5 % */
+/** Taxe = 14,5 % du montant après réduction */
 const taxesAmountCreate = computed(() =>
-    Math.round(primeNetteCreate.value * 0.145),
+    Math.round(montantApresReductionCreate.value * 0.145),
 );
 
 /** Prime TTC = Montant après réduction + Accessoire + Taxes + FGA + CEDEAO (comme le PDF) */

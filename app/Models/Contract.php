@@ -282,9 +282,11 @@ class Contract extends Model
             + (int) ($this->optional_guarantees_amount ?? 0);
         $totalReduction = $this->getTotalReductionAmountAttribute();
         $montantApresReduction = max(0, $primeNette - $totalReduction);
+        $taxesAmount = (int) round($montantApresReduction * 0.145);
+
         return $montantApresReduction
             + (int) ($this->accessory_amount ?? 0)
-            + (int) ($this->taxes_amount ?? 0)
+            + $taxesAmount
             + (int) ($this->fga_amount ?? 0)
             + (int) ($this->cedeao_amount ?? 0);
     }
@@ -319,9 +321,11 @@ class Contract extends Model
         $totalReduction = $reductionBnsAmount + $reductionOnCommissionAmount + $reductionOnProfAmount + $reductionOther;
         $montantApresReduction = max(0, $primeNette - $totalReduction);
 
+        $taxesAmount = (int) round($montantApresReduction * 0.145);
+
         $totalAmount = $montantApresReduction
             + (int) ($this->accessory_amount ?? 0)
-            + (int) ($this->taxes_amount ?? 0)
+            + $taxesAmount
             + (int) ($this->fga_amount ?? 0)
             + (int) ($this->cedeao_amount ?? 0);
 
@@ -331,6 +335,7 @@ class Contract extends Model
             'reduction_on_commission_amount' => $reductionOnCommissionAmount,
             'reduction_on_profession_amount_stored' => $reductionOnProfAmount,
             'total_reduction_amount' => $totalReduction,
+            'taxes_amount' => $taxesAmount,
             'total_amount' => $totalAmount,
         ]);
         $this->saveQuietly();

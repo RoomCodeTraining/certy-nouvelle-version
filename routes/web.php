@@ -79,6 +79,7 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     Route::get('/contracts/{contract}/renew', [ContractController::class, 'renew'])->name('contracts.renew');
     Route::get('/contracts/{contract}/edit', [ContractController::class, 'edit'])->name('contracts.edit');
     Route::put('/contracts/{contract}', [ContractController::class, 'update'])->name('contracts.update');
+    Route::put('/contracts/{contract}/reductions', [ContractController::class, 'updateReductions'])->name('contracts.update-reductions');
     Route::post('/contracts/{contract}/validate', [ContractController::class, 'validate'])->name('contracts.validate');
     Route::post('/contracts/{contract}/cancel', [ContractController::class, 'cancel'])->name('contracts.cancel');
     Route::post('/contracts/{contract}/mark-attestation-issued', [ContractController::class, 'markAttestationIssued'])->name('contracts.mark-attestation-issued');

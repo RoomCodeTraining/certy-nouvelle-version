@@ -358,7 +358,7 @@ function contractTypeLabel($type) {
                         }
                         $montantReduction = $bnsAmount + $commAmount + $profAmount;
                         $montantApresReduction = $primeNette - $montantReduction;
-                        $taxesAmount = (int) round($primeNette * 0.145);
+                        $taxesAmount = (int) round($montantApresReduction * 0.145);
                         $primeTtc = $montantApresReduction
                             + ($contract->accessory_amount ?? 0)
                             + $taxesAmount

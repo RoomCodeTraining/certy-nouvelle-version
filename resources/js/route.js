@@ -30,6 +30,7 @@ export function route(name, ...params) {
         'contracts.renew': (id) => `/contracts/${id}/renew`,
         'contracts.edit': (id) => `/contracts/${id}/edit`,
         'contracts.update': (id) => `/contracts/${id}`,
+        'contracts.update-reductions': (id) => `/contracts/${id}/reductions`,
         'contracts.validate': (id) => `/contracts/${id}/validate`,
         'contracts.cancel': (id) => `/contracts/${id}/cancel`,
         'contracts.mark-attestation-issued': (id) => `/contracts/${id}/mark-attestation-issued`,

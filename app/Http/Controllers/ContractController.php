@@ -6,6 +6,7 @@ use App\Actions\StoreContractAction;
 use App\Actions\UpdateContractAction;
 use App\Http\Requests\ContractPreviewRequest;
 use App\Http\Requests\StoreContractRequest;
+use App\Http\Requests\UpdateContractReductionsRequest;
 use App\Http\Requests\UpdateContractRequest;
 use App\Models\CirculationZone;
 use App\Models\Client;
@@ -641,6 +642,30 @@ class ContractController extends Controller
         $this->authorizeClientVehicle($request, $request->validated('client_id'), $request->validated('vehicle_id'));
         $action->execute($contract, $request->validated(), $request->user());
         return redirect()->route('contracts.show', $contract)->with('success', 'Contrat mis à jour.');
+    }
+
+    /**
+     * Mise à jour des réductions sur un contrat validé/actif (réservé aux utilisateurs root).
+     */
+    public function updateReductions(UpdateContractReductionsRequest $request, Contract $contract, UpdateContractAction $action): RedirectResponse
+    {
+        $this->authorizeContract($request, $contract);
+
+        if (! $request->user() || ! $request->user()->isRoot()) {
+            abort(403);
+        }
+
+
+        $data = $request->only([
+            'reduction_bns',
+            'reduction_on_commission',
+            'reduction_on_profession_percent',
+        ]);
+
+        $action->execute($contract, $data, $request->user());
+
+        return redirect()->route('contracts.show', $contract)
+            ->with('success', 'Réductions mises à jour.');
     }
 
     /**

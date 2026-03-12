@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from "vue";
-import { Link, router } from "@inertiajs/vue3";
+import { Link, router, usePage } from "@inertiajs/vue3";
 import DashboardLayout from "@/Layouts/DashboardLayout.vue";
 import PageHeader from "@/Components/PageHeader.vue";
 import { route } from "@/route";
@@ -104,9 +104,9 @@ const montantApresReduction = computed(() =>
     Math.max(0, primeNette.value - montantReduction.value),
 );
 
-/** Taxe = Prime nette × 14,5 % */
+/** Taxe = 14,5 % du montant après réduction */
 const taxesAmount = computed(() =>
-    Math.round(primeNette.value * 0.145),
+    Math.round(montantApresReduction.value * 0.145),
 );
 
 const totalDisplay = computed(
@@ -155,6 +155,45 @@ const isActive = computed(() => props.contract?.status === "active");
 const isNewBusiness = computed(() => !props.contract?.parent_id);
 const parentContract = computed(() => props.contract?.parent ?? null);
 const childContracts = computed(() => props.contract?.children ?? []);
+
+const page = usePage();
+const isRoot = computed(() => page.props.auth?.user?.is_root === true);
+
+const canEditReductions = computed(
+    () =>
+        isRoot.value &&
+        ["validated", "active"].includes(props.contract?.status),
+);
+
+const reductionsForm = ref({
+    reduction_bns: props.contract?.reduction_bns ?? null,
+    reduction_on_commission: props.contract?.reduction_on_commission ?? null,
+    reduction_on_profession_percent:
+        props.contract?.reduction_on_profession_percent ?? null,
+});
+
+const updatingReductions = ref(false);
+const showReductionsForm = ref(false);
+
+function submitReductions() {
+    if (!canEditReductions.value) return;
+    updatingReductions.value = true;
+    router.put(
+        route("contracts.update-reductions", props.contract.id),
+        {
+            reduction_bns: reductionsForm.value.reduction_bns,
+            reduction_on_commission: reductionsForm.value.reduction_on_commission,
+            reduction_on_profession_percent:
+                reductionsForm.value.reduction_on_profession_percent,
+        },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                updatingReductions.value = false;
+            },
+        },
+    );
+}
 
 const { confirm: confirmDialog } = useConfirm();
 function cancel(contract) {
@@ -939,11 +978,21 @@ function markAttestationIssued(contract) {
                             </div>
 
                             <!-- Résumé financier -->
-                            <p
-                                class="text-xs font-medium text-slate-500 uppercase tracking-wide pt-2"
-                            >
-                                Résumé Financier
-                            </p>
+                            <div class="flex items-center justify-between pt-2">
+                                <p
+                                    class="text-xs font-medium text-slate-500 uppercase tracking-wide"
+                                >
+                                    Résumé Financier
+                                </p>
+                                <button
+                                    v-if="canEditReductions"
+                                    type="button"
+                                    class="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                                    @click="showReductionsForm = !showReductionsForm"
+                                >
+                                    {{ showReductionsForm ? "Fermer l'édition" : "Modifier les réductions" }}
+                                </button>
+                            </div>
                             <dl class="space-y-2 text-sm">
                                 <div class="flex justify-between gap-2">
                                     <dt class="text-slate-600">Prime nette</dt>
@@ -1023,6 +1072,66 @@ function markAttestationIssued(contract) {
                                             )
                                         }}
                                     </dd>
+                                </div>
+                                <div
+                                    v-if="canEditReductions && showReductionsForm"
+                                    class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 space-y-2"
+                                >
+                                    <p class="text-[11px] font-medium text-slate-600 uppercase">
+                                        Modifier les réductions (root uniquement)
+                                    </p>
+                                    <div class="grid grid-cols-2 gap-2 text-xs">
+                                        <label class="flex flex-col gap-1">
+                                            <span class="text-slate-600">% Réduction BNS</span>
+                                            <input
+                                                v-model.number="reductionsForm.reduction_bns"
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                class="w-full rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-slate-500 focus:ring-1 focus:ring-slate-500 focus:outline-none"
+                                            />
+                                        </label>
+                                        <label class="flex flex-col gap-1">
+                                            <span class="text-slate-600">% Réduction commission</span>
+                                            <input
+                                                v-model.number="reductionsForm.reduction_on_commission"
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                class="w-full rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-slate-500 focus:ring-1 focus:ring-slate-500 focus:outline-none"
+                                            />
+                                        </label>
+                                        <label class="flex flex-col gap-1">
+                                            <span class="text-slate-600">% Réduction profession</span>
+                                            <input
+                                                v-model.number="reductionsForm.reduction_on_profession_percent"
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                class="w-full rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-slate-500 focus:ring-1 focus:ring-slate-500 focus:outline-none"
+                                            />
+                                        </label>
+                                    </div>
+                                    <div class="flex justify-end gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            class="px-3 py-1 rounded-md border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                                            @click="showReductionsForm = false"
+                                        >
+                                            Annuler
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="px-3 py-1 rounded-md bg-slate-900 text-[11px] font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                                            :disabled="updatingReductions"
+                                            @click="submitReductions"
+                                        >
+                                            {{ updatingReductions ? "Enregistrement…" : "Enregistrer" }}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="flex justify-between gap-2">
                                     <dt class="text-slate-600">Accessoire</dt>
