@@ -267,6 +267,22 @@ class Contract extends Model
     }
 
     /**
+     * Prime nette (base pour calcul commission bordereau) = RC + DR + TP + optional - réductions + accessoire.
+     * Montant avant taxes, FGA, CEDEAO. En FCFA.
+     */
+    public function getPrimeNetteForCommissionAttribute(): ?int
+    {
+        $primeNette = (int) ($this->rc_amount ?? 0)
+            + (int) ($this->defence_appeal_amount ?? 0)
+            + (int) ($this->person_transport_amount ?? 0)
+            + (int) ($this->optional_guarantees_amount ?? 0);
+        $totalReduction = $this->getTotalReductionAmountAttribute();
+        $montantApresReduction = max(0, $primeNette - $totalReduction);
+
+        return $montantApresReduction + (int) ($this->accessory_amount ?? 0);
+    }
+
+    /**
      * Montant total final (Prime TTC) = montant_apres_reduction + accessory + taxes + fga + cedao.
      * Utilise la valeur stockée total_amount si présente, sinon calcule.
      */
