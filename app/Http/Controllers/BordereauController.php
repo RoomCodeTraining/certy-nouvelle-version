@@ -8,6 +8,7 @@ use App\Models\Contract;
 use App\Models\OrganizationCompanyConfig;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -498,7 +499,8 @@ class BordereauController extends Controller
         foreach ($allRows as $r => $rowData) {
             $excelRow = $dataStartRow + $r;
             foreach ($rowData as $col => $value) {
-                $sheet->setCellValueByColumnAndRow($col + 1, $excelRow, $value);
+                $colLetter = Coordinate::stringFromColumnIndex($col + 1);
+                $sheet->setCellValue($colLetter . $excelRow, $value);
             }
         }
 
