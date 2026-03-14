@@ -194,8 +194,9 @@ class BordereauController extends Controller
         $commissionPct = $bordereau->commission_pct !== null ? (float) $bordereau->commission_pct : null;
         $perPage = min(max((int) $request->input('per_page', 25), 10), 100);
 
-        // Période du/au = date de création des contrats (created_at). Contrats annulés exclus.
-        $contractsPaginator = Contract::accessibleBy($user)
+        // Même requête que PDF/Excel pour garantir le même nombre de contrats (organization + compagnie + période).
+        $contractsPaginator = Contract::query()
+            ->where('organization_id', $bordereau->organization_id)
             ->where('company_id', $bordereau->company_id)
             ->where('status', '!=', Contract::STATUS_CANCELLED)
             ->whereDate('created_at', '>=', $bordereau->period_start->format('Y-m-d'))
@@ -371,7 +372,8 @@ class BordereauController extends Controller
         }
         $bordereau->load(['company', 'organization:id,name']);
         $commissionPct = $bordereau->commission_pct !== null ? (float) $bordereau->commission_pct : null;
-        $contracts = Contract::accessibleBy($user)
+        // Même requête que l'export PDF pour avoir les mêmes contrats (période, compagnie, non annulés)
+        $contracts = Contract::query()
             ->where('organization_id', $bordereau->organization_id)
             ->where('company_id', $bordereau->company_id)
             ->where('status', '!=', Contract::STATUS_CANCELLED)
@@ -496,8 +498,11 @@ class BordereauController extends Controller
                 $prReverser,
             ];
         }
-        if (! empty($allRows)) {
-            $sheet->fromArray($allRows, null, 'A' . $dataStartRow);
+        foreach ($allRows as $r => $rowData) {
+            $excelRow = $dataStartRow + $r;
+            foreach ($rowData as $col => $value) {
+                $sheet->setCellValueByColumnAndRow($col + 1, $excelRow, $value);
+            }
         }
 
         $totalRow = $dataStartRow + count($allRows);
