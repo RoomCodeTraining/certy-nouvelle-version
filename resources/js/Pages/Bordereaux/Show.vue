@@ -6,6 +6,7 @@ import PageHeader from '@/Components/PageHeader.vue';
 import Paginator from '@/Components/Paginator.vue';
 import { route } from '@/route';
 import { formatDate } from '@/utils/formatDate';
+import { expiresSoon } from '@/utils/expiresSoon';
 import { useConfirm } from '@/Composables/useConfirm';
 
 const props = defineProps({
@@ -193,7 +194,7 @@ function formatXOF(value) {
                             <tr
                                 v-for="c in contractList"
                                 :key="c.id"
-                                class="hover:bg-slate-50/50"
+                                :class="['hover:bg-slate-50/50', expiresSoon(c.date_echeance, c.status) ? 'bg-amber-50/80' : '']"
                             >
                                 <td class="px-2 py-2 text-slate-700">{{ c.no }}</td>
                                 <td class="px-2 py-2 text-slate-700 font-mono">{{ c.attestation_number ?? '—' }}</td>
@@ -203,7 +204,10 @@ function formatXOF(value) {
                                 <td class="px-2 py-2 text-slate-700">{{ c.telephone_assure ?? '—' }}</td>
                                 <td class="px-2 py-2 text-slate-700 max-w-[140px] truncate" :title="c.email_assure">{{ c.email_assure ?? '—' }}</td>
                                 <td class="px-2 py-2 text-slate-700">{{ formatDate(c.date_effet) }}</td>
-                                <td class="px-2 py-2 text-slate-700">{{ formatDate(c.date_echeance) }}</td>
+                                <td class="px-2 py-2 text-slate-700">
+                                    {{ formatDate(c.date_echeance) }}
+                                    <span v-if="expiresSoon(c.date_echeance, c.status)" class="ml-1 inline-flex px-1.5 py-0.5 rounded text-amber-700 bg-amber-200/80 text-xs font-medium">Échéance proche</span>
+                                </td>
                                 <td class="px-2 py-2 text-slate-700 font-mono">{{ c.carte_grise ?? '—' }}</td>
                                 <td class="px-2 py-2 text-slate-700">{{ c.marque ?? '—' }}</td>
                                 <td class="px-2 py-2 text-slate-700">{{ c.modele ?? '—' }}</td>

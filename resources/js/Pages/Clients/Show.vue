@@ -6,6 +6,7 @@ import PageHeader from '@/Components/PageHeader.vue';
 import { route } from '@/route';
 import { contractTypeLabel } from '@/utils/contractTypes';
 import { formatDate } from '@/utils/formatDate';
+import { expiresSoon } from '@/utils/expiresSoon';
 
 const props = defineProps({
     client: Object,
@@ -217,7 +218,7 @@ function dealTypeLabel(c) {
                                     <tr
                                         v-for="c in contracts"
                                         :key="c.id"
-                                        class="border-b border-slate-100 last:border-0 hover:bg-slate-50/50"
+                                        :class="['border-b border-slate-100 last:border-0 hover:bg-slate-50/50', expiresSoon(c.end_date, c.status) ? 'bg-amber-50/80' : '']"
                                     >
                                         <td class="py-3 px-4 font-mono text-slate-900">{{ c.reference ?? '—' }}</td>
                                         <td class="py-3 px-4 text-slate-700">
@@ -227,6 +228,7 @@ function dealTypeLabel(c) {
                                         <td class="py-3 px-4 text-slate-700">{{ c.company?.name ?? '—' }}</td>
                                         <td class="py-3 px-4 text-slate-600">
                                             {{ formatDate(c.start_date) }} → {{ formatDate(c.end_date) }}
+                                            <span v-if="expiresSoon(c.end_date, c.status)" class="ml-1 inline-flex px-1.5 py-0.5 rounded text-amber-700 bg-amber-200/80 text-xs font-medium">Échéance proche</span>
                                         </td>
                                         <td class="py-3 px-4 font-medium text-slate-900">{{ formatXOF(c.total_amount) }}</td>
                                         <td class="py-3 px-4">

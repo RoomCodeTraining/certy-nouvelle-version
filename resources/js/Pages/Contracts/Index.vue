@@ -12,6 +12,7 @@ import { route } from '@/route';
 import { contractTypeLabel } from '@/utils/contractTypes';
 import { contractStatusLabel, contractStatusBadgeClass } from '@/utils/contractStatus';
 import { formatDate } from '@/utils/formatDate';
+import { expiresSoon } from '@/utils/expiresSoon';
 import { useConfirm } from '@/Composables/useConfirm';
 
 const props = defineProps({
@@ -93,7 +94,10 @@ const columns = [
     { key: 'owner', label: 'Propriétaire', getValue: (row) => row.client?.owner?.name ?? '—' },
     { key: 'contract_type', label: 'Type', getValue: (row) => contractTypeLabel(row.contract_type) },
     { key: 'start_date', label: 'Date début', sortKey: 'start_date', getValue: (row) => formatDate(row.start_date) },
-    { key: 'end_date', label: 'Date fin', sortKey: 'end_date', getValue: (row) => formatDate(row.end_date) },
+    { key: 'end_date', label: 'Date fin', sortKey: 'end_date', getValue: (row) => {
+        const d = formatDate(row.end_date);
+        return expiresSoon(row.end_date, row.status) ? `${d} (proche)` : d;
+    }},
     {
         key: 'prime_nette',
         label: 'Prime nette',
@@ -252,7 +256,7 @@ function cancel(contract, label) {
                 <div
                     v-for="row in (contracts?.data ?? [])"
                     :key="row.id"
-                    class="p-4"
+                    :class="['p-4', expiresSoon(row.end_date, row.status) ? 'bg-amber-50/80 border-l-4 border-amber-400' : '']"
                 >
                     <Link :href="route('contracts.show', row.id)" class="block active:bg-slate-50/80 rounded-lg -m-2 p-2 transition-colors">
                         <div class="flex items-start justify-between gap-2">
@@ -267,7 +271,10 @@ function cancel(contract, label) {
                         <p class="text-sm text-slate-700 mt-0.5">{{ contractTypeLabel(row.contract_type) }}</p>
                         <p class="text-xs text-slate-500 mt-1">{{ row.vehicle?.registration_number || [row.vehicle?.brand?.name, row.vehicle?.model?.name].filter(Boolean).join(' ') || '—' }}</p>
                         <p v-if="row.client?.owner?.name" class="text-xs text-slate-500 mt-0.5">Propriétaire : {{ row.client.owner.name }}</p>
-                        <p class="text-xs text-slate-500 mt-0.5">{{ formatDate(row.start_date) }} → {{ formatDate(row.end_date) }}</p>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            {{ formatDate(row.start_date) }} → {{ formatDate(row.end_date) }}
+                            <span v-if="expiresSoon(row.end_date, row.status)" class="ml-1 inline-flex px-1.5 py-0.5 rounded text-amber-700 bg-amber-200/80 text-xs font-medium">Échéance proche</span>
+                        </p>
                         <div class="flex items-center justify-between gap-2 mt-2">
                             <span
                                 class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium"
@@ -315,6 +322,7 @@ function cancel(contract, label) {
                     :data="contracts.data ?? []"
                     :columns="columns"
                     row-key="id"
+                    :row-class="(row) => expiresSoon(row.end_date, row.status) ? 'bg-amber-50/80' : ''"
                     sort-base-url="/contracts"
                     :sort-key="filters?.sort ?? 'created_at'"
                     :sort-order="filters?.order ?? 'desc'"

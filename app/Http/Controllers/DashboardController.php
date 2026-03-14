@@ -13,6 +13,37 @@ class DashboardController extends Controller
         $user = auth()->user();
         $organization = $user->currentOrganization();
 
+        $today = now()->startOfDay();
+        $expiryThreshold = $today->copy()->addDays(7);
+
+        $contractsExpiringSoon = Contract::accessibleBy($user)
+            ->whereIn('status', [Contract::STATUS_ACTIVE, Contract::STATUS_VALIDATED])
+            ->whereNotNull('end_date')
+            ->whereDate('end_date', '>=', $today)
+            ->whereDate('end_date', '<=', $expiryThreshold)
+            ->with([
+                'client:id,full_name',
+                'vehicle:id,registration_number,vehicle_brand_id,vehicle_model_id',
+                'vehicle.brand:id,name',
+                'vehicle.model:id,name',
+            ])
+            ->orderBy('end_date')
+            ->limit(10)
+            ->get()
+            ->map(fn (Contract $c) => [
+                'id' => $c->id,
+                'reference' => $c->reference ?? '—',
+                'end_date' => $c->end_date?->format('Y-m-d'),
+                'client' => $c->client?->full_name ?? '—',
+                'vehicle' => $c->vehicle
+                    ? implode(', ', array_filter([
+                        trim(collect([$c->vehicle->brand?->name, $c->vehicle->model?->name])->filter()->join(' ')),
+                        $c->vehicle->registration_number,
+                    ])) ?: '—'
+                    : '—',
+                'status' => $c->status,
+            ]);
+
         $recentContracts = Contract::accessibleBy($user)
             ->with([
                 'client:id,full_name',
@@ -52,6 +83,7 @@ class DashboardController extends Controller
                     'id' => $c->id,
                     'reference' => $c->reference ?? '—',
                     'created_at' => $c->created_at?->format('Y-m-d'),
+                    'end_date' => $c->end_date?->format('Y-m-d'),
                     'client' => $c->client?->full_name ?? '—',
                     'vehicle' => $c->vehicle
                         ? implode(', ', array_filter([
@@ -70,7 +102,7 @@ class DashboardController extends Controller
         return Inertia::render('Dashboard', [
             'organization' => $organization,
             'recentContracts' => $recentContracts,
-            // Bandeau d'information sur le nouveau rapport de production (uniquement pour le root)
+            'contractsExpiringSoon' => $contractsExpiringSoon,
             'showProductionExportHint' => $user->isRoot(),
         ]);
     }

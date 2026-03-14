@@ -29,6 +29,11 @@ const props = defineProps({
         type: String,
         default: 'Aucune donnée.',
     },
+    /** Fonction optionnelle (row) => string pour des classes CSS sur chaque ligne */
+    rowClass: {
+        type: [String, Function],
+        default: null,
+    },
 });
 
 function getRowKey(row) {
@@ -63,6 +68,12 @@ function buildSortUrl(col) {
 
 function isSorted(col) {
     return props.sortKey && col.sortKey === props.sortKey;
+}
+
+function getRowClass(row) {
+    if (!props.rowClass) return '';
+    if (typeof props.rowClass === 'function') return props.rowClass(row);
+    return props.rowClass;
 }
 </script>
 
@@ -114,7 +125,7 @@ function isSorted(col) {
                     <tr
                         v-for="row in data"
                         :key="getRowKey(row)"
-                        class="border-b border-slate-200/80 transition-colors hover:bg-slate-50/50"
+                        :class="['border-b border-slate-200/80 transition-colors hover:bg-slate-50/50', getRowClass(row)]"
                     >
                         <td
                             v-for="col in columns"

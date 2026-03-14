@@ -11,10 +11,12 @@ import ChartSkeleton from "@/Components/ChartSkeleton.vue";
 import EmptyState from "@/Components/EmptyState.vue";
 import { useStatistics } from "@/Composables/useStatistics";
 import { formatDate } from "@/utils/formatDate";
+import { expiresSoon } from "@/utils/expiresSoon";
 import { route } from "@/route";
 
 const props = defineProps({
     recentContracts: { type: Array, default: () => [] },
+    contractsExpiringSoon: { type: Array, default: () => [] },
     showProductionExportHint: { type: Boolean, default: false },
 });
 
@@ -352,6 +354,43 @@ function dismissProductionHint() {
                 </div>
             </div>
 
+            <!-- Contrats à échéance proche (7 jours) -->
+            <div
+                v-if="viewMode === 'ensemble' && props.contractsExpiringSoon?.length > 0"
+                class="rounded-xl border border-amber-200 bg-amber-50 overflow-hidden mb-4 sm:mb-6"
+            >
+                <div class="p-3 sm:p-4 md:p-6 border-b border-amber-200/80">
+                    <h2 class="text-base sm:text-lg font-semibold text-amber-900">
+                        Contrats à échéance proche
+                    </h2>
+                    <p class="text-xs sm:text-sm text-amber-700/90 mt-0.5">
+                        {{ props.contractsExpiringSoon.length }} contrat(s) arrive(nt) à expiration dans les 7 prochains jours
+                    </p>
+                </div>
+                <div class="divide-y divide-amber-200/60">
+                    <Link
+                        v-for="row in props.contractsExpiringSoon"
+                        :key="row.id"
+                        :href="route('contracts.show', row.id)"
+                        class="block p-4 hover:bg-amber-100/50 transition-colors"
+                    >
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div class="min-w-0">
+                                <p class="font-mono text-sm font-medium text-slate-900">{{ row.reference ?? "—" }}</p>
+                                <p class="text-sm text-slate-700 truncate">{{ row.client }}</p>
+                                <p class="text-xs text-slate-500">{{ row.vehicle }}</p>
+                            </div>
+                            <div class="flex items-center gap-3 shrink-0">
+                                <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-amber-200 text-amber-900">
+                                    Échéance : {{ formatDate(row.end_date) }}
+                                </span>
+                                <span class="text-amber-600">→</span>
+                            </div>
+                        </div>
+                    </Link>
+                </div>
+            </div>
+
             <!-- Contrats récents (Vue ensemble uniquement) -->
             <div
                 v-if="viewMode === 'ensemble'"
@@ -374,7 +413,7 @@ function dismissProductionHint() {
                         v-for="row in props.recentContracts"
                         :key="row.id"
                         :href="route('contracts.show', row.id)"
-                        class="block p-4 active:bg-slate-50/80 transition-colors"
+                        :class="['block p-4 transition-colors', expiresSoon(row.end_date, row.status) ? 'bg-amber-50/80 border-l-4 border-amber-400' : 'active:bg-slate-50/80']"
                     >
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0 flex-1">
@@ -385,6 +424,7 @@ function dismissProductionHint() {
                                 </p>
                                 <p class="text-xs text-slate-500 mt-0.5">
                                     {{ formatDate(row.created_at) }}
+                                    <span v-if="expiresSoon(row.end_date, row.status)" class="ml-2 inline-flex px-1.5 py-0.5 rounded text-amber-700 bg-amber-200/80 font-medium">Échéance {{ formatDate(row.end_date) }}</span>
                                 </p>
                                 <p class="text-sm text-slate-700 mt-1 truncate">
                                     {{ row.client }}
@@ -482,10 +522,11 @@ function dismissProductionHint() {
                             <tr
                                 v-for="row in props.recentContracts"
                                 :key="row.id"
-                                class="border-b border-slate-100 hover:bg-slate-50/50"
+                                :class="['border-b border-slate-100 hover:bg-slate-50/50', expiresSoon(row.end_date, row.status) ? 'bg-amber-50/80' : '']"
                             >
                                 <td class="py-3 px-4 text-slate-700">
                                     {{ formatDate(row.created_at) }}
+                                    <span v-if="expiresSoon(row.end_date, row.status)" class="block text-xs text-amber-700 font-medium mt-0.5">Échéance {{ formatDate(row.end_date) }}</span>
                                 </td>
                                 <td class="py-3 px-4 font-mono text-slate-900">
                                     {{ row.reference ?? "—" }}
