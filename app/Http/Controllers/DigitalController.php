@@ -86,6 +86,50 @@ class DigitalController extends Controller
     }
 
     /**
+     * Vérifie si l'export dépasse le seuil (traitement asynchrone).
+     * Retourne JSON : count, exceeds_threshold, threshold.
+     */
+    public function exportCheckAttestationsExternes(Request $request)
+    {
+        $token = $this->requireToken($request);
+        if ($token instanceof RedirectResponse) {
+            return $token;
+        }
+
+        $validated = $request->validate([
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'search' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $threshold = config('app.reporting_export_background_threshold', 200);
+        $probeRequest = new Request(array_filter([
+            'per_page' => $threshold + 1,
+            'date_from' => $validated['date_from'] ?? null,
+            'date_to' => $validated['date_to'] ?? null,
+            'search' => $validated['search'] ?? null,
+        ], fn ($v) => $v !== null && $v !== ''));
+
+        $probeResult = $this->externalService->getCertificates($token, $probeRequest);
+        if (isset($probeResult['errors'])) {
+            return response()->json([
+                'error' => $probeResult['errors'][0]['title'] ?? 'Erreur lors du contrôle.',
+            ], 422);
+        }
+
+        $rows = isset($probeResult['data']) && is_array($probeResult['data']) ? $probeResult['data'] : [];
+        $hasMore = ! empty($probeResult['meta']['next_cursor'] ?? null);
+        $count = count($rows);
+        $exceeds = $count > $threshold || $hasMore;
+
+        return response()->json([
+            'count' => $count,
+            'exceeds_threshold' => $exceeds,
+            'threshold' => $threshold,
+        ]);
+    }
+
+    /**
      * Export Excel des attestations externes sur une période.
      * Si > 200 lignes : traitement en arrière-plan (Job) et envoi par email.
      * Sinon : téléchargement direct (synchrone).
@@ -108,9 +152,10 @@ class DigitalController extends Controller
             $printedAt = $validated['date_from'].','.$validated['date_to'];
         }
 
-        // Requête de sondage : per_page=201 pour détecter si > 200 lignes
+        $threshold = config('app.reporting_export_background_threshold', 200);
+        // Requête de sondage : per_page = threshold + 1 pour détecter si > threshold lignes
         $probeRequest = new Request(array_filter([
-            'per_page' => 201,
+            'per_page' => $threshold + 1,
             'date_from' => $validated['date_from'] ?? null,
             'date_to' => $validated['date_to'] ?? null,
             'search' => $validated['search'] ?? null,
@@ -127,19 +172,12 @@ class DigitalController extends Controller
         $rows = isset($probeResult['data']) && is_array($probeResult['data']) ? $probeResult['data'] : [];
         $hasMore = ! empty($probeResult['meta']['next_cursor'] ?? null);
         $count = count($rows);
-        $useBackground = $count > 200 || $hasMore;
+        $useBackground = $count > $threshold || $hasMore;
 
         if ($useBackground) {
-            ExportReportingAttestationsJob::dispatch(
-                $request->user()->id,
-                $validated['date_from'] ?? null,
-                $validated['date_to'] ?? null,
-                $validated['search'] ?? null,
-            );
-
             return redirect()
                 ->route('digital.attestations-externes', $validated)
-                ->with('success', 'Export en cours. Vous recevrez le fichier Excel par email à '.config('app.admin_email', 'dsieroger@gmail.com'));
+                ->with('info', 'Export volumineux (> '.$threshold.' lignes). Utilisez le formulaire « Envoyer par email » en renseignant les adresses de réception.');
         }
 
         $filename = 'reporting-attestations-externes-'.now()->format('Y-m-d').'.xlsx';
@@ -186,6 +224,54 @@ class DigitalController extends Controller
             $spreadsheet->disconnectWorksheets();
             unset($spreadsheet);
         });
+    }
+
+    /**
+     * Envoyer l'export Excel par email aux adresses saisies par l'utilisateur.
+     * Traitement en arrière-plan (Job) — les destinataires sont ceux indiqués par l'utilisateur.
+     */
+    public function sendExportAttestationsExternes(Request $request): RedirectResponse
+    {
+        $token = $this->requireToken($request);
+        if ($token instanceof RedirectResponse) {
+            return $token;
+        }
+
+        $validated = $request->validate([
+            'date_from' => ['required', 'date'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'emails' => ['required', 'string', 'min:5'],
+        ]);
+
+        $emailsRaw = preg_split('/[\s,;]+/', $validated['emails'], -1, PREG_SPLIT_NO_EMPTY);
+        $emails = array_values(array_filter(array_map(function ($e) {
+            $e = trim($e);
+            return filter_var($e, FILTER_VALIDATE_EMAIL) ? $e : null;
+        }, $emailsRaw)));
+
+        if (empty($emails)) {
+            return redirect()
+                ->route('digital.attestations-externes', $request->only(['date_from', 'date_to', 'search']))
+                ->with('error', 'Veuillez saisir au moins une adresse email valide.');
+        }
+
+        ExportReportingAttestationsJob::dispatch(
+            $request->user()->id,
+            $validated['date_from'],
+            $validated['date_to'],
+            $validated['search'] ?? null,
+            $emails,
+        );
+
+        $destList = implode(', ', array_slice($emails, 0, 3));
+        if (count($emails) > 3) {
+            $destList .= ' et ' . (count($emails) - 3) . ' autre(s)';
+        }
+
+        return redirect()
+            ->route('digital.attestations-externes', $request->only(['date_from', 'date_to', 'search']))
+            ->with('success', 'Export en cours. Le fichier Excel sera envoyé par email à : ' . $destList);
     }
 
     /**

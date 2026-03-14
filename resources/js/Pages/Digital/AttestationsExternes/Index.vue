@@ -1,6 +1,7 @@
 <script setup>
 import { Link, router, usePage } from "@inertiajs/vue3";
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { useForm } from "@inertiajs/vue3";
 import DashboardLayout from "@/Layouts/DashboardLayout.vue";
 import PageHeader from "@/Components/PageHeader.vue";
 import DataTable from "@/Components/DataTable.vue";
@@ -21,6 +22,31 @@ const errorToShow = computed(
     () => displayError.value ?? props.error ?? page.props.flash?.error ?? null,
 );
 const successMessage = computed(() => page.props.flash?.success ?? null);
+
+const sendExportForm = useForm({
+    date_from: props.filters?.date_from ?? "",
+    date_to: props.filters?.date_to ?? "",
+    search: props.filters?.search ?? "",
+    emails: "",
+});
+
+function initSendExportFormFromFilters() {
+    sendExportForm.date_from = props.filters?.date_from ?? "";
+    sendExportForm.date_to = props.filters?.date_to ?? "";
+    sendExportForm.search = props.filters?.search ?? "";
+}
+onMounted(initSendExportFormFromFilters);
+
+watch(
+    () => props.filters,
+    (f) => {
+        if (!f) return;
+        sendExportForm.date_from = f.date_from ?? "";
+        sendExportForm.date_to = f.date_to ?? "";
+        sendExportForm.search = f.search ?? "";
+    },
+    { deep: true },
+);
 
 const list = computed(() =>
     Array.isArray(props.attestations)
@@ -371,6 +397,18 @@ function handleSearch(e) {
 }
 
 const isExporting = ref(false);
+const showSendExportModal = ref(false);
+const exportCheckContext = ref(null); // { count, threshold } when opened from oversized export
+
+const exportCheckUrl = computed(() => {
+    const params = new URLSearchParams();
+    if (dateFrom.value) params.set("date_from", dateFrom.value);
+    if (dateTo.value) params.set("date_to", dateTo.value);
+    if (props.filters?.search) params.set("search", props.filters.search);
+    const base = route("digital.attestations-externes.export-check");
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+});
 
 const exportUrl = computed(() => {
     const params = new URLSearchParams();
@@ -383,20 +421,69 @@ const exportUrl = computed(() => {
     return qs ? `${base}?${qs}` : base;
 });
 
-function handleExport() {
+async function handleExport() {
     if (isExporting.value) return;
+    if (!dateFrom.value || !dateTo.value) return;
     isExporting.value = true;
-    const link = document.createElement("a");
-    link.href = exportUrl.value;
-    link.target = "_blank";
-    link.rel = "noopener";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => {
+    try {
+        const res = await fetch(exportCheckUrl.value, { credentials: "same-origin" });
+        const data = await res.json().catch(() => ({}));
+        if (data.error) {
+            displayError.value = data.error;
+            return;
+        }
+        if (data.exceeds_threshold) {
+            exportCheckContext.value = { count: data.count, threshold: data.threshold };
+            showSendExportModal.value = true;
+            return;
+        }
+        const link = document.createElement("a");
+        link.href = exportUrl.value;
+        link.target = "_blank";
+        link.rel = "noopener";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } finally {
         isExporting.value = false;
-    }, 2000);
+    }
 }
+
+function openSendExportModal() {
+    exportCheckContext.value = null;
+    showSendExportModal.value = true;
+}
+
+function closeSendExportModal() {
+    showSendExportModal.value = false;
+    exportCheckContext.value = null;
+}
+
+function submitSendExport() {
+    sendExportForm.post(route("digital.attestations-externes.export-send"), {
+        preserveScroll: true,
+        onSuccess: () => {
+            sendExportForm.reset("emails");
+            closeSendExportModal();
+        },
+    });
+}
+
+watch(showSendExportModal, (open) => {
+    if (open) {
+        document.body.style.overflow = "hidden";
+        const onEscape = (e) => {
+            if (e.key === "Escape") closeSendExportModal();
+        };
+        window.addEventListener("keydown", onEscape);
+        return () => {
+            document.body.style.overflow = "";
+            window.removeEventListener("keydown", onEscape);
+        };
+    } else {
+        document.body.style.overflow = "";
+    }
+});
 </script>
 
 <template>
@@ -535,6 +622,14 @@ function handleExport() {
                         />
                     </svg>
                     <span>Exporter Excel</span>
+                </button>
+                <button
+                    type="button"
+                    :disabled="!dateFrom || !dateTo"
+                    @click="openSendExportModal"
+                    class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-sky-600 bg-sky-50 border border-sky-200 hover:bg-sky-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                    Envoyer par email
                 </button>
                 <p
                     v-if="!dateFrom && !dateTo"
@@ -799,6 +894,120 @@ function handleExport() {
                         </Link>
                     </template>
                 </div>
+            </div>
+        </div>
+
+        <!-- Modal Envoyer l'export par email -->
+        <div
+            v-if="showSendExportModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="send-export-modal-title"
+            @click.self="closeSendExportModal"
+        >
+            <div
+                class="relative w-full max-w-md bg-white rounded-xl shadow-xl overflow-hidden"
+            >
+                <div class="px-6 py-5">
+                    <h2 id="send-export-modal-title" class="text-lg font-semibold text-slate-900 mb-2">
+                        Envoyer l'export par email
+                    </h2>
+                    <p
+                        v-if="exportCheckContext"
+                        class="text-sm text-slate-600 mb-4"
+                    >
+                        Votre export contient plus de
+                        <strong>{{ exportCheckContext.threshold }}</strong>
+                        attestations. Pour éviter un délai, recevez le fichier Excel par email.
+                    </p>
+                    <p
+                        v-else
+                        class="text-sm text-slate-600 mb-4"
+                    >
+                        Recevez l'export Excel des attestations à l'adresse de votre choix.
+                    </p>
+                    <form @submit.prevent="submitSendExport" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="send_date_from" class="block text-xs font-medium text-slate-600 mb-1">
+                                    Du
+                                </label>
+                                <input
+                                    id="send_date_from"
+                                    v-model="sendExportForm.date_from"
+                                    type="date"
+                                    class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:ring-1 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label for="send_date_to" class="block text-xs font-medium text-slate-600 mb-1">
+                                    Au
+                                </label>
+                                <input
+                                    id="send_date_to"
+                                    v-model="sendExportForm.date_to"
+                                    type="date"
+                                    class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:ring-1 focus:outline-none"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label for="send_emails" class="block text-xs font-medium text-slate-600 mb-1">
+                                Adresse(s) email
+                            </label>
+                            <input
+                                id="send_emails"
+                                v-model="sendExportForm.emails"
+                                type="text"
+                                placeholder="email@exemple.com, autre@exemple.com"
+                                class="w-full rounded-lg border px-3 py-2 text-sm focus:border-slate-400 focus:ring-1 focus:outline-none placeholder-slate-400"
+                                :class="sendExportForm.errors.emails ? 'border-red-300' : 'border-slate-200'"
+                            />
+                            <p v-if="sendExportForm.errors.emails" class="mt-1 text-xs text-red-600">
+                                {{ sendExportForm.errors.emails }}
+                            </p>
+                            <p class="mt-1 text-xs text-slate-500">
+                                Séparez les adresses par des virgules ou des espaces.
+                            </p>
+                        </div>
+                        <div class="flex justify-end gap-3 pt-2">
+                            <button
+                                type="button"
+                                @click="closeSendExportModal"
+                                class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                type="submit"
+                                :disabled="sendExportForm.processing || !sendExportForm.date_from || !sendExportForm.date_to || !sendExportForm.emails?.trim()"
+                                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-sky-600 rounded-lg hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                <svg
+                                    v-if="sendExportForm.processing"
+                                    class="w-4 h-4 animate-spin"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Envoyer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <button
+                    type="button"
+                    class="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                    aria-label="Fermer"
+                    @click="closeSendExportModal"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
         </div>
 

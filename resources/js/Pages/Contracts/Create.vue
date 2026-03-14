@@ -15,6 +15,7 @@ import {
 
 const props = defineProps({
     clients: Array,
+    initialVehicleId: { type: [Number, String], default: null },
     companies: Array,
     contractTypes: Array,
     durationOptions: Array,
@@ -390,16 +391,27 @@ function applyParentContract(parent) {
     });
 }
 
-// Pré-remplir le formulaire en cas de renouvellement (parentContract fourni)
-// Date d'effet = jour d'expiration de l'ancien contrat + 1 (le lendemain)
+// Pré-remplir le formulaire en cas de renouvellement (parentContract) ou véhicule présélectionné (initialVehicleId)
 onMounted(() => {
-    applyParentContract(props.parentContract);
+    if (props.parentContract) {
+        applyParentContract(props.parentContract);
+    } else if (props.initialVehicleId && props.clients?.length) {
+        for (const client of props.clients) {
+            const vehicle = (client.vehicles ?? []).find((v) => String(v.id) === String(props.initialVehicleId));
+            if (vehicle) {
+                form.client_id = String(client.id);
+                form.vehicle_id = String(vehicle.id);
+                form.contract_type = vehicle.pricing_type ?? "VP";
+                nextTick(() => onVehicleChange());
+                break;
+            }
+        }
+    }
 });
 
-// Au cas où parentContract arrive après le mount (hydration Inertia)
 watch(
     () => props.parentContract,
-    (parent) => applyParentContract(parent),
+    (parent) => { if (parent) applyParentContract(parent); },
     { immediate: true },
 );
 

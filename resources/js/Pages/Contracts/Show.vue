@@ -359,48 +359,53 @@ function markAttestationIssued(contract) {
                 </div>
                 <div
                     v-if="childContracts.length > 0"
-                    class="mt-4 pt-4 border-t border-slate-100"
+                    class="mt-4 pt-4 border-t border-slate-200"
                 >
-                    <h3 class="text-sm font-medium text-slate-700 mb-2">
-                        Renouvellements de ce contrat
+                    <h3 class="text-sm font-semibold text-slate-800 mb-3">
+                        Renouvellements de ce contrat ({{ childContracts.length }})
                     </h3>
-                    <ul class="space-y-2">
-                        <li
-                            v-for="child in childContracts"
-                            :key="child.id"
-                            class="flex flex-wrap items-center gap-2 text-sm"
-                        >
-                            <Link
-                                :href="route('contracts.show', child.id)"
-                                class="font-medium text-slate-900 hover:underline"
+                    <div class="rounded-lg border border-slate-200 bg-slate-50/50 overflow-hidden">
+                        <ul class="divide-y divide-slate-200">
+                            <li
+                                v-for="child in childContracts"
+                                :key="child.id"
+                                class="flex flex-wrap sm:flex-nowrap sm:items-center justify-between gap-3 px-4 py-3 hover:bg-slate-100/50"
                             >
-                                {{ formatDate(child.start_date) }} →
-                                {{ formatDate(child.end_date) }}
-                            </Link>
-                            <span class="text-slate-500">·</span>
-                            <span class="text-slate-600">{{
-                                child.total_amount != null
-                                    ? Number(child.total_amount).toLocaleString(
-                                          "fr-FR",
-                                      ) + " F CFA"
-                                    : "—"
-                            }}</span>
-                            <span
-                                :class="[
-                                    'inline-flex px-2 py-0.5 rounded text-xs font-medium',
-                                    child.status === 'active' ||
-                                    child.status === 'validated'
-                                        ? 'bg-emerald-100 text-emerald-800'
-                                        : 'bg-slate-100 text-slate-600',
-                                ]"
-                            >
-                                {{
-                                    CONTRACT_STATUS_LABELS[child.status] ??
-                                    child.status
-                                }}
-                            </span>
-                        </li>
-                    </ul>
+                                <Link
+                                    :href="route('contracts.show', child.id)"
+                                    class="flex-1 min-w-0 group"
+                                >
+                                    <span class="font-mono text-sm font-medium text-slate-900 group-hover:text-sky-700 group-hover:underline">
+                                        {{ child.reference ?? '—' }}
+                                    </span>
+                                    <span class="block sm:inline sm:ml-2 text-sm text-slate-600">
+                                        {{ formatDate(child.start_date) }} → {{ formatDate(child.end_date) }}
+                                    </span>
+                                </Link>
+                                <div class="flex items-center gap-3 shrink-0">
+                                    <span class="text-sm font-medium text-slate-900 tabular-nums">
+                                        {{ child.total_amount != null ? Number(child.total_amount).toLocaleString('fr-FR') + ' F CFA' : '—' }}
+                                    </span>
+                                    <span
+                                        :class="[
+                                            'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium',
+                                            child.status === 'active' || child.status === 'validated'
+                                                ? 'bg-emerald-100 text-emerald-800'
+                                                : 'bg-slate-100 text-slate-600',
+                                        ]"
+                                    >
+                                        {{ CONTRACT_STATUS_LABELS[child.status] ?? child.status }}
+                                    </span>
+                                    <Link
+                                        :href="route('contracts.show', child.id)"
+                                        class="text-sm font-medium text-sky-600 hover:text-sky-700"
+                                    >
+                                        Voir →
+                                    </Link>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </section>
 

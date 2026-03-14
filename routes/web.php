@@ -119,7 +119,9 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     // Digital (service externe ASACI)
     Route::get('/digital/attestations', [DigitalController::class, 'attestations'])->name('digital.attestations');
     Route::get('/digital/attestations-externes', [DigitalController::class, 'attestationsExternes'])->name('digital.attestations-externes');
+    Route::get('/digital/attestations-externes/export-check', [DigitalController::class, 'exportCheckAttestationsExternes'])->name('digital.attestations-externes.export-check');
     Route::get('/digital/attestations-externes/export', [DigitalController::class, 'exportAttestationsExternes'])->name('digital.attestations-externes.export');
+    Route::post('/digital/attestations-externes/export-send', [DigitalController::class, 'sendExportAttestationsExternes'])->name('digital.attestations-externes.export-send');
     Route::get('/digital/attestations/{reference}/download', [DigitalController::class, 'downloadAttestation'])->name('digital.attestations.download');
     Route::get('/digital/attestations/{reference}/download-url', [DigitalController::class, 'downloadUrlAttestation'])->name('digital.attestations.download_url');
     Route::get('/digital/attestations/{reference}/view', [DigitalController::class, 'viewAttestation'])->name('digital.attestations.view');

@@ -385,6 +385,10 @@ class ContractController extends Controller
             : collect();
         $companies = $this->companiesForUser($request);
 
+        $initialVehicleId = $request->filled('vehicle_id')
+            ? (Vehicle::accessibleBy($user)->where('id', $request->vehicle_id)->exists() ? (int) $request->vehicle_id : null)
+            : null;
+
         $parentContract = null;
         if ($request->filled('parent_id')) {
             $parent = Contract::find($request->parent_id);
@@ -398,6 +402,7 @@ class ContractController extends Controller
 
         return Inertia::render('Contracts/Create', [
             'clients' => $clients,
+            'initialVehicleId' => $initialVehicleId,
             'companies' => $companies,
             'contractTypes' => $this->contractTypes(),
             'durationOptions' => $this->durationOptions(),
@@ -491,7 +496,7 @@ class ContractController extends Controller
         $relations = ['client', 'vehicle.brand', 'vehicle.model', 'company'];
         if (Schema::hasColumn('contracts', 'parent_id')) {
             $relations[] = 'parent:id,start_date,end_date,status';
-            $relations[] = 'children:id,parent_id,start_date,end_date,status,total_amount';
+            $relations[] = 'children:id,parent_id,reference,start_date,end_date,status,total_amount';
         }
         if (Schema::hasColumn('contracts', 'created_by_id')) {
             $relations[] = 'createdBy:id,name';

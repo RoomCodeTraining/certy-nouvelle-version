@@ -212,4 +212,15 @@ return [
     */
     'admin_email' => env('ADMIN_EMAIL', 'dsieroger@gmail.com'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Seuil export Reporting (traitement en arrière-plan)
+    |--------------------------------------------------------------------------
+    | Nombre de lignes au-delà duquel l'export des attestations externes
+    | impose le traitement en arrière-plan (Job) + envoi par email.
+    | Au-dessous de ce seuil : téléchargement direct.
+    | Configurable pour les tests (ex: 5 pour forcer le mode asynchrone).
+    */
+    'reporting_export_background_threshold' => (int) env('REPORTING_EXPORT_BACKGROUND_THRESHOLD', 200),
+
 ];
