@@ -194,9 +194,8 @@ class BordereauController extends Controller
         $commissionPct = $bordereau->commission_pct !== null ? (float) $bordereau->commission_pct : null;
         $perPage = min(max((int) $request->input('per_page', 25), 10), 100);
 
-        // Même requête que PDF/Excel pour garantir le même nombre de contrats (organization + compagnie + période).
-        $contractsPaginator = Contract::query()
-            ->where('organization_id', $bordereau->organization_id)
+        // Période du/au = date de création des contrats (created_at). Contrats annulés exclus.
+        $contractsPaginator = Contract::accessibleBy($user)
             ->where('company_id', $bordereau->company_id)
             ->where('status', '!=', Contract::STATUS_CANCELLED)
             ->whereDate('created_at', '>=', $bordereau->period_start->format('Y-m-d'))
@@ -341,9 +340,8 @@ class BordereauController extends Controller
             }
         }
         $bordereau->load('company');
-        // Période du/au = date de création des contrats (created_at). Contrats annulés exclus.
-        $contracts = Contract::query()
-            ->where('organization_id', $bordereau->organization_id)
+        // Même requête que la page détail (accessibleBy + compagnie + période).
+        $contracts = Contract::accessibleBy($user)
             ->where('company_id', $bordereau->company_id)
             ->where('status', '!=', Contract::STATUS_CANCELLED)
             ->whereDate('created_at', '>=', $bordereau->period_start->format('Y-m-d'))
@@ -372,9 +370,8 @@ class BordereauController extends Controller
         }
         $bordereau->load(['company', 'organization:id,name']);
         $commissionPct = $bordereau->commission_pct !== null ? (float) $bordereau->commission_pct : null;
-        // Même requête que l'export PDF pour avoir les mêmes contrats (période, compagnie, non annulés)
-        $contracts = Contract::query()
-            ->where('organization_id', $bordereau->organization_id)
+        // Même requête que la page détail (accessibleBy + compagnie + période).
+        $contracts = Contract::accessibleBy($user)
             ->where('company_id', $bordereau->company_id)
             ->where('status', '!=', Contract::STATUS_CANCELLED)
             ->whereDate('created_at', '>=', $bordereau->period_start->format('Y-m-d'))
