@@ -192,17 +192,23 @@ class BordereauController extends Controller
         $bordereau->load('company:id,name,code');
 
         $commissionPct = $bordereau->commission_pct !== null ? (float) $bordereau->commission_pct : null;
+        $perPage = min(max((int) $request->input('per_page', 25), 10), 100);
 
         // Période du/au = date de création des contrats (created_at). Contrats annulés exclus.
-        $contracts = Contract::accessibleBy($user)
+        $contractsPaginator = Contract::accessibleBy($user)
             ->where('company_id', $bordereau->company_id)
             ->where('status', '!=', Contract::STATUS_CANCELLED)
             ->whereDate('created_at', '>=', $bordereau->period_start->format('Y-m-d'))
             ->whereDate('created_at', '<=', $bordereau->period_end->format('Y-m-d'))
             ->with(['client:id,full_name,email,phone,address', 'vehicle:id,registration_number,registration_card_number,seat_count,pricing_type,vehicle_brand_id,vehicle_model_id,energy_source_id', 'vehicle.brand:id,name', 'vehicle.model:id,name', 'vehicle.energySource:id,name'])
             ->orderBy('created_at')
-            ->get()
-            ->map(function (Contract $c, int $index) use ($commissionPct, $bordereau) {
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $baseNo = ($contractsPaginator->currentPage() - 1) * $contractsPaginator->perPage();
+        $rowIndex = 0;
+        $contracts = $contractsPaginator->through(function (Contract $c) use (&$rowIndex, $baseNo, $commissionPct, $bordereau) {
+                $no = $baseNo + (++$rowIndex);
                 $primeNette = (int) ($c->prime_nette_for_commission ?? 0);
                 $primeTtc = (int) ($c->total_amount ?? 0);
                 $commission = $commissionPct !== null && $primeNette > 0
@@ -214,7 +220,7 @@ class BordereauController extends Controller
 
                 return [
                     'id' => $c->id,
-                    'no' => $index + 1,
+                    'no' => $no,
                     'attestation_number' => $c->attestation_number ?? '—',
                     'policy_insured' => $c->policy_number ?? $c->reference ?? '—',
                     'nom_assure' => $c->client?->full_name ?? '—',
@@ -446,8 +452,8 @@ class BordereauController extends Controller
         $dataStartRow = $row + 1;
 
         $sumPrimeNette = $sumAccessory = $sumTaxe = $sumPrimeTtc = $sumCommission = $sumPrimeAReverser = 0;
+        $allRows = [];
         foreach ($contracts as $i => $c) {
-            $row++;
             $primeNette = (int) ($c->prime_nette_for_commission ?? 0);
             $primeTtcC = (int) ($c->total_amount ?? 0);
             $comm = $commissionPct !== null && $primeNette > 0 ? (int) round($primeNette * ($commissionPct / 100)) : 0;
@@ -463,7 +469,7 @@ class BordereauController extends Controller
 
             $typeVal = match ($c->contract_type ?? $c->vehicle?->pricing_type ?? '') { 'VP' => 'VP', 'TPC' => 'TPC', 'TPM' => 'TPM', 'TWO_WHEELER' => '2 roues', default => $c->contract_type ?? $c->vehicle?->pricing_type ?? '—' };
 
-            $rowData = [
+            $allRows[] = [
                 $i + 1,
                 $c->attestation_number ?? '—',
                 $c->policy_number ?? $c->reference ?? '—',
@@ -489,11 +495,12 @@ class BordereauController extends Controller
                 $prReverser,
                 $prReverser,
             ];
-            $sheet->fromArray([$rowData], null, 'A' . $row);
+        }
+        if (! empty($allRows)) {
+            $sheet->fromArray($allRows, null, 'A' . $dataStartRow);
         }
 
-        $row++;
-        $totalRow = $row;
+        $totalRow = $dataStartRow + count($allRows);
         $sheet->setCellValue('A' . $totalRow, 'TOTAL');
         $sheet->mergeCells('A' . $totalRow . ':P' . $totalRow);
         $sheet->getStyle('A' . $totalRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);

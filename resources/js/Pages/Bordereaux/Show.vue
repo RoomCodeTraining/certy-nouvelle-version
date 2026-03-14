@@ -3,13 +3,14 @@ import { Link, usePage, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import DashboardLayout from '@/Layouts/DashboardLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
+import Paginator from '@/Components/Paginator.vue';
 import { route } from '@/route';
 import { formatDate } from '@/utils/formatDate';
 import { useConfirm } from '@/Composables/useConfirm';
 
 const props = defineProps({
     bordereau: Object,
-    contracts: Array,
+    contracts: Object,
     can_validate: Boolean,
     can_delete: Boolean,
 });
@@ -37,6 +38,9 @@ const statusLabels = {
     rejected: 'Rejeté',
     paid: 'Payé',
 };
+
+const contractList = computed(() => props.contracts?.data ?? []);
+const contractsPaginator = computed(() => props.contracts);
 
 const { confirm: confirmDialog } = useConfirm();
 function confirmDelete() {
@@ -187,7 +191,7 @@ function formatXOF(value) {
                         </thead>
                         <tbody class="bg-white divide-y divide-slate-200">
                             <tr
-                                v-for="c in contracts"
+                                v-for="c in contractList"
                                 :key="c.id"
                                 class="hover:bg-slate-50/50"
                             >
@@ -229,7 +233,7 @@ function formatXOF(value) {
                                     <Link :href="route('contracts.show', c.id)" class="text-sky-600 hover:underline font-medium">Voir</Link>
                                 </td>
                             </tr>
-                            <tr v-if="!contracts.length">
+                            <tr v-if="!contractList.length">
                                 <td colspan="26" class="px-4 py-8 text-center text-slate-500">
                                     Aucun contrat sur cette période pour cette compagnie.
                                 </td>
@@ -237,6 +241,11 @@ function formatXOF(value) {
                         </tbody>
                     </table>
                 </div>
+                <Paginator
+                    v-if="contractsPaginator && contractsPaginator.total > 0"
+                    :paginator="contractsPaginator"
+                    :query-params="{}"
+                />
                 <div class="p-4 border-t border-slate-200 bg-slate-50 flex flex-wrap justify-end gap-x-8 gap-y-2 text-sm">
                     <div class="flex items-center gap-2">
                         <span class="text-slate-600">Prime TTC :</span>
