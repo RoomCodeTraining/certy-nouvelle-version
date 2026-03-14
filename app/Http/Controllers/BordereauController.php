@@ -365,7 +365,7 @@ class BordereauController extends Controller
         }
         $bordereau->load(['company', 'organization:id,name']);
         $commissionPct = $bordereau->commission_pct !== null ? (float) $bordereau->commission_pct : null;
-        $contracts = Contract::query()
+        $contracts = Contract::accessibleBy($user)
             ->where('organization_id', $bordereau->organization_id)
             ->where('company_id', $bordereau->company_id)
             ->where('status', '!=', Contract::STATUS_CANCELLED)
@@ -463,7 +463,7 @@ class BordereauController extends Controller
 
             $typeVal = match ($c->contract_type ?? $c->vehicle?->pricing_type ?? '') { 'VP' => 'VP', 'TPC' => 'TPC', 'TPM' => 'TPM', 'TWO_WHEELER' => '2 roues', default => $c->contract_type ?? $c->vehicle?->pricing_type ?? '—' };
 
-            $sheet->fromArray([
+            $rowData = [
                 $i + 1,
                 $c->attestation_number ?? '—',
                 $c->policy_number ?? $c->reference ?? '—',
@@ -488,7 +488,8 @@ class BordereauController extends Controller
                 $comm,
                 $prReverser,
                 $prReverser,
-            ], null, 'A' . $row);
+            ];
+            $sheet->fromArray([$rowData], null, 'A' . $row);
         }
 
         $row++;
