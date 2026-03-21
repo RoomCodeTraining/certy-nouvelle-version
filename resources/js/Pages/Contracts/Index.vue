@@ -39,26 +39,61 @@ function dealTypeBadgeClass(row) {
     return row.parent_id ? 'bg-violet-100 text-violet-800' : 'bg-emerald-100 text-emerald-800';
 }
 
-/** Prime nette = RC + DR + TP + optional_guarantees (identique à la vue détails) */
-function primeNette(row) {
-    const v = (row.rc_amount ?? 0) + (row.defence_appeal_amount ?? 0)
-        + (row.person_transport_amount ?? 0) + (row.optional_guarantees_amount ?? 0);
-    return v > 0 ? v : null;
+/** Montants par garantie (rc, dr, tp, optionnelles) */
+function getGuaranteeAmounts(row) {
+    const amounts = [];
+    const rc = Number(row.rc_amount ?? 0);
+    const dr = Number(row.defence_appeal_amount ?? 0);
+    const tp = Number(row.person_transport_amount ?? 0);
+    if (rc > 0) amounts.push(rc);
+    if (dr > 0) amounts.push(dr);
+    if (tp > 0) amounts.push(tp);
+    const optional = row.metadata?.optional_guarantees ?? [];
+    let optSum = 0;
+    optional.forEach((g) => {
+        const amt = Number(g?.amount ?? 0);
+        if (amt > 0) { amounts.push(amt); optSum += amt; }
+    });
+    const optTotal = Number(row.optional_guarantees_amount ?? 0);
+    if (optTotal > 0 && optSum === 0) amounts.push(optTotal);
+    else if (optTotal > optSum) amounts.push(optTotal - optSum);
+    return amounts;
 }
 
-/** Prime TTC = montant après réduction + accessory + taxes (14,5 % du montant après réduction) + fga + cedao (identique à la vue détails) */
+/** Montant réduit pour une garantie (chaque réduction s'applique à chaque garantie) */
+function amountAfterReduction(amount, totalGuarantees, row) {
+    if (totalGuarantees <= 0) return amount;
+    const totalPct = Number(row.reduction_bns ?? 0) + Number(row.reduction_on_commission ?? 0)
+        + Number(row.reduction_on_profession_percent ?? 0);
+    const profFixed = Number(row.reduction_on_profession_amount_stored ?? row.reduction_on_profession_amount ?? 0);
+    let reduced = amount;
+    if (totalPct > 0) reduced = Math.max(0, amount - Math.round((amount * totalPct) / 100));
+    if (profFixed > 0) {
+        const share = Math.round((amount / totalGuarantees) * profFixed);
+        reduced = Math.max(0, reduced - share);
+    }
+    return reduced;
+}
+
+/** Prime nette : backend (aligné fiche/PDF) ou calcul frontend */
+function primeNette(row) {
+    const fromBackend = row.prime_nette;
+    if (fromBackend != null && Number(fromBackend) >= 0) return Number(fromBackend);
+    const amounts = getGuaranteeAmounts(row);
+    const total = amounts.reduce((s, a) => s + a, 0);
+    if (total <= 0) return null;
+    const sum = amounts.reduce((s, a) => s + amountAfterReduction(a, total, row), 0);
+    return sum > 0 ? sum : null;
+}
+
+/** Prime TTC : backend (aligné fiche/PDF) ou calcul frontend */
 function primeTtc(row) {
+    const fromBackend = row.prime_ttc ?? row.total_amount;
+    if (fromBackend != null && Number(fromBackend) > 0) return Number(fromBackend);
     const pn = primeNette(row) ?? 0;
-    const pctBns = Number(row.reduction_bns ?? 0);
-    const pctComm = Number(row.reduction_on_commission ?? 0);
-    const pctProf = Number(row.reduction_on_profession_percent ?? 0);
-    const amtProf = Number(row.reduction_on_profession_amount_stored ?? row.reduction_on_profession_amount ?? 0);
-    const bnsAmt = pctBns > 0 ? Math.round(pn * pctBns / 100) : 0;
-    const commAmt = pctComm > 0 ? Math.round(pn * pctComm / 100) : 0;
-    const profAmt = pctProf > 0 ? Math.round(pn * pctProf / 100) : amtProf;
-    const montantReduction = bnsAmt + commAmt + profAmt;
-    const montantApresReduction = Math.max(0, pn - montantReduction);
-    const taxesAmount = Math.round(montantApresReduction * 0.145);
+    const reductionOther = Number(row.reduction_amount ?? 0);
+    const montantApresReduction = Math.max(0, pn - reductionOther);
+    const taxesAmount = Math.round((montantApresReduction + (row.accessory_amount ?? 0)) * 0.145);
     return montantApresReduction
         + (row.accessory_amount ?? 0)
         + taxesAmount

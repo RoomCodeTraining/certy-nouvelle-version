@@ -15,6 +15,7 @@ use App\Http\Controllers\Settings\ReportSettingController;
 use App\Http\Controllers\Settings\CertyIaSettingsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\OptionalGuaranteeController;
+use App\Http\Controllers\Settings\PricingGridController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\Reports\ProductionController;
 use Illuminate\Support\Facades\Route;
@@ -52,6 +53,8 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
         Route::put('/settings/certy-ia', [CertyIaSettingsController::class, 'update'])->name('settings.certy-ia.update');
         Route::get('/settings/guarantees', [OptionalGuaranteeController::class, 'index'])->name('settings.guarantees.index');
         Route::put('/settings/guarantees/{guarantee}', [OptionalGuaranteeController::class, 'update'])->name('settings.guarantees.update');
+        Route::get('/settings/pricing-grids', [PricingGridController::class, 'index'])->name('settings.pricing-grids.index');
+        Route::patch('/api/pricing-grids/update', [PricingGridController::class, 'update'])->name('api.pricing-grids.update');
     });
 
     // CRUD Clients

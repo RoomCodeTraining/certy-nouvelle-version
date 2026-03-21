@@ -189,6 +189,13 @@ class ContractController extends Controller
         $perPage = min(max((int) $request->input('per_page', 25), 1), 100);
         $contracts = $query->paginate($perPage)->withQueryString();
 
+        $contracts->through(function (Contract $c) {
+            $c->setAttribute('prime_nette', $c->getPrimeNetteForDisplay());
+            $c->setAttribute('prime_ttc', (int) ($c->total_amount ?? $c->prime_ttc ?? 0));
+
+            return $c;
+        });
+
         $draftCount = Contract::accessibleBy($user)->where('status', Contract::STATUS_DRAFT)->count();
 
         return Inertia::render('Contracts/Index', [
@@ -504,7 +511,13 @@ class ContractController extends Controller
         }
         $contract->load($relations);
 
-        // Une attestation "réelle" = numéro ou lien disponible (pas seulement attestation_issued_at)
+        $displayAmounts = $contract->getDisplayAmounts();
+        $contract->setAttribute('guarantee_amounts_reduced', $displayAmounts['guarantee_amounts_reduced']);
+        $contract->setAttribute('prime_nette', $displayAmounts['prime_nette']);
+        $contract->setAttribute('montant_apres_reduction', $displayAmounts['montant_apres_reduction']);
+        $contract->setAttribute('taxes_amount_display', $displayAmounts['taxes_amount']);
+        $contract->setAttribute('total_amount_display', $displayAmounts['total_amount']);
+
         $hasAttestation = $contract->attestation_number !== null || $contract->attestation_link !== null;
         $canEditAttestation = in_array($contract->status, [Contract::STATUS_VALIDATED, Contract::STATUS_ACTIVE], true) && ! $hasAttestation;
 

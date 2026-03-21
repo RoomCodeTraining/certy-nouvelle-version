@@ -100,6 +100,8 @@ const recap = ref({
     amounts: {},
 });
 
+const todayYMD = computed(() => new Date().toISOString().slice(0, 10));
+
 const optionalGuaranteeDefs = computed(() =>
     props.optionalGuaranteesEnabled
         ? (props.optionalGuaranteesConfig || []).filter((g) => g.enabled)
@@ -132,12 +134,9 @@ watch(
     { immediate: true },
 );
 
-watch(
-    optionalGuaranteeDefs,
-    () => {
-        initOptionalGuarantees();
-    },
-);
+watch(optionalGuaranteeDefs, () => {
+    initOptionalGuarantees();
+});
 
 const vehicleNewValue = ref(null);
 const vehicleVenaleValue = ref(null);
@@ -194,11 +193,16 @@ function onClientChange() {
     form.contract_type = "VP";
 }
 
+const isTwoWheeler = computed(() => form.contract_type === "TWO_WHEELER");
+
 function onVehicleChange() {
     const v = vehiclesForClient.value.find(
         (vh) => String(vh.id) === String(form.vehicle_id),
     );
     form.contract_type = v?.pricing_type ?? "VP";
+    if (form.contract_type === "TWO_WHEELER") {
+        form.duration = "12_months";
+    }
     if (v) {
         vehicleNewValue.value =
             v.new_value != null ? Number(v.new_value) : null;
@@ -367,6 +371,7 @@ function applyParentContract(parent) {
     if (parent.client_id) form.client_id = String(parent.client_id);
     if (parent.company_id) form.company_id = String(parent.company_id);
     if (parent.contract_type) form.contract_type = parent.contract_type;
+    if (form.contract_type === "TWO_WHEELER") form.duration = "12_months";
     if (parent.end_date) {
         const end = new Date(parent.end_date + "T12:00:00");
         end.setDate(end.getDate() + 1);
@@ -397,7 +402,9 @@ onMounted(() => {
         applyParentContract(props.parentContract);
     } else if (props.initialVehicleId && props.clients?.length) {
         for (const client of props.clients) {
-            const vehicle = (client.vehicles ?? []).find((v) => String(v.id) === String(props.initialVehicleId));
+            const vehicle = (client.vehicles ?? []).find(
+                (v) => String(v.id) === String(props.initialVehicleId),
+            );
             if (vehicle) {
                 form.client_id = String(client.id);
                 form.vehicle_id = String(vehicle.id);
@@ -411,7 +418,9 @@ onMounted(() => {
 
 watch(
     () => props.parentContract,
-    (parent) => { if (parent) applyParentContract(parent); },
+    (parent) => {
+        if (parent) applyParentContract(parent);
+    },
     { immediate: true },
 );
 
@@ -604,47 +613,8 @@ const totalAccessoryDisplay = computed(
         agencyAccessoryDisplay.value,
 );
 
-/** Montant total avant toute réduction (prime + accessoires) = base du calcul des réductions */
+/** Montant total avant toute réduction (pour affichage réduction) */
 const totalBeforeReduction = computed(
-    () =>
-        (recap.value.prime_amount ?? 0) +
-        totalAccessoryDisplay.value +
-        optionalGuaranteesTotal.value,
-);
-
-/** Réductions en montant (FCFA) appliquées au total avant réduction */
-const reductionBnsAmount = computed(() => {
-    const pct = Number(form.reduction_bns);
-    if (!pct || pct <= 0) return 0;
-    return Math.round(totalBeforeReduction.value * (pct / 100));
-});
-const reductionCommissionAmount = computed(() => {
-    const pct = Number(form.reduction_on_commission);
-    if (!pct || pct <= 0) return 0;
-    return Math.round(totalBeforeReduction.value * (pct / 100));
-});
-const reductionProfessionPercentAmount = computed(() => {
-    const pct = Number(form.reduction_on_profession_percent);
-    if (!pct || pct <= 0) return 0;
-    return Math.round(totalBeforeReduction.value * (pct / 100));
-});
-const reductionProfessionAmount = computed(
-    () => Number(form.reduction_on_profession_amount) || 0,
-);
-const reductionOtherAmount = computed(() => Number(form.reduction_amount) || 0);
-
-/** Total de toutes les réductions (impact sur le montant total et les frais) */
-const totalReduction = computed(
-    () =>
-        reductionBnsAmount.value +
-        reductionCommissionAmount.value +
-        reductionProfessionPercentAmount.value +
-        reductionProfessionAmount.value +
-        reductionOtherAmount.value,
-);
-
-/** Prime nette = RC + DR + TP + optional (comme sur le PDF) */
-const primeNetteCreate = computed(
     () =>
         (recap.value.amounts?.rc_amount ?? 0) +
         (recap.value.amounts?.defence_appeal_amount ?? 0) +
@@ -652,42 +622,121 @@ const primeNetteCreate = computed(
         optionalGuaranteesTotal.value,
 );
 
-/** Réductions appliquées sur la prime nette (comme le PDF) */
-const reductionOnPrimeNette = computed(() => {
-    const pctBns = Number(form.reduction_bns) || 0;
-    const pctComm = Number(form.reduction_on_commission) || 0;
-    const pctProf = Number(form.reduction_on_profession_percent) || 0;
-    const amtProf = Number(form.reduction_on_profession_amount) || 0;
-    const pn = primeNetteCreate.value;
-    const bns = pctBns > 0 ? Math.round(pn * pctBns / 100) : 0;
-    const comm = pctComm > 0 ? Math.round(pn * pctComm / 100) : 0;
-    const prof = pctProf > 0 ? Math.round(pn * pctProf / 100) : amtProf;
-    return bns + comm + prof + reductionOtherAmount.value;
+const reductionOtherAmount = computed(() => Number(form.reduction_amount) || 0);
+
+/** Montants par garantie : RC, DR, TP, puis chaque optionnelle */
+const guaranteeAmounts = computed(() => {
+    const amounts = [];
+    const rc = recap.value.amounts?.rc_amount ?? 0;
+    const dr = recap.value.amounts?.defence_appeal_amount ?? 0;
+    const tp = recap.value.amounts?.person_transport_amount ?? 0;
+    if (rc > 0) amounts.push({ key: "rc", amount: rc });
+    if (dr > 0) amounts.push({ key: "dr", amount: dr });
+    if (tp > 0) amounts.push({ key: "tp", amount: tp });
+    (form.optional_guarantees_detail ?? []).forEach((g) => {
+        const amt = Number(g?.amount ?? 0);
+        if (amt > 0) amounts.push({ key: g.code, amount: amt });
+    });
+    return amounts;
 });
 
-/** Montant après réduction (comme le PDF) */
+/** Réductions appliquées sur chaque garantie, puis somme = prime nette */
+const pctBns = computed(() => Number(form.reduction_bns) || 0);
+const pctComm = computed(() => Number(form.reduction_on_commission) || 0);
+const pctProf = computed(() => Number(form.reduction_on_profession_percent) || 0);
+const profFixed = computed(() => Number(form.reduction_on_profession_amount) || 0);
+const totalPct = computed(() => pctBns.value + pctComm.value + pctProf.value);
+const hasPercentReduction = computed(() => totalPct.value > 0);
+
+/** Pour chaque garantie : montant après réduction (réductions % + part de prof fixe) */
+function amountAfterReductionForGuarantee(guaranteeAmount, totalGuarantees, index) {
+    if (totalGuarantees <= 0) return guaranteeAmount;
+    let reduced = guaranteeAmount;
+    if (hasPercentReduction.value) {
+        reduced = Math.max(0, guaranteeAmount - Math.round((guaranteeAmount * totalPct.value) / 100));
+    }
+    const profFixedAmt = profFixed.value;
+    if (profFixedAmt > 0) {
+        const share = Math.round((guaranteeAmount / totalGuarantees) * profFixedAmt);
+        reduced = Math.max(0, reduced - share);
+    }
+    return reduced;
+}
+
+/** Garanties avec montants réduits pour affichage (chaque garantie réduite, somme = prime nette) */
+const guaranteeDisplayItems = computed(() => {
+    const amounts = guaranteeAmounts.value;
+    const total = amounts.reduce((s, a) => s + a.amount, 0);
+    const labels = { rc: "Responsabilité Civile", dr: "Défense et Recours", tp: "Transport de personnes" };
+    const optionalDetail = form.optional_guarantees_detail ?? [];
+    return amounts.map(({ key, amount }) => {
+        let label = labels[key];
+        if (!label) {
+            label = optionalDetail.find((g) => g.code === key)?.label || "Autre garantie";
+        }
+        return {
+            key,
+            label: label || key,
+            amountReduced: amountAfterReductionForGuarantee(amount, total, 0),
+        };
+    });
+});
+
+/** Prime nette = somme des (chaque garantie après réduction) */
+const primeNetteCreate = computed(() => {
+    const amounts = guaranteeAmounts.value;
+    const total = amounts.reduce((s, a) => s + a.amount, 0);
+    if (total <= 0) return totalBeforeReduction.value;
+    let sum = 0;
+    amounts.forEach(({ amount }) => {
+        sum += amountAfterReductionForGuarantee(amount, total, 0);
+    });
+    return sum;
+});
+
+/** RC après réduction (pour FGA = 2% si réduction) */
+const rcAfterReduction = computed(() => {
+    const rc = recap.value.amounts?.rc_amount ?? 0;
+    if (rc <= 0) return 0;
+    const amounts = guaranteeAmounts.value;
+    const total = amounts.reduce((s, a) => s + a.amount, 0);
+    if (total <= 0) return rc;
+    return amountAfterReductionForGuarantee(rc, total, 0);
+});
+
+/** Montant après réduction = prime nette (déjà réduite) - réduction "autre" si applicable */
 const montantApresReductionCreate = computed(() =>
-    Math.max(0, primeNetteCreate.value - reductionOnPrimeNette.value),
+    Math.max(0, primeNetteCreate.value - reductionOtherAmount.value),
 );
 
-/** Taxe = 14,5 % du montant après réduction */
+/** Accessoire grille (pour calcul taxe et total) */
+const accessoryForTax = computed(
+    () => recap.value.amounts?.accessory_amount ?? recap.value.accessory_amount ?? 0,
+);
+
+/** Taxe = 14,5 % de (prime nette + accessoire) */
 const taxesAmountCreate = computed(() =>
-    Math.round(montantApresReductionCreate.value * 0.145),
+    Math.round((montantApresReductionCreate.value + accessoryForTax.value) * 0.145),
 );
 
-/** Prime TTC = Montant après réduction + Accessoire + Taxes + FGA + CEDEAO (comme le PDF) */
-const displayTotal = computed(() =>
-    montantApresReductionCreate.value +
-    (recap.value.amounts?.accessory_amount ?? recap.value.accessory_amount ?? 0) +
-    taxesAmountCreate.value +
-    (recap.value.amounts?.fga_amount ?? 0) +
-    (recap.value.amounts?.cedeao_amount ?? 0),
-);
+/** Taxe FGA = 2 % de la RC après réduction si réduction appliquée, sinon grille */
+const fgaAmountCreate = computed(() => {
+    const hasReduction = hasPercentReduction.value || profFixed.value > 0 || reductionOtherAmount.value > 0;
+    if (hasReduction && rcAfterReduction.value > 0) {
+        return Math.round(rcAfterReduction.value * 0.02);
+    }
+    return recap.value.amounts?.fga_amount ?? 0;
+});
 
-/** Pourcentages de réduction (affichage) */
-const reductionBnsPct = computed(() => Number(form.reduction_bns) || 0);
-const reductionCommPct = computed(() => Number(form.reduction_on_commission) || 0);
-const reductionProfPct = computed(() => Number(form.reduction_on_profession_percent) || 0);
+/** Prime TTC = Montant après réduction + Accessoire + Taxes + FGA + CEDEAO */
+const displayTotal = computed(
+    () =>
+        montantApresReductionCreate.value +
+        accessoryForTax.value +
+        taxesAmountCreate.value +
+        fgaAmountCreate.value +
+        (recap.value.amounts?.cedeao_amount ?? 0),
+);
 
 watch(
     () => [form.vehicle_id, form.contract_type, form.start_date, form.end_date],
@@ -703,6 +752,16 @@ watch(
         applyDuration();
     },
     { deep: true },
+);
+
+watch(
+    () => form.contract_type,
+    (type) => {
+        if (type === "TWO_WHEELER") {
+            form.duration = "12_months";
+            applyDuration();
+        }
+    },
 );
 
 watch(
@@ -867,6 +926,7 @@ function submitDraft() {
                             <select
                                 v-model="form.duration"
                                 :class="inputClass"
+                                :disabled="isTwoWheeler"
                                 @change="applyDuration"
                             >
                                 <option
@@ -877,6 +937,12 @@ function submitDraft() {
                                     {{ opt.label }}
                                 </option>
                             </select>
+                            <p
+                                v-if="isTwoWheeler"
+                                class="mt-1 text-xs text-slate-500"
+                            >
+                                Durée annuelle obligatoire pour deux roues
+                            </p>
                         </div>
                         <div>
                             <label
@@ -889,6 +955,7 @@ function submitDraft() {
                                 :error="!!form.errors.start_date"
                                 :input-class="inputClass"
                                 :year-range="[2020, 2030]"
+                                :min="todayYMD"
                             />
                             <p
                                 v-if="form.errors.start_date"
@@ -1025,14 +1092,12 @@ function submitDraft() {
                             Garanties
                         </h3>
                         <p class="text-xs text-slate-500">
-                            Cochez les garanties souhaitées. Les montants sont calculés
-                            à partir de la valeur neuve ou vénale du véhicule.
+                            Cochez les garanties souhaitées. Les montants sont
+                            calculés à partir de la valeur neuve ou vénale du
+                            véhicule.
                         </p>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div
-                                class="space-y-2"
-                                v-if="anyGuaranteeUsingNew"
-                            >
+                            <div class="space-y-2" v-if="anyGuaranteeUsingNew">
                                 <label
                                     class="block text-sm font-medium text-slate-700 mb-1"
                                 >
@@ -1050,7 +1115,8 @@ function submitDraft() {
                                     v-if="missingNewBase"
                                     class="text-xs text-amber-600"
                                 >
-                                    Requis pour les garanties basées sur la valeur neuve.
+                                    Requis pour les garanties basées sur la
+                                    valeur neuve.
                                 </p>
                             </div>
                             <div
@@ -1074,7 +1140,8 @@ function submitDraft() {
                                     v-if="missingVenaleBase"
                                     class="text-xs text-amber-600"
                                 >
-                                    Requis pour les garanties basées sur la valeur vénale.
+                                    Requis pour les garanties basées sur la
+                                    valeur vénale.
                                 </p>
                             </div>
                         </div>
@@ -1086,12 +1153,16 @@ function submitDraft() {
                             >
                                 <div class="flex items-start gap-2">
                                     <input
-                                        v-model="optionalGuarantees[def.code].enabled"
+                                        v-model="
+                                            optionalGuarantees[def.code].enabled
+                                        "
                                         type="checkbox"
                                         class="mt-1 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
                                     />
                                     <div>
-                                        <p class="text-sm font-medium text-slate-800">
+                                        <p
+                                            class="text-sm font-medium text-slate-800"
+                                        >
                                             {{ def.label }}
                                         </p>
                                         <p class="text-xs text-slate-500">
@@ -1110,9 +1181,10 @@ function submitDraft() {
                                     </p>
                                     <p class="font-medium text-slate-900">
                                         {{
-                                            (optionalGuarantees[def.code].amount || 0).toLocaleString(
-                                                "fr-FR",
-                                            )
+                                            (
+                                                optionalGuarantees[def.code]
+                                                    .amount || 0
+                                            ).toLocaleString("fr-FR")
                                         }}
                                         FCFA
                                     </p>
@@ -1124,7 +1196,11 @@ function submitDraft() {
                             >
                                 Total garanties optionnelles :
                                 <span class="font-semibold">
-                                    {{ optionalGuaranteesTotal.toLocaleString("fr-FR") }}
+                                    {{
+                                        optionalGuaranteesTotal.toLocaleString(
+                                            "fr-FR",
+                                        )
+                                    }}
                                     FCFA
                                 </span>
                             </p>
@@ -1271,10 +1347,7 @@ function submitDraft() {
                     </template>
                     <template v-else-if="recap.total_premium != null">
                         <!-- Garanties (comme sur le PDF) -->
-                        <div
-                            v-if="primeNetteCreate > 0"
-                            class="space-y-2"
-                        >
+                        <div v-if="primeNetteCreate > 0" class="space-y-2">
                             <h4
                                 class="text-xs font-semibold text-slate-600 uppercase tracking-wide"
                             >
@@ -1282,54 +1355,42 @@ function submitDraft() {
                             </h4>
                             <dl class="space-y-1.5 text-sm">
                                 <div
-                                    v-if="(recap.amounts?.rc_amount ?? 0) > 0"
+                                    v-for="item in guaranteeDisplayItems"
+                                    :key="item.key"
                                     class="flex justify-between gap-2"
                                 >
-                                    <dt class="text-slate-600">Responsabilité Civile</dt>
-                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                        {{ Number(recap.amounts.rc_amount).toLocaleString("fr-FR") }} FCFA
-                                    </dd>
-                                </div>
-                                <div
-                                    v-if="(recap.amounts?.defence_appeal_amount ?? 0) > 0"
-                                    class="flex justify-between gap-2"
-                                >
-                                    <dt class="text-slate-600">Défense et Recours</dt>
-                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                        {{ Number(recap.amounts.defence_appeal_amount).toLocaleString("fr-FR") }} FCFA
-                                    </dd>
-                                </div>
-                                <div
-                                    v-if="(recap.amounts?.person_transport_amount ?? 0) > 0"
-                                    class="flex justify-between gap-2"
-                                >
-                                    <dt class="text-slate-600">Transport de personnes</dt>
-                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                        {{ Number(recap.amounts.person_transport_amount).toLocaleString("fr-FR") }} FCFA
-                                    </dd>
-                                </div>
-                                <template v-if="(form.optional_guarantees_detail || []).length">
-                                    <div
-                                        v-for="g in form.optional_guarantees_detail"
-                                        :key="g.code"
-                                        class="flex justify-between gap-2"
+                                    <dt class="text-slate-600 truncate">
+                                        {{ item.label }}
+                                    </dt>
+                                    <dd
+                                        class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
                                     >
-                                        <dt class="text-slate-600 truncate">{{ g.label || "Autre garantie" }}</dt>
-                                        <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                            {{ Number(g.amount ?? 0).toLocaleString("fr-FR") }} FCFA
-                                        </dd>
-                                    </div>
-                                </template>
-                                <div class="flex justify-between gap-2 pt-1.5 border-t border-slate-200">
-                                    <dt class="text-slate-700 font-medium">Prime nette</dt>
-                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                        {{ primeNetteCreate.toLocaleString("fr-FR") }} FCFA
+                                        {{ item.amountReduced.toLocaleString("fr-FR") }} FCFA
+                                    </dd>
+                                </div>
+                                <div
+                                    class="flex justify-between gap-2 pt-1.5 border-t border-slate-200"
+                                >
+                                    <dt class="text-slate-700 font-medium">
+                                        Prime nette
+                                    </dt>
+                                    <dd
+                                        class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
+                                    >
+                                        {{
+                                            primeNetteCreate.toLocaleString(
+                                                "fr-FR",
+                                            )
+                                        }}
+                                        FCFA
                                     </dd>
                                 </div>
                             </dl>
                         </div>
                         <!-- Résumé financier (comme sur le PDF) -->
-                        <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide pt-3">
+                        <h4
+                            class="text-xs font-semibold text-slate-600 uppercase tracking-wide pt-3"
+                        >
                             Résumé financier
                         </h4>
                         <dl class="space-y-2 text-sm">
@@ -1338,52 +1399,35 @@ function submitDraft() {
                                 class="flex justify-between gap-2"
                             >
                                 <dt class="text-slate-600">Prime nette</dt>
-                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                    {{ primeNetteCreate.toLocaleString("fr-FR") }} FCFA
-                                </dd>
-                            </div>
-                            <template v-if="reductionOnPrimeNette > 0">
-                                <div
-                                    v-if="reductionBnsPct > 0"
-                                    class="flex justify-between gap-2"
+                                <dd
+                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
                                 >
-                                    <dt class="text-slate-600">Réduction BNS</dt>
-                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                        {{ reductionBnsPct.toLocaleString("fr-FR", { minimumFractionDigits: 1 }) }} %
-                                    </dd>
-                                </div>
-                                <div
-                                    v-if="reductionCommPct > 0"
-                                    class="flex justify-between gap-2"
-                                >
-                                    <dt class="text-slate-600">Réduction commission</dt>
-                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                        {{ reductionCommPct.toLocaleString("fr-FR", { minimumFractionDigits: 1 }) }} %
-                                    </dd>
-                                </div>
-                                <div
-                                    v-if="reductionProfPct > 0"
-                                    class="flex justify-between gap-2"
-                                >
-                                    <dt class="text-slate-600">Réduction profession</dt>
-                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                        {{ reductionProfPct.toLocaleString("fr-FR", { minimumFractionDigits: 1 }) }} %
-                                    </dd>
-                                </div>
-                            </template>
-                            <div class="flex justify-between gap-2">
-                                <dt class="text-slate-600 font-medium">Montant après réduction</dt>
-                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                    {{ montantApresReductionCreate.toLocaleString("fr-FR") }} FCFA
+                                    {{
+                                        primeNetteCreate.toLocaleString("fr-FR")
+                                    }}
+                                    FCFA
                                 </dd>
                             </div>
                             <div
-                                v-if="(recap.amounts?.accessory_amount ?? recap.accessory_amount ?? 0) > 0"
+                                v-if="
+                                    (recap.amounts?.accessory_amount ??
+                                        recap.accessory_amount ??
+                                        0) > 0
+                                "
                                 class="flex justify-between gap-2"
                             >
                                 <dt class="text-slate-600">Accessoire</dt>
-                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                    {{ Number(recap.amounts?.accessory_amount ?? recap.accessory_amount ?? 0).toLocaleString("fr-FR") }} FCFA
+                                <dd
+                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
+                                >
+                                    {{
+                                        Number(
+                                            recap.amounts?.accessory_amount ??
+                                                recap.accessory_amount ??
+                                                0,
+                                        ).toLocaleString("fr-FR")
+                                    }}
+                                    FCFA
                                 </dd>
                             </div>
                             <div
@@ -1391,17 +1435,26 @@ function submitDraft() {
                                 class="flex justify-between gap-2"
                             >
                                 <dt class="text-slate-600">Taxes</dt>
-                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                    {{ taxesAmountCreate.toLocaleString("fr-FR") }} FCFA
+                                <dd
+                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
+                                >
+                                    {{
+                                        taxesAmountCreate.toLocaleString(
+                                            "fr-FR",
+                                        )
+                                    }}
+                                    FCFA
                                 </dd>
                             </div>
                             <div
-                                v-if="(recap.amounts?.fga_amount ?? 0) > 0"
+                                v-if="fgaAmountCreate > 0"
                                 class="flex justify-between gap-2"
                             >
                                 <dt class="text-slate-600">Taxe FGA</dt>
-                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                    {{ Number(recap.amounts.fga_amount).toLocaleString("fr-FR") }} FCFA
+                                <dd
+                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
+                                >
+                                    {{ fgaAmountCreate.toLocaleString("fr-FR") }} FCFA
                                 </dd>
                             </div>
                             <div
@@ -1409,41 +1462,93 @@ function submitDraft() {
                                 class="flex justify-between gap-2"
                             >
                                 <dt class="text-slate-600">CEDEAO</dt>
-                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                    {{ Number(recap.amounts.cedeao_amount).toLocaleString("fr-FR") }} FCFA
+                                <dd
+                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
+                                >
+                                    {{
+                                        Number(
+                                            recap.amounts.cedeao_amount,
+                                        ).toLocaleString("fr-FR")
+                                    }}
+                                    FCFA
                                 </dd>
                             </div>
-                            <div class="flex justify-between gap-2 pt-2 border-t-2 border-slate-200">
-                                <dt class="font-semibold text-slate-800 min-w-0">Prime TTC</dt>
-                                <dd class="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
-                                    {{ displayTotal.toLocaleString("fr-FR") }} FCFA
+                            <div
+                                class="flex justify-between gap-2 pt-2 border-t-2 border-slate-200"
+                            >
+                                <dt
+                                    class="font-semibold text-slate-800 min-w-0"
+                                >
+                                    Prime TTC
+                                </dt>
+                                <dd
+                                    class="font-semibold text-slate-900 shrink-0 whitespace-nowrap"
+                                >
+                                    {{
+                                        displayTotal.toLocaleString("fr-FR")
+                                    }}
+                                    FCFA
                                 </dd>
                             </div>
                             <div
                                 v-if="(form.agency_accessory ?? 0) > 0"
                                 class="flex justify-between gap-2"
                             >
-                                <dt class="text-slate-600">Accessoire agence</dt>
-                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                    {{ Number(form.agency_accessory).toLocaleString("fr-FR") }} FCFA
+                                <dt class="text-slate-600">
+                                    Accessoire agence
+                                </dt>
+                                <dd
+                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
+                                >
+                                    {{
+                                        Number(
+                                            form.agency_accessory,
+                                        ).toLocaleString("fr-FR")
+                                    }}
+                                    FCFA
                                 </dd>
                             </div>
                             <div
                                 v-if="(form.company_accessory ?? 0) > 0"
                                 class="flex justify-between gap-2"
                             >
-                                <dt class="text-slate-600">Accessoire compagnie</dt>
-                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
-                                    {{ Number(form.company_accessory).toLocaleString("fr-FR") }} FCFA
+                                <dt class="text-slate-600">
+                                    Accessoire compagnie
+                                </dt>
+                                <dd
+                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
+                                >
+                                    {{
+                                        Number(
+                                            form.company_accessory,
+                                        ).toLocaleString("fr-FR")
+                                    }}
+                                    FCFA
                                 </dd>
                             </div>
                             <div
-                                v-if="(form.agency_accessory ?? 0) > 0 || (form.company_accessory ?? 0) > 0"
+                                v-if="
+                                    (form.agency_accessory ?? 0) > 0 ||
+                                    (form.company_accessory ?? 0) > 0
+                                "
                                 class="flex justify-between gap-2 pt-2 border-t border-slate-200"
                             >
-                                <dt class="font-semibold text-slate-800 min-w-0">Montant à payer</dt>
-                                <dd class="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
-                                    {{ (displayTotal + Number(form.agency_accessory ?? 0) + Number(form.company_accessory ?? 0)).toLocaleString("fr-FR") }} FCFA
+                                <dt
+                                    class="font-semibold text-slate-800 min-w-0"
+                                >
+                                    Montant à payer
+                                </dt>
+                                <dd
+                                    class="font-semibold text-slate-900 shrink-0 whitespace-nowrap"
+                                >
+                                    {{
+                                        (
+                                            displayTotal +
+                                            Number(form.agency_accessory ?? 0) +
+                                            Number(form.company_accessory ?? 0)
+                                        ).toLocaleString("fr-FR")
+                                    }}
+                                    FCFA
                                 </dd>
                             </div>
                         </dl>

@@ -223,4 +223,16 @@ return [
     */
     'reporting_export_background_threshold' => (int) env('REPORTING_EXPORT_BACKGROUND_THRESHOLD', 200),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Grilles tarifaires affichées sur le dashboard root
+    |--------------------------------------------------------------------------
+    | Types de grilles à afficher : VP, TPC, TPM, TWO_WHEELER.
+    | Liste vide = toutes affichées.
+    */
+    'pricing_grid_types' => array_filter(
+        array_map('trim', explode(',', env('PRICING_GRID_TYPES', 'VP,TPC,TPM,TWO_WHEELER'))),
+        fn ($v) => $v !== '',
+    ) ?: ['VP', 'TPC', 'TPM', 'TWO_WHEELER'],
+
 ];

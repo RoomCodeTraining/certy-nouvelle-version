@@ -230,8 +230,8 @@ class Contract extends Model
     }
 
     /**
-     * Total de toutes les réductions en FCFA (appliquées sur prime nette).
-     * Utilise la valeur stockée total_reduction_amount si présente, sinon calcule.
+     * Total de toutes les réductions en FCFA.
+     * Utilise la valeur stockée total_reduction_amount si présente, sinon appelle computeAndFillStoredAmounts.
      */
     public function getTotalReductionAmountAttribute(): int
     {
@@ -239,31 +239,9 @@ class Contract extends Model
         if ($stored !== null && (int) $stored >= 0) {
             return (int) $stored;
         }
-        $primeNette = (int) ($this->rc_amount ?? 0)
-            + (int) ($this->defence_appeal_amount ?? 0)
-            + (int) ($this->person_transport_amount ?? 0)
-            + (int) ($this->optional_guarantees_amount ?? 0);
-        if ($primeNette <= 0) {
-            return 0;
-        }
-        $r = 0;
-        $bns = (float) ($this->reduction_bns ?? 0);
-        if ($bns > 0) {
-            $r += (int) round($primeNette * ($bns / 100));
-        }
-        $comm = (float) ($this->reduction_on_commission ?? 0);
-        if ($comm > 0) {
-            $r += (int) round($primeNette * ($comm / 100));
-        }
-        $profPct = (float) ($this->reduction_on_profession_percent ?? 0);
-        if ($profPct > 0) {
-            $r += (int) round($primeNette * ($profPct / 100));
-        } else {
-            $r += (int) ($this->reduction_on_profession_amount ?? 0);
-        }
-        $r += (int) ($this->reduction_amount ?? 0);
+        $this->computeAndFillStoredAmounts();
 
-        return $r;
+        return (int) ($this->getRawOriginal('total_reduction_amount') ?? 0);
     }
 
     /**
@@ -292,57 +270,73 @@ class Contract extends Model
         if ($stored !== null) {
             return max(0, (int) $stored);
         }
-        $primeNette = (int) ($this->rc_amount ?? 0)
-            + (int) ($this->defence_appeal_amount ?? 0)
-            + (int) ($this->person_transport_amount ?? 0)
-            + (int) ($this->optional_guarantees_amount ?? 0);
-        $totalReduction = $this->getTotalReductionAmountAttribute();
-        $montantApresReduction = max(0, $primeNette - $totalReduction);
-        $taxesAmount = (int) round($montantApresReduction * 0.145);
+        $this->computeAndFillStoredAmounts();
 
-        return $montantApresReduction
-            + (int) ($this->accessory_amount ?? 0)
-            + $taxesAmount
-            + (int) ($this->fga_amount ?? 0)
-            + (int) ($this->cedeao_amount ?? 0);
+        return max(0, (int) ($this->getRawOriginal('total_amount') ?? 0));
     }
 
     /**
-     * Calcule et remplit tous les montants stockés selon la formule du PDF.
-     * Formule : prime_nette = RC + DR + TP + optional ; réductions sur prime_nette ;
-     * montant_apres_reduction = prime_nette - réductions ;
-     * total_amount (Prime TTC) = montant_apres_reduction + accessory + taxes + fga + cedao.
-     * Les accessoires agence et compagnie ne sont pas inclus dans total_amount.
+     * Calcule et remplit tous les montants stockés.
+     * Chaque réduction (BNS, commission, profession) s'applique sur chaque garantie ;
+     * prime_nette = somme des garanties après réduction.
+     * Taxe = 14,5 % de (prime_nette + accessoire).
+     * Taxe FGA = 2 % de la RC après réduction si réduction, sinon grille.
      */
     public function computeAndFillStoredAmounts(): void
     {
-        $primeNette = (int) ($this->rc_amount ?? 0)
-            + (int) ($this->defence_appeal_amount ?? 0)
-            + (int) ($this->person_transport_amount ?? 0)
-            + (int) ($this->optional_guarantees_amount ?? 0);
+        $amounts = $this->getGuaranteeAmountsArray();
+        $totalGuarantees = array_sum($amounts);
 
         $bnsPct = (float) ($this->reduction_bns ?? 0);
-        $reductionBnsAmount = $bnsPct > 0 ? (int) round($primeNette * ($bnsPct / 100)) : 0;
-
         $commPct = (float) ($this->reduction_on_commission ?? 0);
-        $reductionOnCommissionAmount = $commPct > 0 ? (int) round($primeNette * ($commPct / 100)) : 0;
-
         $profPct = (float) ($this->reduction_on_profession_percent ?? 0);
         $profFixed = (int) ($this->reduction_on_profession_amount ?? 0);
-        $reductionOnProfAmount = $profPct > 0
-            ? (int) round($primeNette * ($profPct / 100))
-            : $profFixed;
-
         $reductionOther = (int) ($this->reduction_amount ?? 0);
-        $totalReduction = $reductionBnsAmount + $reductionOnCommissionAmount + $reductionOnProfAmount + $reductionOther;
-        $montantApresReduction = max(0, $primeNette - $totalReduction);
+        $totalPct = $bnsPct + $commPct + $profPct;
 
-        $taxesAmount = (int) round($montantApresReduction * 0.145);
+        $primeNetteBeforeReduction = $totalGuarantees;
+        $primeNette = 0;
+        $rcAfterReduction = (int) ($this->rc_amount ?? 0);
+
+        foreach ($amounts as $key => $amount) {
+            if ($totalGuarantees <= 0) {
+                $reduced = $amount;
+            } else {
+                $reduced = $amount;
+                if ($totalPct > 0) {
+                    $reduced = max(0, $amount - (int) round($amount * $totalPct / 100));
+                }
+                if ($profFixed > 0) {
+                    $share = (int) round(($amount / $totalGuarantees) * $profFixed);
+                    $reduced = max(0, $reduced - $share);
+                }
+            }
+            $primeNette += $reduced;
+            if ($key === 'rc') {
+                $rcAfterReduction = $reduced;
+            }
+        }
+
+        $reductionBnsAmount = $bnsPct > 0 ? (int) round($primeNetteBeforeReduction * ($bnsPct / 100)) : 0;
+        $reductionOnCommissionAmount = $commPct > 0 ? (int) round($primeNetteBeforeReduction * ($commPct / 100)) : 0;
+        $reductionOnProfAmount = $profPct > 0
+            ? (int) round($primeNetteBeforeReduction * ($profPct / 100))
+            : $profFixed;
+        $totalReduction = $primeNetteBeforeReduction - $primeNette + $reductionOther;
+        $montantApresReduction = max(0, $primeNette - $reductionOther);
+
+        $accessoryForTax = (int) ($this->accessory_amount ?? 0);
+        $taxesAmount = (int) round(($montantApresReduction + $accessoryForTax) * 0.145);
+
+        $hasReduction = $totalPct > 0 || $profFixed > 0 || $reductionOther > 0;
+        $fgaAmount = $hasReduction && $rcAfterReduction > 0
+            ? (int) round($rcAfterReduction * 0.02)
+            : (int) ($this->fga_amount ?? 0);
 
         $totalAmount = $montantApresReduction
-            + (int) ($this->accessory_amount ?? 0)
+            + $accessoryForTax
             + $taxesAmount
-            + (int) ($this->fga_amount ?? 0)
+            + $fgaAmount
             + (int) ($this->cedeao_amount ?? 0);
 
         $this->forceFill([
@@ -352,8 +346,134 @@ class Contract extends Model
             'reduction_on_profession_amount_stored' => $reductionOnProfAmount,
             'total_reduction_amount' => $totalReduction,
             'taxes_amount' => $taxesAmount,
+            'fga_amount' => $fgaAmount,
             'total_amount' => $totalAmount,
         ]);
         $this->saveQuietly();
+    }
+
+    /** Retourne les montants par garantie : rc, dr, tp, optionnelles. */
+    private function getGuaranteeAmountsArray(): array
+    {
+        $result = [];
+        $rc = (int) ($this->rc_amount ?? 0);
+        $dr = (int) ($this->defence_appeal_amount ?? 0);
+        $tp = (int) ($this->person_transport_amount ?? 0);
+        if ($rc > 0) {
+            $result['rc'] = $rc;
+        }
+        if ($dr > 0) {
+            $result['dr'] = $dr;
+        }
+        if ($tp > 0) {
+            $result['tp'] = $tp;
+        }
+        $optional = $this->metadata['optional_guarantees'] ?? [];
+        $optSum = 0;
+        if (is_array($optional)) {
+            foreach ($optional as $g) {
+                $amt = (int) ($g['amount'] ?? 0);
+                if ($amt > 0) {
+                    $result['opt_' . ($g['code'] ?? count($result))] = $amt;
+                    $optSum += $amt;
+                }
+            }
+        }
+        $optTotal = (int) ($this->optional_guarantees_amount ?? 0);
+        if ($optTotal > 0 && $optSum === 0) {
+            $result['optional'] = $optTotal;
+        } elseif ($optTotal > $optSum) {
+            $result['optional'] = $optTotal - $optSum;
+        }
+        return $result;
+    }
+
+    /**
+     * Retourne les garanties avec montants réduits pour affichage PDF (chaque garantie réduite, somme = prime nette).
+     */
+    public function getGuaranteeAmountsReducedForDisplay(): array
+    {
+        $amounts = $this->getGuaranteeAmountsArray();
+        $totalGuarantees = array_sum($amounts);
+        $bnsPct = (float) ($this->reduction_bns ?? 0);
+        $commPct = (float) ($this->reduction_on_commission ?? 0);
+        $profPct = (float) ($this->reduction_on_profession_percent ?? 0);
+        $profFixed = (int) ($this->reduction_on_profession_amount ?? 0);
+        $totalPct = $bnsPct + $commPct + $profPct;
+
+        $labels = ['rc' => 'Responsabilité Civile', 'dr' => 'Défense et Recours', 'tp' => 'Transport de personnes'];
+        $optional = $this->metadata['optional_guarantees'] ?? [];
+        $result = [];
+
+        foreach ($amounts as $key => $amount) {
+            $reduced = $amount;
+            if ($totalGuarantees > 0) {
+                if ($totalPct > 0) {
+                    $reduced = max(0, $amount - (int) round($amount * $totalPct / 100));
+                }
+                if ($profFixed > 0) {
+                    $share = (int) round(($amount / $totalGuarantees) * $profFixed);
+                    $reduced = max(0, $reduced - $share);
+                }
+            }
+            $code = match ($key) {
+                'rc' => 'RC',
+                'dr' => 'DR',
+                'tp' => 'TP',
+                default => 'AG',
+            };
+            $label = $labels[$key] ?? null;
+            if (! $label && str_starts_with((string) $key, 'opt_')) {
+                $codePart = substr((string) $key, 4);
+                foreach ($optional as $g) {
+                    if (($g['code'] ?? '') === $codePart) {
+                        $code = $g['code'] ?? 'AG';
+                        $label = $g['label'] ?? 'Autre garantie';
+                        break;
+                    }
+                }
+                $label = $label ?? 'Autre garantie';
+            } elseif (! $label && $key === 'optional') {
+                $label = 'Autres garanties';
+            } else {
+                $label = $label ?? $key;
+            }
+            $result[] = ['code' => $code, 'label' => $label, 'amount' => $reduced];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Prime nette pour affichage (somme des garanties après réduction).
+     */
+    public function getPrimeNetteForDisplay(): int
+    {
+        $reduced = $this->getGuaranteeAmountsReducedForDisplay();
+
+        return (int) array_sum(array_column($reduced, 'amount'));
+    }
+
+    /**
+     * Montants d'affichage alignés entre tableaux, fiche détail et PDF.
+     * Source unique de vérité pour garantir la cohérence des chiffres.
+     */
+    public function getDisplayAmounts(): array
+    {
+        $guaranteesReduced = $this->getGuaranteeAmountsReducedForDisplay();
+        $primeNette = (int) array_sum(array_column($guaranteesReduced, 'amount'));
+        $reductionAutre = (int) ($this->reduction_amount ?? 0);
+        $montantApresReduction = max(0, $primeNette - $reductionAutre);
+
+        return [
+            'guarantee_amounts_reduced' => $guaranteesReduced,
+            'prime_nette' => $primeNette,
+            'montant_apres_reduction' => $montantApresReduction,
+            'taxes_amount' => (int) ($this->taxes_amount ?? 0),
+            'fga_amount' => (int) ($this->fga_amount ?? 0),
+            'cedeao_amount' => (int) ($this->cedeao_amount ?? 0),
+            'accessory_amount' => (int) ($this->accessory_amount ?? 0),
+            'total_amount' => (int) ($this->total_amount ?? $this->prime_ttc ?? 0),
+        ];
     }
 }

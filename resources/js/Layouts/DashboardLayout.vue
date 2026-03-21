@@ -191,11 +191,18 @@ const settingsItems = computed(() => {
         { href: "/settings/config", label: "Config courtier", icon: "cog" },
     ];
     if (isRoot.value) {
-        items.push({
-            href: "/settings/report-period",
-            label: "Export production",
-            icon: "documentText",
-        });
+        items.push(
+            {
+                href: "/settings/report-period",
+                label: "Export production",
+                icon: "documentText",
+            },
+            {
+                href: "/settings/pricing-grids",
+                label: "Grille tarifaire",
+                icon: "table",
+            },
+        );
     }
     if (certyIa.value?.enabled && isRoot.value) {
         items.push({
@@ -247,6 +254,7 @@ const iconPaths = {
     documentText:
         "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
     chart: "M4 20h16M7 20V10m5 10V6m5 14V4",
+    table: "M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z",
 };
 </script>
 

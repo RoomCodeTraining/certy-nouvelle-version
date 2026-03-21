@@ -273,10 +273,11 @@ function contractTypeLabel($type) {
             </div>
             <div class="col-right">
                 @php
-                    $optionalFromMeta = [];
-                    if (is_array($contract->metadata ?? null) && ! empty($contract->metadata['optional_guarantees'])) {
-                        $optionalFromMeta = $contract->metadata['optional_guarantees'];
-                    }
+                    $displayAmounts = $contract->getDisplayAmounts();
+                    $guaranteesReduced = $displayAmounts['guarantee_amounts_reduced'];
+                    $primeNettePdf = $displayAmounts['prime_nette'];
+                    $reductionAutre = (int) ($contract->reduction_amount ?? 0);
+                    $montantApresReductionPdf = $displayAmounts['montant_apres_reduction'];
                 @endphp
                 <div class="block">
                     <div class="section-title">Garanties</div>
@@ -289,51 +290,16 @@ function contractTypeLabel($type) {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>RC</td>
-                                <td>Responsabilité Civile</td>
-                                <td class="text-right font-bold">{{ number_format($contract->rc_amount ?? 0, 0, ',', ' ') }}</td>
-                            </tr>
-                            <tr>
-                                <td>DR</td>
-                                <td>Défense et Recours</td>
-                                <td class="text-right font-bold">{{ number_format($contract->defence_appeal_amount ?? 0, 0, ',', ' ') }}</td>
-                            </tr>
-                            <tr>
-                                <td>TP</td>
-                                <td>Transport de personnes</td>
-                                <td class="text-right font-bold">{{ number_format($contract->person_transport_amount ?? 0, 0, ',', ' ') }}</td>
-                            </tr>
-                            @if(!empty($optionalFromMeta))
-                                @foreach($optionalFromMeta as $g)
-                                    <tr>
-                                        <td>{{ $g['code'] ?? 'AG' }}</td>
-                                        <td>{{ $g['label'] ?? 'Autre garantie' }}</td>
-                                        <td class="text-right font-bold">
-                                            {{ number_format($g['amount'] ?? 0, 0, ',', ' ') }}
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            @elseif(($contract->optional_guarantees_amount ?? 0) > 0)
+                            @foreach($guaranteesReduced as $g)
                                 <tr>
-                                    <td>AG</td>
-                                    <td>Autres garanties</td>
-                                    <td class="text-right font-bold">{{ number_format($contract->optional_guarantees_amount ?? 0, 0, ',', ' ') }}</td>
+                                    <td>{{ $g['code'] }}</td>
+                                    <td>{{ $g['label'] }}</td>
+                                    <td class="text-right font-bold">{{ number_format($g['amount'], 0, ',', ' ') }}</td>
                                 </tr>
-                            @endif
+                            @endforeach
                             <tr class="font-bold">
                                 <td colspan="2" class="text-right">Prime nette</td>
-                                <td class="text-right">
-                                    {{ number_format(
-                                        ($contract->rc_amount ?? 0)
-                                        + ($contract->defence_appeal_amount ?? 0)
-                                        + ($contract->person_transport_amount ?? 0)
-                                        + ($contract->optional_guarantees_amount ?? 0),
-                                        0,
-                                        ',',
-                                        ' '
-                                    ) }}
-                                </td>
+                                <td class="text-right">{{ number_format($primeNettePdf, 0, ',', ' ') }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -341,57 +307,24 @@ function contractTypeLabel($type) {
                 <div class="block">
                     <div class="section-title">Résumé Financier</div>
                     @php
-                        $primeNette = ($contract->rc_amount ?? 0)
-                            + ($contract->defence_appeal_amount ?? 0)
-                            + ($contract->person_transport_amount ?? 0)
-                            + ($contract->optional_guarantees_amount ?? 0);
-                        $bnsPct = (float) ($contract->reduction_bns ?? 0);
-                        $commPct = (float) ($contract->reduction_on_commission ?? 0);
-                        $profPct = (float) ($contract->reduction_on_profession_percent ?? 0);
-                        $bnsAmount = $bnsPct > 0 ? (int) round($primeNette * ($bnsPct / 100)) : 0;
-                        $commAmount = $commPct > 0 ? (int) round($primeNette * ($commPct / 100)) : 0;
-                        // Toujours calculer depuis le % si défini (même logique que Contract model)
-                        if ($profPct > 0) {
-                            $profAmount = (int) round($primeNette * ($profPct / 100));
-                        } else {
-                            $profAmount = (int) ($contract->reduction_on_profession_amount_stored ?? $contract->reduction_on_profession_amount ?? 0);
-                        }
-                        $montantReduction = $bnsAmount + $commAmount + $profAmount;
-                        $montantApresReduction = $primeNette - $montantReduction;
-                        $taxesAmount = (int) round($montantApresReduction * 0.145);
-                        $primeTtc = $montantApresReduction
-                            + ($contract->accessory_amount ?? 0)
-                            + $taxesAmount
-                            + ($contract->fga_amount ?? 0)
-                            + ($contract->cedeao_amount ?? 0);
+                        $taxesAmount = $displayAmounts['taxes_amount'];
+                        $primeTtc = $displayAmounts['total_amount'];
                     @endphp
                     <table class="section-table">
                         <tr class="row-highlight">
                             <th>Prime nette</th>
-                            <td class="text-right">{{ number_format($primeNette, 0, ',', ' ') }}</td>
+                            <td class="text-right">{{ number_format($primeNettePdf, 0, ',', ' ') }}</td>
                         </tr>
-                        @if($bnsPct > 0)
-                            <tr>
-                                <th>Réduction BNS</th>
-                                <td class="text-right">{{ number_format($bnsPct, 1, ',', ' ') }} %</td>
-                            </tr>
-                        @endif
-                        @if($commPct > 0)
-                            <tr>
-                                <th>Réduction commission</th>
-                                <td class="text-right">{{ number_format($commPct, 1, ',', ' ') }} %</td>
-                            </tr>
-                        @endif
-                        @if($profAmount > 0)
-                            <tr>
-                                <th>Réduction profession</th>
-                                <td class="text-right">{{ number_format($profPct > 0 ? $profPct : round($profAmount / $primeNette * 100, 1), 1, ',', ' ') }} %</td>
-                            </tr>
-                        @endif
-                        <tr class="row-highlight">
+                        @if($reductionAutre > 0)
+                        <tr>
+                            <th>Réduction autre</th>
+                            <td class="text-right" style="color:#dc2626;">− {{ number_format($reductionAutre, 0, ',', ' ') }}</td>
+                        </tr>
+                        <tr>
                             <th>Montant après réduction</th>
-                            <td class="text-right">{{ number_format($montantApresReduction, 0, ',', ' ') }}</td>
+                            <td class="text-right font-bold">{{ number_format($montantApresReductionPdf, 0, ',', ' ') }}</td>
                         </tr>
+                        @endif
                         <tr>
                             <th>Accessoire</th>
                             <td class="text-right">{{ number_format($contract->accessory_amount ?? 0, 0, ',', ' ') }}</td>

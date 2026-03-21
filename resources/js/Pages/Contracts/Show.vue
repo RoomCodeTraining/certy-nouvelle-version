@@ -73,50 +73,125 @@ const optionalGuaranteesList = computed(() =>
         : [],
 );
 
-const primeNette = computed(
-    () =>
-        (props.contract?.rc_amount ?? 0) +
-        (props.contract?.defence_appeal_amount ?? 0) +
-        (props.contract?.person_transport_amount ?? 0) +
-        (props.contract?.optional_guarantees_amount ?? 0),
-);
-
-const montantReduction = computed(() => {
+/** Montants par garantie : RC, DR, TP, puis chaque optionnelle (identique au modèle Contract) */
+const guaranteeAmounts = computed(() => {
     const c = props.contract;
-    const pctBns = Number(c?.reduction_bns ?? 0);
-    const pctComm = Number(c?.reduction_on_commission ?? 0);
-    const pctProf = Number(c?.reduction_on_profession_percent ?? 0);
-    const amtProf = Number(
-        c?.reduction_on_profession_amount_stored ??
-            c?.reduction_on_profession_amount ??
-            0,
-    );
-    const bnsAmt =
-        pctBns > 0 ? Math.round((primeNette.value * pctBns) / 100) : 0;
-    const commAmt =
-        pctComm > 0 ? Math.round((primeNette.value * pctComm) / 100) : 0;
-    const profAmt =
-        pctProf > 0 ? Math.round((primeNette.value * pctProf) / 100) : amtProf;
-    return bnsAmt + commAmt + profAmt;
+    const amounts = [];
+    const rc = Number(c?.rc_amount ?? 0);
+    const dr = Number(c?.defence_appeal_amount ?? 0);
+    const tp = Number(c?.person_transport_amount ?? 0);
+    if (rc > 0) amounts.push({ key: "rc", amount: rc, label: "Responsabilité Civile" });
+    if (dr > 0) amounts.push({ key: "dr", amount: dr, label: "Défense et Recours" });
+    if (tp > 0) amounts.push({ key: "tp", amount: tp, label: "Transport de personnes" });
+    const optional = optionalGuaranteesList.value;
+    optional.forEach((g) => {
+        const amt = Number(g?.amount ?? 0);
+        if (amt > 0) {
+            amounts.push({
+                key: g.code ?? "opt",
+                amount: amt,
+                label: g.label || "Autre garantie",
+            });
+        }
+    });
+    const optTotal = Number(c?.optional_guarantees_amount ?? 0);
+    const optSum = optional.reduce((s, g) => s + Number(g?.amount ?? 0), 0);
+    if (optTotal > 0 && optSum === 0) {
+        amounts.push({ key: "optional", amount: optTotal, label: "Autres garanties" });
+    } else if (optTotal > optSum) {
+        amounts.push({ key: "optional", amount: optTotal - optSum, label: "Autres garanties" });
+    }
+    return amounts;
 });
 
-const montantApresReduction = computed(() =>
-    Math.max(0, primeNette.value - montantReduction.value),
+/** Réductions % et fixe : chaque réduction s'applique à chaque garantie (identique à Create.vue et PDF) */
+const pctBns = computed(() => Number(props.contract?.reduction_bns ?? 0));
+const pctComm = computed(() => Number(props.contract?.reduction_on_commission ?? 0));
+const pctProf = computed(() => Number(props.contract?.reduction_on_profession_percent ?? 0));
+const profFixed = computed(() =>
+    Number(
+        props.contract?.reduction_on_profession_amount_stored ??
+            props.contract?.reduction_on_profession_amount ??
+            0,
+    ),
+);
+const totalPct = computed(() => pctBns.value + pctComm.value + pctProf.value);
+const reductionOther = computed(() => Number(props.contract?.reduction_amount ?? 0));
+
+/** Montant réduit pour une garantie donnée */
+function amountAfterReductionForGuarantee(guaranteeAmount, totalGuarantees) {
+    if (totalGuarantees <= 0) return guaranteeAmount;
+    let reduced = guaranteeAmount;
+    if (totalPct.value > 0) {
+        reduced = Math.max(0, guaranteeAmount - Math.round((guaranteeAmount * totalPct.value) / 100));
+    }
+    if (profFixed.value > 0) {
+        const share = Math.round((guaranteeAmount / totalGuarantees) * profFixed.value);
+        reduced = Math.max(0, reduced - share);
+    }
+    return reduced;
+}
+
+/** Garanties avec montants réduits : backend (aligné PDF/tableaux) ou calcul frontend */
+const guaranteeDisplayItems = computed(() => {
+    const fromBackend = props.contract?.guarantee_amounts_reduced;
+    if (Array.isArray(fromBackend) && fromBackend.length > 0) {
+        return fromBackend.map((g) => ({
+            key: g.code,
+            label: g.label,
+            amountReduced: Number(g.amount ?? 0),
+        }));
+    }
+    const amounts = guaranteeAmounts.value;
+    const total = amounts.reduce((s, a) => s + a.amount, 0);
+    return amounts.map(({ key, amount, label }) => ({
+        key,
+        label,
+        amountReduced: amountAfterReductionForGuarantee(amount, total),
+    }));
+});
+
+/** Total des garanties avant réduction (pour affichage équivalent %) */
+const totalGarantiesAvantReduction = computed(() =>
+    guaranteeAmounts.value.reduce((s, a) => s + a.amount, 0),
 );
 
-/** Taxe = 14,5 % du montant après réduction */
-const taxesAmount = computed(() =>
-    Math.round(montantApresReduction.value * 0.145),
-);
+/** Prime nette : backend (aligné PDF/tableaux) ou calcul frontend */
+const primeNette = computed(() => {
+    const fromBackend = props.contract?.prime_nette;
+    if (fromBackend != null && Number(fromBackend) >= 0) return Number(fromBackend);
+    const amounts = guaranteeAmounts.value;
+    const total = totalGarantiesAvantReduction.value;
+    if (total <= 0) return 0;
+    return amounts.reduce((s, { amount }) => s + amountAfterReductionForGuarantee(amount, total), 0);
+});
 
-const totalDisplay = computed(
-    () =>
+/** Montant après réduction : backend ou calcul frontend */
+const montantApresReduction = computed(() => {
+    const fromBackend = props.contract?.montant_apres_reduction;
+    if (fromBackend != null && Number(fromBackend) >= 0) return Number(fromBackend);
+    return Math.max(0, primeNette.value - reductionOther.value);
+});
+
+/** Taxe : backend ou calcul frontend */
+const taxesAmount = computed(() => {
+    const fromBackend = props.contract?.taxes_amount_display ?? props.contract?.taxes_amount;
+    if (fromBackend != null && Number(fromBackend) > 0) return Number(fromBackend);
+    return Math.round((montantApresReduction.value + (props.contract?.accessory_amount ?? 0)) * 0.145);
+});
+
+/** Total à afficher : backend (aligné PDF) ou calcul frontend */
+const totalDisplay = computed(() => {
+    const fromBackend = props.contract?.total_amount_display ?? props.contract?.total_amount ?? props.contract?.prime_ttc;
+    if (fromBackend != null && Number(fromBackend) > 0) return Number(fromBackend);
+    return (
         montantApresReduction.value +
         (props.contract?.accessory_amount ?? 0) +
         taxesAmount.value +
         (props.contract?.fga_amount ?? 0) +
-        (props.contract?.cedeao_amount ?? 0),
-);
+        (props.contract?.cedeao_amount ?? 0)
+    );
+});
 
 const reductionBnsPct = computed(() =>
     Number(props.contract?.reduction_bns ?? 0),
@@ -133,8 +208,9 @@ const reductionProfPct = computed(() => {
             c?.reduction_on_profession_amount ??
             0,
     );
-    if (primeNette.value > 0 && amt > 0)
-        return Math.round((amt / primeNette.value) * 1000) / 10;
+    const total = totalGarantiesAvantReduction.value;
+    if (total > 0 && amt > 0)
+        return Math.round((amt / total) * 1000) / 10;
     return 0;
 });
 
@@ -866,15 +942,15 @@ function markAttestationIssued(contract) {
                             </h2>
                         </div>
                         <div class="p-6 space-y-4">
-                            <!-- Garanties : Code | Désignation | Primes (FCFA) -->
+                            <!-- Garanties : chaque réduction s'applique à chaque garantie, puis prime nette (comme Create.vue et PDF) -->
                             <div
-                                v-if="primeNette > 0"
+                                v-if="guaranteeDisplayItems.length > 0"
                                 class="space-y-2 overflow-x-auto"
                             >
                                 <p
                                     class="text-xs font-medium text-slate-500 uppercase tracking-wide"
                                 >
-                                    Garanties
+                                    Garanties (montants après réduction)
                                 </p>
                                 <table
                                     class="w-full min-w-[240px] text-sm border border-slate-200 rounded-lg overflow-hidden"
@@ -895,68 +971,20 @@ function markAttestationIssued(contract) {
                                     </thead>
                                     <tbody>
                                         <tr
-                                            v-for="f in guaranteeFieldsPdf"
-                                            :key="f.key"
-                                            v-show="(contract[f.key] ?? 0) > 0"
+                                            v-for="item in guaranteeDisplayItems"
+                                            :key="item.key"
                                             class="border-t border-slate-100"
                                         >
                                             <td
                                                 class="px-2 py-2 text-slate-700"
                                             >
-                                                {{ f.label }}
+                                                {{ item.label }}
                                             </td>
                                             <td
                                                 class="w-28 px-2 py-2 text-right font-medium text-slate-900 tabular-nums shrink-0 whitespace-nowrap"
                                             >
                                                 {{
-                                                    Number(
-                                                        contract[f.key],
-                                                    ).toLocaleString("fr-FR")
-                                                }}
-                                            </td>
-                                        </tr>
-                                        <tr
-                                            v-for="g in optionalGuaranteesList"
-                                            :key="g.code"
-                                            class="border-t border-slate-100"
-                                        >
-                                            <td
-                                                class="px-2 py-2 text-slate-700"
-                                            >
-                                                {{
-                                                    g.label || "Autre garantie"
-                                                }}
-                                            </td>
-                                            <td
-                                                class="w-28 px-2 py-2 text-right font-medium text-slate-900 tabular-nums shrink-0 whitespace-nowrap"
-                                            >
-                                                {{
-                                                    Number(
-                                                        g.amount ?? 0,
-                                                    ).toLocaleString("fr-FR")
-                                                }}
-                                            </td>
-                                        </tr>
-                                        <tr
-                                            v-if="
-                                                !optionalGuaranteesList.length &&
-                                                (contract.optional_guarantees_amount ??
-                                                    0) > 0
-                                            "
-                                            class="border-t border-slate-100"
-                                        >
-                                            <td
-                                                class="px-2 py-2 text-slate-700"
-                                            >
-                                                Autres garanties
-                                            </td>
-                                            <td
-                                                class="w-28 px-2 py-2 text-right font-medium text-slate-900 tabular-nums shrink-0 whitespace-nowrap"
-                                            >
-                                                {{
-                                                    Number(
-                                                        contract.optional_guarantees_amount,
-                                                    ).toLocaleString("fr-FR")
+                                                    item.amountReduced.toLocaleString("fr-FR")
                                                 }}
                                             </td>
                                         </tr>
@@ -972,9 +1000,7 @@ function markAttestationIssued(contract) {
                                                 class="w-28 px-2 py-2 text-right text-slate-900 tabular-nums shrink-0 whitespace-nowrap"
                                             >
                                                 {{
-                                                    primeNette.toLocaleString(
-                                                        "fr-FR",
-                                                    )
+                                                    primeNette.toLocaleString("fr-FR")
                                                 }}
                                             </td>
                                         </tr>
@@ -1062,6 +1088,19 @@ function markAttestationIssued(contract) {
                                             )
                                         }}
                                         %
+                                    </dd>
+                                </div>
+                                <div
+                                    v-if="reductionOther > 0"
+                                    class="flex justify-between gap-2"
+                                >
+                                    <dt class="text-slate-600">
+                                        Réduction autre
+                                    </dt>
+                                    <dd
+                                        class="font-medium text-red-600 tabular-nums text-right"
+                                    >
+                                        − {{ reductionOther.toLocaleString("fr-FR") }}
                                     </dd>
                                 </div>
                                 <div class="flex justify-between gap-2">

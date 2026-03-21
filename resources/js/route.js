@@ -95,6 +95,8 @@ export function route(name, ...params) {
         'certy-ia.ask': () => '/certy-ia/ask',
         'settings.certy-ia.edit': () => '/settings/certy-ia',
         'settings.certy-ia.update': () => '/settings/certy-ia',
+        'settings.pricing-grids.index': () => '/settings/pricing-grids',
+        'api.pricing-grids.update': () => '/api/pricing-grids/update',
     };
     const fn = routes[name];
     if (!fn) return '#';
