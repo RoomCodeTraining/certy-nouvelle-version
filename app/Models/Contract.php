@@ -10,6 +10,11 @@ use Illuminate\Support\Str;
 
 class Contract extends Model
 {
+    /** Affichage PDF avenant : CEDEAO et prime TTC (autres lignes à 0). */
+    public const PDF_ENDORSEMENT_CEDEAO_FCFA = 1000;
+
+    public const PDF_ENDORSEMENT_PRIME_TTC_FCFA = 1000;
+
     protected $fillable = [
         'reference',
         'policy_number',
@@ -20,6 +25,7 @@ class Contract extends Model
         'vehicle_id',
         'company_id',
         'parent_id',
+        'endorsement_type',
         'contract_type',
         'status',
         'attestation_issued_at',
@@ -87,14 +93,21 @@ class Contract extends Model
     }
 
     public const TYPE_VP = 'VP';
+
     public const TYPE_TPC = 'TPC';
+
     public const TYPE_TPM = 'TPM';
+
     public const TYPE_TWO_WHEELER = 'TWO_WHEELER';
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_VALIDATED = 'validated';
+
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_CANCELLED = 'cancelled';
+
     public const STATUS_EXPIRED = 'expired';
 
     /** Préfixe et longueur après le tiret : 11 caractères alphanumériques majuscules (ex. CA-A7K9M2X4B1Q). */
@@ -108,7 +121,7 @@ class Contract extends Model
     public static function generateUniqueReference(): string
     {
         do {
-            $ref = self::REFERENCE_PREFIX . strtoupper(Str::random(self::REFERENCE_SUFFIX_LENGTH));
+            $ref = self::REFERENCE_PREFIX.strtoupper(Str::random(self::REFERENCE_SUFFIX_LENGTH));
         } while (self::query()->where('reference', $ref)->exists());
 
         return $ref;
@@ -170,6 +183,56 @@ class Contract extends Model
         return $this->parent_id === null;
     }
 
+    /** Contrat avenant (souscription ou avenant « garanties »). */
+    public function isEndorsementContract(): bool
+    {
+        if (! empty($this->endorsement_type)) {
+            return true;
+        }
+
+        $meta = $this->metadata;
+        if (! is_array($meta)) {
+            return false;
+        }
+
+        if (! empty($meta['endorsement_type'] ?? null)) {
+            return true;
+        }
+
+        return ($meta['creation_mode'] ?? null) === 'endorsement';
+    }
+
+    /**
+     * Requête alignée sur isEndorsementContract() (colonne + metadata).
+     */
+    public function scopeWhereEndorsementContract(Builder $query): void
+    {
+        $query->where(function (Builder $w) {
+            $w->where(function (Builder $a) {
+                $a->whereNotNull('endorsement_type')
+                    ->where('endorsement_type', '!=', '');
+            })->orWhere('metadata->creation_mode', 'endorsement')
+                ->orWhere(function (Builder $b) {
+                    $b->whereNotNull('metadata->endorsement_type')
+                        ->where('metadata->endorsement_type', '!=', '');
+                });
+        });
+    }
+
+    /**
+     * @param  'new'|'endorsement'|'renewal'  $scope  Filtre liste contrats (URL deal_scope).
+     */
+    public function scopeForDealScope(Builder $query, string $scope): void
+    {
+        match ($scope) {
+            'new' => $query->whereNull('parent_id'),
+            'endorsement' => $query->whereNotNull('parent_id')->whereEndorsementContract(),
+            'renewal' => $query->whereNotNull('parent_id')
+                ->whereNot(fn (Builder $q) => $q->whereEndorsementContract()),
+            default => null,
+        };
+    }
+
     public function histories(): HasMany
     {
         return $this->hasMany(ContractHistory::class);
@@ -206,6 +269,7 @@ class Contract extends Model
     public function getPrimeWithAccessoryAttribute(): ?int
     {
         $t = $this->total_premium;
+
         return $t;
     }
 
@@ -374,7 +438,7 @@ class Contract extends Model
             foreach ($optional as $g) {
                 $amt = (int) ($g['amount'] ?? 0);
                 if ($amt > 0) {
-                    $result['opt_' . ($g['code'] ?? count($result))] = $amt;
+                    $result['opt_'.($g['code'] ?? count($result))] = $amt;
                     $optSum += $amt;
                 }
             }
@@ -385,6 +449,7 @@ class Contract extends Model
         } elseif ($optTotal > $optSum) {
             $result['optional'] = $optTotal - $optSum;
         }
+
         return $result;
     }
 

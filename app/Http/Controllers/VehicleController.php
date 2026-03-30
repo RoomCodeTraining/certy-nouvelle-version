@@ -79,13 +79,13 @@ class VehicleController extends Controller
             'clients' => $clients,
             'client' => $client,
             'brands' => VehicleBrand::with('models:id,vehicle_brand_id,name')->get(['id', 'name']),
-            'circulationZones' => CirculationZone::orderBy('name')->get(['id', 'name']),
-            'energySources' => EnergySource::orderBy('name')->get(['id', 'name']),
-            'vehicleUsages' => VehicleUsage::orderBy('name')->get(['id', 'name']),
-            'vehicleTypes' => VehicleType::orderBy('name')->get(['id', 'name']),
-            'vehicleCategories' => VehicleCategory::orderBy('name')->get(['id', 'name']),
-            'vehicleGenders' => VehicleGender::orderBy('name')->get(['id', 'name']),
-            'colors' => Color::orderBy('name')->get(['id', 'name']),
+            'circulationZones' => CirculationZone::orderBy('name')->get(['id', 'name', 'code']),
+            'energySources' => EnergySource::orderBy('name')->get(['id', 'name', 'code']),
+            'vehicleUsages' => VehicleUsage::orderBy('name')->get(['id', 'name', 'code']),
+            'vehicleTypes' => VehicleType::orderBy('name')->get(['id', 'name', 'code']),
+            'vehicleCategories' => VehicleCategory::orderBy('name')->get(['id', 'name', 'code']),
+            'vehicleGenders' => VehicleGender::orderBy('name')->get(['id', 'name', 'code']),
+            'colors' => Color::orderBy('name')->get(['id', 'name', 'code']),
         ]);
     }
 
@@ -97,8 +97,10 @@ class VehicleController extends Controller
         $vehicle = $action->execute($validated);
         if ($request->wantsJson()) {
             $vehicle->load('brand:id,name', 'model:id,name');
+
             return response()->json(['vehicle' => $vehicle]);
         }
+
         return redirect()->route('clients.show', $client)->with('success', 'Véhicule ajouté.');
     }
 
@@ -131,6 +133,7 @@ class VehicleController extends Controller
             'replacement_value' => null,
         ]));
         $vehicle->load('brand:id,name', 'model:id,name');
+
         return response()->json(['vehicle' => $vehicle]);
     }
 
@@ -150,28 +153,71 @@ class VehicleController extends Controller
         ]);
     }
 
-    public function edit(Request $request, Vehicle $vehicle): Response
+    public function edit(Request $request, Vehicle $vehicle): Response|JsonResponse
     {
         $this->authorizeVehicle($request, $vehicle);
-        $vehicle->load('client:id,full_name');
+        $vehicle->load([
+            'client:id,full_name',
+            'brand:id,name',
+            'model:id,name,vehicle_brand_id',
+            'vehicleUsage:id,name,code',
+            'vehicleType:id,name,code',
+            'vehicleCategory:id,name,code',
+            'vehicleGender:id,name,code',
+            'energySource:id,name,code',
+            'color:id,name,code',
+            'circulationZone:id,name,code',
+        ]);
+
+        $brands = VehicleBrand::with('models:id,vehicle_brand_id,name')->get(['id', 'name']);
+        $circulationZones = CirculationZone::orderBy('name')->get(['id', 'name', 'code']);
+        $energySources = EnergySource::orderBy('name')->get(['id', 'name', 'code']);
+        $vehicleUsages = VehicleUsage::orderBy('name')->get(['id', 'name', 'code']);
+        $vehicleTypes = VehicleType::orderBy('name')->get(['id', 'name', 'code']);
+        $vehicleCategories = VehicleCategory::orderBy('name')->get(['id', 'name', 'code']);
+        $vehicleGenders = VehicleGender::orderBy('name')->get(['id', 'name', 'code']);
+        $colors = Color::orderBy('name')->get(['id', 'name', 'code']);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'vehicle' => $vehicle,
+                'brands' => $brands,
+                'circulationZones' => $circulationZones,
+                'energySources' => $energySources,
+                'vehicleUsages' => $vehicleUsages,
+                'vehicleTypes' => $vehicleTypes,
+                'vehicleCategories' => $vehicleCategories,
+                'vehicleGenders' => $vehicleGenders,
+                'colors' => $colors,
+            ]);
+        }
 
         return Inertia::render('Vehicles/Edit', [
             'vehicle' => $vehicle,
-            'brands' => VehicleBrand::with('models:id,vehicle_brand_id,name')->get(['id', 'name']),
-            'circulationZones' => CirculationZone::orderBy('name')->get(['id', 'name']),
-            'energySources' => EnergySource::orderBy('name')->get(['id', 'name']),
-            'vehicleUsages' => VehicleUsage::orderBy('name')->get(['id', 'name']),
-            'vehicleTypes' => VehicleType::orderBy('name')->get(['id', 'name']),
-            'vehicleCategories' => VehicleCategory::orderBy('name')->get(['id', 'name']),
-            'vehicleGenders' => VehicleGender::orderBy('name')->get(['id', 'name']),
-            'colors' => Color::orderBy('name')->get(['id', 'name']),
+            'brands' => $brands,
+            'circulationZones' => $circulationZones,
+            'energySources' => $energySources,
+            'vehicleUsages' => $vehicleUsages,
+            'vehicleTypes' => $vehicleTypes,
+            'vehicleCategories' => $vehicleCategories,
+            'vehicleGenders' => $vehicleGenders,
+            'colors' => $colors,
         ]);
     }
 
-    public function update(UpdateVehicleRequest $request, Vehicle $vehicle, UpdateVehicleAction $action): RedirectResponse
+    public function update(UpdateVehicleRequest $request, Vehicle $vehicle, UpdateVehicleAction $action): RedirectResponse|JsonResponse
     {
         $this->authorizeVehicle($request, $vehicle);
         $action->execute($vehicle, $request->validated());
+        $vehicle->refresh()->load('brand:id,name', 'model:id,name');
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'vehicle' => $vehicle,
+                'message' => 'Véhicule mis à jour.',
+            ]);
+        }
+
         return redirect()->route('vehicles.show', $vehicle)->with('success', 'Véhicule mis à jour.');
     }
 

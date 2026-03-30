@@ -20,6 +20,17 @@ class StoreContractAction
 
     public function execute(User $user, array $validated, $accessoryAmountOverride = null): Contract
     {
+        $amountOverrides = [
+            'base_amount' => $validated['base_amount_override'] ?? null,
+            'rc_amount' => $validated['rc_amount_override'] ?? null,
+            'defence_appeal_amount' => $validated['defence_appeal_amount_override'] ?? null,
+            'person_transport_amount' => $validated['person_transport_amount_override'] ?? null,
+            'accessory_amount' => $accessoryAmountOverride ?? ($validated['accessory_amount_override'] ?? null),
+            'taxes_amount' => $validated['taxes_amount_override'] ?? null,
+            'cedeao_amount' => $validated['cedeao_amount_override'] ?? null,
+            'fga_amount' => $validated['fga_amount_override'] ?? null,
+        ];
+
         if (empty($validated['end_date']) && ! empty($validated['start_date']) && ! empty($validated['duration'])) {
             $validated['end_date'] = $this->endDateFromDuration($validated['start_date'], $validated['duration']);
         }
@@ -38,9 +49,43 @@ class StoreContractAction
         $validated['commission_amount'] = (int) ($validated['commission_amount'] ?? 0);
         $validated['optional_guarantees_amount'] = (int) ($validated['optional_guarantees_amount'] ?? 0);
         $optionalDetail = $validated['optional_guarantees_detail'] ?? null;
-        unset($validated['duration'], $validated['accessory_amount_override'], $validated['optional_guarantees_detail']);
+        $creationMode = $validated['creation_mode'] ?? null;
+        $endorsementType = $validated['endorsement_type'] ?? null;
+        unset(
+            $validated['duration'],
+            $validated['accessory_amount_override'],
+            $validated['base_amount_override'],
+            $validated['rc_amount_override'],
+            $validated['defence_appeal_amount_override'],
+            $validated['person_transport_amount_override'],
+            $validated['taxes_amount_override'],
+            $validated['cedeao_amount_override'],
+            $validated['fga_amount_override'],
+            $validated['creation_mode'],
+            $validated['endorsement_type'],
+            $validated['optional_guarantees_detail']
+        );
+
+        $metadataMerge = [];
         if (is_array($optionalDetail) && $optionalDetail !== []) {
-            $validated['metadata']['optional_guarantees'] = $optionalDetail;
+            $metadataMerge['optional_guarantees'] = $optionalDetail;
+        }
+        if (is_string($endorsementType) && $endorsementType !== '') {
+            $metadataMerge['endorsement_type'] = $endorsementType;
+        }
+        if (! empty($validated['parent_id'])) {
+            $isEndorsement = $creationMode === 'endorsement' || ($metadataMerge['endorsement_type'] ?? null);
+            $metadataMerge['creation_mode'] = $isEndorsement ? 'endorsement' : 'renewal';
+        }
+        if ($metadataMerge !== []) {
+            $existing = is_array($validated['metadata'] ?? null) ? $validated['metadata'] : [];
+            $validated['metadata'] = array_merge($existing, $metadataMerge);
+        }
+
+        if (Schema::hasColumn('contracts', 'endorsement_type')) {
+            $validated['endorsement_type'] = is_string($endorsementType) && $endorsementType !== ''
+                ? $endorsementType
+                : null;
         }
         if (Schema::hasColumn('contracts', 'reference')) {
             $validated['reference'] = Contract::generateUniqueReference();
@@ -79,8 +124,14 @@ class StoreContractAction
         $contract = Contract::create($validated);
         $this->pricingService->applyToContract($contract);
 
-        if ($accessoryAmountOverride !== null && $accessoryAmountOverride !== '') {
-            $contract->update(['accessory_amount' => (int) $accessoryAmountOverride]);
+        $updates = [];
+        foreach ($amountOverrides as $field => $value) {
+            if ($value !== null && $value !== '') {
+                $updates[$field] = (int) $value;
+            }
+        }
+        if ($updates !== []) {
+            $contract->update($updates);
         }
         $contract->computeAndFillStoredAmounts();
 
@@ -101,6 +152,7 @@ class StoreContractAction
             '12_months' => 12,
             default => 12,
         };
+
         return $start->copy()->addMonths($months)->subDay()->format('Y-m-d');
     }
 }

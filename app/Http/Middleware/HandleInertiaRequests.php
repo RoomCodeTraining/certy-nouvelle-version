@@ -57,12 +57,14 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user() ? (function () use ($request) {
                     $user = $request->user();
                     $user->load('organizations');
+
                     return [
                         'id' => $user->id,
                         'name' => $user->name,
                         'email' => $user->email,
                         'is_root' => $user->isRoot(),
                         'can_manage_utilisateurs' => $user->isRoot() || $user->isOfficeAdmin(),
+                        'can_manage_pricing_grids' => $user->isRoot() || $user->isOfficeAdmin(),
                         'onboarding_completed' => $user->hasCompletedOnboarding(),
                         'current_organization' => $user->currentOrganization()?->only(['id', 'name', 'slug']),
                     ];

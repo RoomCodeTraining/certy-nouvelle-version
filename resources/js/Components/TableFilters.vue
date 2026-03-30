@@ -36,7 +36,7 @@ const resetUrl = props.resetHref ?? props.action;
                     Rechercher
                 </button>
                 <Link
-                    v-if="hasActiveFilters || resetHref !== action"
+                    v-if="hasActiveFilters"
                     :href="resetUrl"
                     class="inline-flex items-center px-4 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
                 >

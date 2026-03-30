@@ -1,6 +1,6 @@
 <script setup>
 import { usePage } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 
 const page = usePage();
 const visible = ref(false);
@@ -8,19 +8,40 @@ const message = ref(null);
 const type = ref(null);
 let dismissTimer = null;
 
-function show(flash) {
-    if (flash?.success) {
-        message.value = flash.success;
-        type.value = 'success';
-        visible.value = true;
-        scheduleDismiss();
-    } else if (flash?.error) {
-        message.value = flash.error;
-        type.value = 'error';
-        visible.value = true;
-        scheduleDismiss();
+function displayToast(msg, toastType = 'success') {
+    if (!msg) return;
+    message.value = msg;
+    type.value = toastType;
+    visible.value = true;
+    scheduleDismiss();
+}
+
+/** Événement global : window.dispatchEvent(new CustomEvent('app:toast', { detail: { message: '…', type?: 'success'|'error' } })) */
+function onAppToast(e) {
+    const d = e?.detail;
+    if (typeof d === 'string') {
+        displayToast(d, 'success');
+        return;
+    }
+    if (d?.message) {
+        displayToast(d.message, d.type === 'error' ? 'error' : 'success');
     }
 }
+
+function show(flash) {
+    if (flash?.success) {
+        displayToast(flash.success, 'success');
+    } else if (flash?.error) {
+        displayToast(flash.error, 'error');
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('app:toast', onAppToast);
+});
+onUnmounted(() => {
+    window.removeEventListener('app:toast', onAppToast);
+});
 
 function scheduleDismiss() {
     if (dismissTimer) clearTimeout(dismissTimer);

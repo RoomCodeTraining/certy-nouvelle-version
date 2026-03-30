@@ -8,6 +8,7 @@ use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Models\Client;
 use App\Models\Profession;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -73,6 +74,7 @@ class ClientController extends Controller
                 'client' => array_merge($client->only(['id', 'full_name']), ['vehicles' => []]),
             ]);
         }
+
         return redirect()->route('clients.index')->with('success', 'Client créé.');
     }
 
@@ -94,25 +96,43 @@ class ClientController extends Controller
         ]);
     }
 
-    public function edit(Request $request, Client $client): Response
+    public function edit(Request $request, Client $client): Response|JsonResponse
     {
         $this->authorizeClient($request, $client);
         $client->load('profession:id,name');
 
+        $typeAssureOptions = [
+            ['value' => Client::TYPE_TAPP, 'label' => 'Personne physique (TAPP)'],
+            ['value' => Client::TYPE_TAPM, 'label' => 'Personne morale (TAPM)'],
+        ];
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'client' => $client,
+                'typeAssureOptions' => $typeAssureOptions,
+            ]);
+        }
+
         return Inertia::render('Clients/Edit', [
             'client' => $client,
             'professions' => Profession::orderBy('name')->get(['id', 'name']),
-            'typeAssureOptions' => [
-                ['value' => Client::TYPE_TAPP, 'label' => 'Personne physique (TAPP)'],
-                ['value' => Client::TYPE_TAPM, 'label' => 'Personne morale (TAPM)'],
-            ],
+            'typeAssureOptions' => $typeAssureOptions,
         ]);
     }
 
-    public function update(UpdateClientRequest $request, Client $client, UpdateClientAction $action): RedirectResponse
+    public function update(UpdateClientRequest $request, Client $client, UpdateClientAction $action): RedirectResponse|JsonResponse
     {
         $this->authorizeClient($request, $client);
         $action->execute($client, $request->validated());
+        $client->refresh()->load('profession:id,name');
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'client' => $client,
+                'message' => 'Client mis à jour.',
+            ]);
+        }
+
         return redirect()->route('clients.show', $client)->with('success', 'Client mis à jour.');
     }
 

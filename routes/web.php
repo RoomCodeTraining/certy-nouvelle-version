@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\BordereauController;
+use App\Http\Controllers\CertyIaController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ContractController;
 use App\Http\Controllers\DashboardController;
@@ -8,16 +10,14 @@ use App\Http\Controllers\DigitalController;
 use App\Http\Controllers\RedirectController;
 use App\Http\Controllers\Referential\VehicleBrandController;
 use App\Http\Controllers\Referential\VehicleModelController;
-use App\Http\Controllers\BordereauController;
-use App\Http\Controllers\CertyIaController;
-use App\Http\Controllers\Settings\OrganizationCompanyConfigController;
-use App\Http\Controllers\Settings\ReportSettingController;
-use App\Http\Controllers\Settings\CertyIaSettingsController;
-use App\Http\Controllers\Settings\ProfileController;
-use App\Http\Controllers\Settings\OptionalGuaranteeController;
-use App\Http\Controllers\Settings\PricingGridController;
-use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\Reports\ProductionController;
+use App\Http\Controllers\Settings\CertyIaSettingsController;
+use App\Http\Controllers\Settings\OptionalGuaranteeController;
+use App\Http\Controllers\Settings\OrganizationCompanyConfigController;
+use App\Http\Controllers\Settings\PricingGridController;
+use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\ReportSettingController;
+use App\Http\Controllers\VehicleController;
 use Illuminate\Support\Facades\Route;
 
 // Point d'entrée : redirection vers login (invités) ou dashboard (connectés)
@@ -53,6 +53,9 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
         Route::put('/settings/certy-ia', [CertyIaSettingsController::class, 'update'])->name('settings.certy-ia.update');
         Route::get('/settings/guarantees', [OptionalGuaranteeController::class, 'index'])->name('settings.guarantees.index');
         Route::put('/settings/guarantees/{guarantee}', [OptionalGuaranteeController::class, 'update'])->name('settings.guarantees.update');
+    });
+
+    Route::middleware('can.manage.pricing_grids')->group(function () {
         Route::get('/settings/pricing-grids', [PricingGridController::class, 'index'])->name('settings.pricing-grids.index');
         Route::patch('/api/pricing-grids/update', [PricingGridController::class, 'update'])->name('api.pricing-grids.update');
     });
@@ -80,6 +83,7 @@ Route::middleware(['auth', 'ensure.organization'])->group(function () {
     Route::get('/contracts/{contract}', [ContractController::class, 'show'])->name('contracts.show');
     Route::get('/contracts/{contract}/pdf', [ContractController::class, 'pdf'])->name('contracts.pdf');
     Route::get('/contracts/{contract}/renew', [ContractController::class, 'renew'])->name('contracts.renew');
+    Route::get('/contracts/{contract}/endorse', [ContractController::class, 'endorse'])->name('contracts.endorse');
     Route::get('/contracts/{contract}/edit', [ContractController::class, 'edit'])->name('contracts.edit');
     Route::put('/contracts/{contract}', [ContractController::class, 'update'])->name('contracts.update');
     Route::put('/contracts/{contract}/reductions', [ContractController::class, 'updateReductions'])->name('contracts.update-reductions');

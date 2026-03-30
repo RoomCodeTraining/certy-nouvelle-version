@@ -1,6 +1,6 @@
 <script setup>
 import { useForm, Link, router } from "@inertiajs/vue3";
-import { computed, watch, ref, onMounted, nextTick } from "vue";
+import { computed, watch, ref, onMounted, nextTick, reactive } from "vue";
 import axios from "axios";
 import DashboardLayout from "@/Layouts/DashboardLayout.vue";
 import PageHeader from "@/Components/PageHeader.vue";
@@ -164,8 +164,17 @@ const form = useForm({
     start_date: "",
     end_date: "",
     duration: "12_months",
+    creation_mode: null,
+    endorsement_type: "",
     reduction_amount: 0,
     accessory_amount_override: null,
+    base_amount_override: null,
+    rc_amount_override: null,
+    defence_appeal_amount_override: null,
+    person_transport_amount_override: null,
+    taxes_amount_override: null,
+    cedeao_amount_override: null,
+    fga_amount_override: null,
     reduction_bns: null,
     reduction_on_commission: null,
     reduction_on_profession_percent: null,
@@ -194,6 +203,532 @@ function onClientChange() {
 }
 
 const isTwoWheeler = computed(() => form.contract_type === "TWO_WHEELER");
+const isEndorsementMode = computed(
+    () => props.parentContract?.creation_mode === "endorsement",
+);
+const needsVehicleUpdateForEndorsement = computed(() =>
+    ["registration_change", "vehicle_info_update"].includes(
+        form.endorsement_type,
+    ),
+);
+const needsClientUpdateForEndorsement = computed(
+    () => form.endorsement_type === "client_info_update",
+);
+
+const TYPE_TAPP = "TAPP";
+const TYPE_TAPM = "TAPM";
+
+const pricingTypeOptions = [
+    { value: "VP", label: "VP (Véhicule Particulier)" },
+    { value: "TPC", label: "TPC (Transport pour propre compte)" },
+    { value: "TPM", label: "TPM (Transport Personnes et Marchandises)" },
+    { value: "TWO_WHEELER", label: "Deux roues" },
+];
+
+function formatDateForEndorsement(d) {
+    return d ? String(d).slice(0, 10) : "";
+}
+
+/** IDs en chaîne pour SearchableSelect (alignement avec les options `id`). */
+function normalizeSelectId(val) {
+    if (val === null || val === undefined || val === "") return "";
+    return String(val);
+}
+
+function numOrNull(v) {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isNaN(n) ? null : n;
+}
+
+/** FK ou id issu de la relation chargée (réponse JSON Laravel en snake_case). */
+function fkIdFromVehicle(v, fkAttr, relationSnake) {
+    const direct = v?.[fkAttr];
+    if (direct !== null && direct !== undefined && direct !== "") {
+        return normalizeSelectId(direct);
+    }
+    const rel = v?.[relationSnake];
+    if (rel && typeof rel === "object" && rel.id != null) {
+        return normalizeSelectId(rel.id);
+    }
+    return "";
+}
+
+function fiscalPowerOrNull(v) {
+    const x = v?.fiscal_power;
+    if (x === null || x === undefined || x === "") return null;
+    const n =
+        typeof x === "number" && Number.isFinite(x)
+            ? Math.trunc(x)
+            : parseInt(String(x), 10);
+    return Number.isNaN(n) ? null : n;
+}
+
+function mapVehicleToEndorsementForm(v) {
+    return {
+        pricing_type:
+            v?.pricing_type != null && v.pricing_type !== ""
+                ? String(v.pricing_type)
+                : "",
+        vehicle_type_id: fkIdFromVehicle(
+            v,
+            "vehicle_type_id",
+            "vehicle_type",
+        ),
+        registration_number: v?.registration_number ?? "",
+        vehicle_brand_id: fkIdFromVehicle(v, "vehicle_brand_id", "brand"),
+        vehicle_model_id: fkIdFromVehicle(v, "vehicle_model_id", "model"),
+        body_type: v?.body_type ?? "",
+        color_id: fkIdFromVehicle(v, "color_id", "color"),
+        payload_capacity: numOrNull(v?.payload_capacity),
+        energy_source_id: fkIdFromVehicle(
+            v,
+            "energy_source_id",
+            "energy_source",
+        ),
+        engine_capacity: numOrNull(v?.engine_capacity),
+        seat_count: numOrNull(v?.seat_count),
+        vehicle_usage_id: fkIdFromVehicle(
+            v,
+            "vehicle_usage_id",
+            "vehicle_usage",
+        ),
+        vehicle_category_id: fkIdFromVehicle(
+            v,
+            "vehicle_category_id",
+            "vehicle_category",
+        ),
+        vehicle_gender_id: fkIdFromVehicle(
+            v,
+            "vehicle_gender_id",
+            "vehicle_gender",
+        ),
+        circulation_zone_id: fkIdFromVehicle(
+            v,
+            "circulation_zone_id",
+            "circulation_zone",
+        ),
+        fiscal_power: fiscalPowerOrNull(v),
+        year_of_first_registration: numOrNull(v?.year_of_first_registration),
+        first_registration_date: formatDateForEndorsement(v?.first_registration_date),
+        registration_card_number: v?.registration_card_number ?? "",
+        chassis_number: v?.chassis_number ?? "",
+        new_value: numOrNull(v?.new_value),
+        replacement_value: numOrNull(v?.replacement_value),
+    };
+}
+
+const endorsementVehicleForm = reactive(mapVehicleToEndorsementForm({}));
+const endorsementVehicleLoading = ref(false);
+const endorsementVehicleSaving = ref(false);
+const endorsementVehicleErrors = ref({});
+const endorsementVehicleLoadedId = ref(null);
+
+const endorsementClientForm = reactive({
+    type_assure: TYPE_TAPP,
+    full_name: "",
+    email: "",
+    phone: "",
+    address: "",
+    postal_address: "",
+    profession: "",
+});
+const endorsementClientLoading = ref(false);
+const endorsementClientSaving = ref(false);
+const endorsementClientErrors = ref({});
+const endorsementClientLoadedId = ref(null);
+
+
+/** Listes alignées sur la réponse `vehicles.edit` (JSON) pour les selects avenant. */
+const endorsementSelectLists = ref(null);
+
+/**
+ * `[] ?? props.x` renvoie `[]` (tableau vide ≠ nullish) → les listes Inertia étaient ignorées.
+ */
+function mergeRefList(apiList, propList) {
+    const fromApi = Array.isArray(apiList) ? apiList : [];
+    const fromProp = Array.isArray(propList) ? propList : [];
+    return fromApi.length > 0 ? fromApi : fromProp;
+}
+
+const endorsementVehicleBrandsOptions = computed(() =>
+    mergeRefList(
+        endorsementSelectLists.value?.brands,
+        props.vehicleBrands,
+    ),
+);
+
+const endorsementVehicleUsagesOptions = computed(() =>
+    mergeRefList(
+        endorsementSelectLists.value?.vehicleUsages,
+        props.vehicleUsages,
+    ),
+);
+const endorsementVehicleTypesOptions = computed(() =>
+    mergeRefList(
+        endorsementSelectLists.value?.vehicleTypes,
+        props.vehicleTypes,
+    ),
+);
+const endorsementVehicleCategoriesOptions = computed(() =>
+    mergeRefList(
+        endorsementSelectLists.value?.vehicleCategories,
+        props.vehicleCategories,
+    ),
+);
+const endorsementVehicleGendersOptions = computed(() =>
+    mergeRefList(
+        endorsementSelectLists.value?.vehicleGenders,
+        props.vehicleGenders,
+    ),
+);
+const endorsementVehicleColorsOptions = computed(() =>
+    mergeRefList(endorsementSelectLists.value?.colors, props.colors),
+);
+const endorsementVehicleCirculationZonesOptions = computed(() =>
+    mergeRefList(
+        endorsementSelectLists.value?.circulationZones,
+        props.circulationZones,
+    ),
+);
+const endorsementVehicleEnergySourcesOptions = computed(() =>
+    mergeRefList(
+        endorsementSelectLists.value?.energySources,
+        props.energySources,
+    ),
+);
+
+const modelsForEndorsementVehicle = computed(() => {
+    if (!endorsementVehicleForm.vehicle_brand_id) return [];
+    const brand = endorsementVehicleBrandsOptions.value.find(
+        (b) => String(b.id) === String(endorsementVehicleForm.vehicle_brand_id),
+    );
+    return brand?.models ?? [];
+});
+
+function onEndorsementVehicleBrandChange() {
+    if (
+        !modelsForEndorsementVehicle.value.some(
+            (m) => String(m.id) === String(endorsementVehicleForm.vehicle_model_id),
+        )
+    ) {
+        endorsementVehicleForm.vehicle_model_id = "";
+    }
+}
+
+function endorsementVehicleErr(key) {
+    const e = endorsementVehicleErrors.value[key];
+    return Array.isArray(e) ? e[0] : e || "";
+}
+
+function endorsementClientErr(key) {
+    const e = endorsementClientErrors.value[key];
+    return Array.isArray(e) ? e[0] : e || "";
+}
+
+const endorsementVehicleReady = computed(() => {
+    if (!needsVehicleUpdateForEndorsement.value || !form.vehicle_id) return true;
+    return (
+        String(endorsementVehicleLoadedId.value) === String(form.vehicle_id) &&
+        !endorsementVehicleLoading.value
+    );
+});
+
+const endorsementClientReady = computed(() => {
+    if (!needsClientUpdateForEndorsement.value || !form.client_id) return true;
+    return (
+        String(endorsementClientLoadedId.value) === String(form.client_id) &&
+        !endorsementClientLoading.value
+    );
+});
+
+const endorsementClientNameLabel = computed(() =>
+    endorsementClientForm.type_assure === TYPE_TAPM
+        ? "Raison sociale *"
+        : "Nom complet *",
+);
+const endorsementClientProfessionLabel = computed(() =>
+    endorsementClientForm.type_assure === TYPE_TAPM
+        ? "Activité / Secteur *"
+        : "Profession *",
+);
+
+/**
+ * Aligne les FK sur les listes via `code` quand l’id ne matche pas (référentiels / seeds).
+ */
+function syncEndorsementVehicleFkFromRelations(v) {
+    const lists = endorsementSelectLists.value;
+    if (!lists || !v) return;
+
+    const pairs = [
+        ["vehicle_usage_id", v.vehicle_usage, lists.vehicleUsages],
+        ["vehicle_category_id", v.vehicle_category, lists.vehicleCategories],
+        ["vehicle_gender_id", v.vehicle_gender, lists.vehicleGenders],
+        ["vehicle_type_id", v.vehicle_type, lists.vehicleTypes],
+        ["energy_source_id", v.energy_source, lists.energySources],
+        ["color_id", v.color, lists.colors],
+        ["circulation_zone_id", v.circulation_zone, lists.circulationZones],
+    ];
+
+    for (const [field, rel, list] of pairs) {
+        if (!list?.length) continue;
+        const cur = endorsementVehicleForm[field];
+        if (cur !== "" && cur != null) {
+            const byId = list.find((o) => String(o.id) === String(cur));
+            if (byId) continue;
+        }
+        if (rel?.code != null) {
+            const byCode = list.find(
+                (o) =>
+                    o.code != null && String(o.code) === String(rel.code),
+            );
+            if (byCode) {
+                endorsementVehicleForm[field] = normalizeSelectId(byCode.id);
+            }
+        }
+    }
+}
+
+async function loadEndorsementVehicleData() {
+    if (!form.vehicle_id) return;
+    endorsementVehicleLoading.value = true;
+    endorsementVehicleErrors.value = {};
+    try {
+        const { data } = await axios.get(route("vehicles.edit", form.vehicle_id), {
+            headers: {
+                Accept: "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+                "X-CSRF-TOKEN":
+                    document.querySelector('meta[name="csrf-token"]')?.content || "",
+            },
+        });
+        const v = data.vehicle;
+        endorsementSelectLists.value = {
+            brands: mergeRefList(data.brands, props.vehicleBrands),
+            vehicleUsages: mergeRefList(
+                data.vehicleUsages ?? data.vehicle_usages,
+                props.vehicleUsages,
+            ),
+            vehicleTypes: mergeRefList(
+                data.vehicleTypes ?? data.vehicle_types,
+                props.vehicleTypes,
+            ),
+            vehicleCategories: mergeRefList(
+                data.vehicleCategories ?? data.vehicle_categories,
+                props.vehicleCategories,
+            ),
+            vehicleGenders: mergeRefList(
+                data.vehicleGenders ?? data.vehicle_genders,
+                props.vehicleGenders,
+            ),
+            colors: mergeRefList(data.colors, props.colors),
+            circulationZones: mergeRefList(
+                data.circulationZones ?? data.circulation_zones,
+                props.circulationZones,
+            ),
+            energySources: mergeRefList(
+                data.energySources ?? data.energy_sources,
+                props.energySources,
+            ),
+        };
+        if (!v) {
+            throw new Error("Réponse véhicule vide");
+        }
+        Object.assign(endorsementVehicleForm, mapVehicleToEndorsementForm(v));
+        syncEndorsementVehicleFkFromRelations(v);
+        endorsementVehicleLoadedId.value = String(form.vehicle_id);
+        await nextTick();
+    } catch {
+        endorsementVehicleErrors.value = {
+            general: [
+                "Impossible de charger le véhicule. Réessayez ou ouvrez la fiche véhicule.",
+            ],
+        };
+        endorsementVehicleLoadedId.value = null;
+    } finally {
+        endorsementVehicleLoading.value = false;
+    }
+}
+
+async function loadEndorsementClientData() {
+    if (!form.client_id) return;
+    endorsementClientLoading.value = true;
+    endorsementClientErrors.value = {};
+    try {
+        const { data } = await axios.get(route("clients.edit", form.client_id), {
+            headers: {
+                Accept: "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+                "X-CSRF-TOKEN":
+                    document.querySelector('meta[name="csrf-token"]')?.content || "",
+            },
+        });
+        const c = data.client;
+        endorsementClientForm.type_assure = c.type_assure ?? TYPE_TAPP;
+        endorsementClientForm.full_name = c.full_name ?? "";
+        endorsementClientForm.email = c.email ?? "";
+        endorsementClientForm.phone = c.phone ?? "";
+        endorsementClientForm.address = c.address ?? "";
+        endorsementClientForm.postal_address = c.postal_address ?? "";
+        endorsementClientForm.profession = c.profession?.name ?? "";
+        endorsementClientLoadedId.value = String(form.client_id);
+        await nextTick();
+    } catch {
+        endorsementClientErrors.value = {
+            general: [
+                "Impossible de charger le client. Réessayez ou ouvrez la fiche client.",
+            ],
+        };
+        endorsementClientLoadedId.value = null;
+    } finally {
+        endorsementClientLoading.value = false;
+    }
+}
+
+watch(
+    () => [isEndorsementMode.value, form.vehicle_id, form.endorsement_type],
+    () => {
+        if (
+            !isEndorsementMode.value ||
+            !needsVehicleUpdateForEndorsement.value ||
+            !form.vehicle_id
+        ) {
+            endorsementVehicleLoadedId.value = null;
+            endorsementSelectLists.value = null;
+            return;
+        }
+        loadEndorsementVehicleData();
+    },
+    { immediate: true },
+);
+
+watch(
+    () => [isEndorsementMode.value, form.client_id, form.endorsement_type],
+    () => {
+        if (
+            !isEndorsementMode.value ||
+            !needsClientUpdateForEndorsement.value ||
+            !form.client_id
+        ) {
+            endorsementClientLoadedId.value = null;
+            return;
+        }
+        loadEndorsementClientData();
+    },
+    { immediate: true },
+);
+
+async function persistEndorsementVehicle() {
+    endorsementVehicleErrors.value = {};
+    endorsementVehicleSaving.value = true;
+    try {
+        await axios.put(
+            route("vehicles.update", form.vehicle_id),
+            { ...endorsementVehicleForm },
+            {
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN":
+                        document.querySelector('meta[name="csrf-token"]')?.content || "",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            },
+        );
+    } catch (err) {
+        if (err.response?.status === 422 && err.response?.data?.errors) {
+            endorsementVehicleErrors.value = err.response.data.errors;
+        }
+        throw err;
+    } finally {
+        endorsementVehicleSaving.value = false;
+    }
+}
+
+async function persistEndorsementClient() {
+    endorsementClientErrors.value = {};
+    endorsementClientSaving.value = true;
+    try {
+        await axios.put(
+            route("clients.update", form.client_id),
+            { ...endorsementClientForm },
+            {
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN":
+                        document.querySelector('meta[name="csrf-token"]')?.content || "",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            },
+        );
+    } catch (err) {
+        if (err.response?.status === 422 && err.response?.data?.errors) {
+            endorsementClientErrors.value = err.response.data.errors;
+        }
+        throw err;
+    } finally {
+        endorsementClientSaving.value = false;
+    }
+}
+
+function toastSuccess(text) {
+    window.dispatchEvent(
+        new CustomEvent("app:toast", {
+            detail: { message: text, type: "success" },
+        }),
+    );
+}
+
+async function saveEndorsementVehicleManual() {
+    try {
+        await persistEndorsementVehicle();
+        toastSuccess("Modifications véhicule enregistrées.");
+    } catch {
+        /* Erreurs affichées sur les champs */
+    }
+}
+
+async function saveEndorsementClientManual() {
+    try {
+        await persistEndorsementClient();
+        toastSuccess("Modifications client enregistrées.");
+    } catch {
+        /* Erreurs affichées sur les champs */
+    }
+}
+
+async function persistEndorsementMasterDataIfNeeded() {
+    if (isEndorsementMode.value && needsVehicleUpdateForEndorsement.value) {
+        if (!endorsementVehicleReady.value) {
+            form.setError(
+                "endorsement_vehicle",
+                "Les informations véhicule ne sont pas prêtes. Vérifiez le chargement ou le véhicule sélectionné.",
+            );
+            return false;
+        }
+        try {
+            await persistEndorsementVehicle();
+        } catch {
+            return false;
+        }
+    }
+    if (isEndorsementMode.value && needsClientUpdateForEndorsement.value) {
+        if (!endorsementClientReady.value) {
+            form.setError(
+                "endorsement_client",
+                "Les informations client ne sont pas prêtes. Vérifiez le chargement ou le client sélectionné.",
+            );
+            return false;
+        }
+        try {
+            await persistEndorsementClient();
+        } catch {
+            return false;
+        }
+    }
+    return true;
+}
 
 function onVehicleChange() {
     const v = vehiclesForClient.value.find(
@@ -367,16 +902,30 @@ async function submitVehicleQuick() {
 
 function applyParentContract(parent) {
     if (!parent || !parent.id) return;
+    const isEndorsement = parent.creation_mode === "endorsement";
     form.parent_id = String(parent.id);
     if (parent.client_id) form.client_id = String(parent.client_id);
     if (parent.company_id) form.company_id = String(parent.company_id);
     if (parent.contract_type) form.contract_type = parent.contract_type;
     if (form.contract_type === "TWO_WHEELER") form.duration = "12_months";
+    if (isEndorsement) {
+        if (
+            parent.commission_amount != null &&
+            parent.commission_amount !== ""
+        ) {
+            form.commission_amount = Number(parent.commission_amount) || 0;
+        }
+    }
     if (parent.end_date) {
-        const end = new Date(parent.end_date + "T12:00:00");
-        end.setDate(end.getDate() + 1);
-        form.start_date = end.toISOString().slice(0, 10);
-        applyDuration();
+        if (isEndorsement) {
+            form.start_date = new Date().toISOString().slice(0, 10);
+            form.end_date = parent.end_date;
+        } else {
+            const end = new Date(parent.end_date + "T12:00:00");
+            end.setDate(end.getDate() + 1);
+            form.start_date = end.toISOString().slice(0, 10);
+            applyDuration();
+        }
     }
     // Mettre vehicle_id et lancer le récap après que Vue ait mis à jour
     // vehiclesForSelect (dépend de client_id) pour éviter que le watcher
@@ -425,6 +974,12 @@ watch(
 );
 
 function applyDuration() {
+    if (props.parentContract?.creation_mode === "endorsement") {
+        if (props.parentContract?.end_date) {
+            form.end_date = props.parentContract.end_date;
+        }
+        return;
+    }
     if (!form.start_date || !form.duration) return;
     const start = new Date(form.start_date);
     const monthsMap = {
@@ -447,6 +1002,137 @@ const canPreview = computed(
         form.start_date &&
         form.end_date,
 );
+
+function overrideOrFallback(overrideValue, fallbackValue) {
+    if (overrideValue !== null && overrideValue !== "") {
+        return Number(overrideValue) || 0;
+    }
+    return Number(fallbackValue ?? 0);
+}
+
+function seedEndorsementOverridesFromRecap() {
+    if (!isEndorsementMode.value) return;
+    const amounts = recap.value?.amounts ?? {};
+    const defaults = {
+        base_amount_override: amounts.base_amount ?? 0,
+        rc_amount_override: amounts.rc_amount ?? 0,
+        defence_appeal_amount_override: amounts.defence_appeal_amount ?? 0,
+        person_transport_amount_override: amounts.person_transport_amount ?? 0,
+        accessory_amount_override:
+            amounts.accessory_amount ?? recap.value?.accessory_amount ?? 0,
+        taxes_amount_override: amounts.taxes_amount ?? 0,
+        cedeao_amount_override: amounts.cedeao_amount ?? 0,
+        fga_amount_override: amounts.fga_amount ?? 0,
+    };
+
+    Object.entries(defaults).forEach(([field, value]) => {
+        if (form[field] === null || form[field] === "") {
+            form[field] = Number(value) || 0;
+        }
+    });
+}
+
+function parentHasPremiumSnapshot(parent) {
+    return (
+        parent &&
+        (parent.total_amount != null ||
+            parent.rc_amount != null ||
+            parent.base_amount != null)
+    );
+}
+
+/** Reprend les montants du contrat parent (évite un recalcul grille sur période raccourcie). */
+function applyOptionalGuaranteesFromParentMetadata(list) {
+    if (!props.optionalGuaranteesEnabled) {
+        form.optional_guarantees_detail = [];
+        form.optional_guarantees_amount = 0;
+        return;
+    }
+    const detail = [];
+    const next = { ...optionalGuarantees.value };
+    optionalGuaranteeDefs.value.forEach((def) => {
+        const found = Array.isArray(list)
+            ? list.find((g) => String(g.code) === String(def.code))
+            : null;
+        const amt = found ? Number(found.amount) || 0 : 0;
+        if (amt > 0) {
+            next[def.code] = { enabled: true, amount: amt };
+            detail.push({
+                code: def.code,
+                label: found?.label ?? def.label,
+                rate: def.rate,
+                base: def.base,
+                amount: amt,
+            });
+        } else {
+            next[def.code] = next[def.code] ?? { enabled: false, amount: 0 };
+        }
+    });
+    optionalGuarantees.value = next;
+    form.optional_guarantees_detail = detail;
+    form.optional_guarantees_amount = detail.reduce(
+        (s, g) => s + Number(g.amount ?? 0),
+        0,
+    );
+}
+
+function seedEndorsementFromParent() {
+    const p = props.parentContract;
+    if (!p || !isEndorsementMode.value) return;
+    const num = (v) =>
+        v != null && v !== "" && !Number.isNaN(Number(v)) ? Number(v) : 0;
+    const amounts = {
+        base_amount: num(p.base_amount),
+        rc_amount: num(p.rc_amount),
+        defence_appeal_amount: num(p.defence_appeal_amount),
+        person_transport_amount: num(p.person_transport_amount),
+        accessory_amount: num(p.accessory_amount),
+        taxes_amount: num(p.taxes_amount),
+        fga_amount: num(p.fga_amount),
+        cedeao_amount: num(p.cedeao_amount),
+    };
+    const total =
+        num(p.total_amount) ||
+        num(p.prime_ttc) ||
+        null;
+    recap.value = {
+        prime_amount: null,
+        accessory_amount: amounts.accessory_amount,
+        total_premium: total,
+        amounts,
+    };
+    form.base_amount_override = amounts.base_amount;
+    form.rc_amount_override = amounts.rc_amount;
+    form.defence_appeal_amount_override = amounts.defence_appeal_amount;
+    form.person_transport_amount_override = amounts.person_transport_amount;
+    form.accessory_amount_override = amounts.accessory_amount;
+    form.taxes_amount_override = amounts.taxes_amount;
+    form.fga_amount_override = amounts.fga_amount;
+    form.cedeao_amount_override = amounts.cedeao_amount;
+    form.reduction_amount = num(p.reduction_amount);
+    form.reduction_bns =
+        p.reduction_bns != null && p.reduction_bns !== ""
+            ? Number(p.reduction_bns)
+            : null;
+    form.reduction_on_commission =
+        p.reduction_on_commission != null && p.reduction_on_commission !== ""
+            ? Number(p.reduction_on_commission)
+            : null;
+    form.reduction_on_profession_percent =
+        p.reduction_on_profession_percent != null &&
+        p.reduction_on_profession_percent !== ""
+            ? Number(p.reduction_on_profession_percent)
+            : null;
+    form.reduction_on_profession_amount =
+        p.reduction_on_profession_amount != null &&
+        p.reduction_on_profession_amount !== ""
+            ? Number(p.reduction_on_profession_amount)
+            : null;
+    form.company_accessory = num(p.company_accessory);
+    form.agency_accessory = num(p.agency_accessory);
+    form.commission_amount = num(p.commission_amount);
+    applyOptionalGuaranteesFromParentMetadata(p.metadata?.optional_guarantees);
+}
 
 /** Champs minimaux pour enregistrer en brouillon (étape 1 ou 2). */
 const canSaveDraft = computed(
@@ -547,6 +1233,21 @@ async function fetchPreview() {
         };
         return;
     }
+    if (isEndorsementMode.value && parentHasPremiumSnapshot(props.parentContract)) {
+        previewLoading.value = true;
+        const startAt = Date.now();
+        seedEndorsementFromParent();
+        const elapsed = Date.now() - startAt;
+        const remaining = Math.max(0, PREVIEW_LOADER_MIN_MS - elapsed);
+        if (remaining > 0) {
+            setTimeout(() => {
+                previewLoading.value = false;
+            }, remaining);
+        } else {
+            previewLoading.value = false;
+        }
+        return;
+    }
     previewLoading.value = true;
     const startAt = Date.now();
     try {
@@ -574,6 +1275,7 @@ async function fetchPreview() {
             total_premium: data.total_premium,
             amounts: data.amounts ?? {},
         };
+        seedEndorsementOverridesFromRecap();
     } catch {
         recap.value = {
             prime_amount: null,
@@ -616,9 +1318,18 @@ const totalAccessoryDisplay = computed(
 /** Montant total avant toute réduction (pour affichage réduction) */
 const totalBeforeReduction = computed(
     () =>
-        (recap.value.amounts?.rc_amount ?? 0) +
-        (recap.value.amounts?.defence_appeal_amount ?? 0) +
-        (recap.value.amounts?.person_transport_amount ?? 0) +
+        overrideOrFallback(
+            form.rc_amount_override,
+            recap.value.amounts?.rc_amount ?? 0,
+        ) +
+        overrideOrFallback(
+            form.defence_appeal_amount_override,
+            recap.value.amounts?.defence_appeal_amount ?? 0,
+        ) +
+        overrideOrFallback(
+            form.person_transport_amount_override,
+            recap.value.amounts?.person_transport_amount ?? 0,
+        ) +
         optionalGuaranteesTotal.value,
 );
 
@@ -627,9 +1338,18 @@ const reductionOtherAmount = computed(() => Number(form.reduction_amount) || 0);
 /** Montants par garantie : RC, DR, TP, puis chaque optionnelle */
 const guaranteeAmounts = computed(() => {
     const amounts = [];
-    const rc = recap.value.amounts?.rc_amount ?? 0;
-    const dr = recap.value.amounts?.defence_appeal_amount ?? 0;
-    const tp = recap.value.amounts?.person_transport_amount ?? 0;
+    const rc = overrideOrFallback(
+        form.rc_amount_override,
+        recap.value.amounts?.rc_amount ?? 0,
+    );
+    const dr = overrideOrFallback(
+        form.defence_appeal_amount_override,
+        recap.value.amounts?.defence_appeal_amount ?? 0,
+    );
+    const tp = overrideOrFallback(
+        form.person_transport_amount_override,
+        recap.value.amounts?.person_transport_amount ?? 0,
+    );
     if (rc > 0) amounts.push({ key: "rc", amount: rc });
     if (dr > 0) amounts.push({ key: "dr", amount: dr });
     if (tp > 0) amounts.push({ key: "tp", amount: tp });
@@ -667,7 +1387,11 @@ function amountAfterReductionForGuarantee(guaranteeAmount, totalGuarantees, inde
 const guaranteeDisplayItems = computed(() => {
     const amounts = guaranteeAmounts.value;
     const total = amounts.reduce((s, a) => s + a.amount, 0);
-    const labels = { rc: "Responsabilité Civile", dr: "Défense et Recours", tp: "Transport de personnes" };
+    const labels = {
+        rc: "Responsabilité Civile",
+        dr: "Défense et Recours",
+        tp: "Transport de personnes",
+    };
     const optionalDetail = form.optional_guarantees_detail ?? [];
     return amounts.map(({ key, amount }) => {
         let label = labels[key];
@@ -696,7 +1420,10 @@ const primeNetteCreate = computed(() => {
 
 /** RC après réduction (pour FGA = 2% si réduction) */
 const rcAfterReduction = computed(() => {
-    const rc = recap.value.amounts?.rc_amount ?? 0;
+    const rc = overrideOrFallback(
+        form.rc_amount_override,
+        recap.value.amounts?.rc_amount ?? 0,
+    );
     if (rc <= 0) return 0;
     const amounts = guaranteeAmounts.value;
     const total = amounts.reduce((s, a) => s + a.amount, 0);
@@ -711,22 +1438,43 @@ const montantApresReductionCreate = computed(() =>
 
 /** Accessoire grille (pour calcul taxe et total) */
 const accessoryForTax = computed(
-    () => recap.value.amounts?.accessory_amount ?? recap.value.accessory_amount ?? 0,
+    () =>
+        overrideOrFallback(
+            form.accessory_amount_override,
+            recap.value.amounts?.accessory_amount ??
+                recap.value.accessory_amount ??
+                0,
+        ),
 );
 
 /** Taxe = 14,5 % de (prime nette + accessoire) */
 const taxesAmountCreate = computed(() =>
-    Math.round((montantApresReductionCreate.value + accessoryForTax.value) * 0.145),
+    overrideOrFallback(
+        form.taxes_amount_override,
+        Math.round(
+            (montantApresReductionCreate.value + accessoryForTax.value) * 0.145,
+        ),
+    ),
 );
 
 /** Taxe FGA = 2 % de la RC après réduction si réduction appliquée, sinon grille */
 const fgaAmountCreate = computed(() => {
+    if (form.fga_amount_override !== null && form.fga_amount_override !== "") {
+        return Number(form.fga_amount_override) || 0;
+    }
     const hasReduction = hasPercentReduction.value || profFixed.value > 0 || reductionOtherAmount.value > 0;
     if (hasReduction && rcAfterReduction.value > 0) {
         return Math.round(rcAfterReduction.value * 0.02);
     }
     return recap.value.amounts?.fga_amount ?? 0;
 });
+
+const cedeaoAmountCreate = computed(() =>
+    overrideOrFallback(
+        form.cedeao_amount_override,
+        recap.value.amounts?.cedeao_amount ?? 0,
+    ),
+);
 
 /** Prime TTC = Montant après réduction + Accessoire + Taxes + FGA + CEDEAO */
 const displayTotal = computed(
@@ -735,7 +1483,7 @@ const displayTotal = computed(
         accessoryForTax.value +
         taxesAmountCreate.value +
         fgaAmountCreate.value +
-        (recap.value.amounts?.cedeao_amount ?? 0),
+        cedeaoAmountCreate.value,
 );
 
 watch(
@@ -782,10 +1530,13 @@ const inputClass =
 const inputErrorClass =
     "border-red-400 focus:border-red-400 focus:ring-red-400";
 
-function submitValidate() {
+async function submitValidate() {
+    const ok = await persistEndorsementMasterDataIfNeeded();
+    if (!ok) return;
     form.status = "validated";
     form.transform((data) => ({
         ...data,
+        creation_mode: props.parentContract?.creation_mode ?? null,
         // Toujours envoyer parent_id en renouvellement pour que le contrat soit bien lié
         parent_id:
             data.parent_id ||
@@ -794,15 +1545,31 @@ function submitValidate() {
     form.post(route("contracts.store"), { preserveScroll: true });
 }
 
-function submitDraft() {
+async function submitDraft() {
+    const ok = await persistEndorsementMasterDataIfNeeded();
+    if (!ok) return;
     form.status = "draft";
     form.transform((data) => ({
         ...data,
+        creation_mode: props.parentContract?.creation_mode ?? null,
         parent_id:
             data.parent_id ||
             (props.parentContract?.id ? String(props.parentContract.id) : null),
     }));
     form.post(route("contracts.store"), { preserveScroll: true });
+}
+
+/** Soumission formulaire (Entrée ou comportement natif) — évite les blocages de validation HTML sur l’avenant. */
+function onFormSubmit() {
+    if (isEndorsementMode.value) {
+        submitValidate();
+        return;
+    }
+    if (step.value === 1) {
+        step.value = 2;
+        return;
+    }
+    submitValidate();
 }
 </script>
 
@@ -816,12 +1583,43 @@ function submitDraft() {
             <!-- Formulaire principal -->
             <form
                 class="flex-1 space-y-6"
-                @submit.prevent="step === 1 ? (step = 2) : submitValidate()"
+                :novalidate="isEndorsementMode"
+                @submit.prevent="onFormSubmit"
             >
+                <div
+                    v-if="isEndorsementMode && parentContract"
+                    class="rounded-xl border border-sky-200 bg-sky-50/90 p-4 text-sm text-sky-950"
+                >
+                    <p class="font-semibold text-sky-900">
+                        Avenant — reprise des informations du contrat parent
+                    </p>
+                    <p class="mt-1.5 text-sky-900/90 leading-relaxed">
+                        Client, véhicule, compagnie, période jusqu’à
+                        l’échéance, montants et garanties (y compris
+                        réductions et accessoires) sont alignés sur le contrat
+                        <span
+                            v-if="parentContract.reference"
+                            class="font-mono font-medium text-sky-950"
+                            >{{ parentContract.reference }}</span
+                        ><template v-else>parent</template>.
+                        <span
+                            v-if="parentContract.policy_number"
+                            class="block sm:inline sm:ml-1 mt-1 sm:mt-0"
+                        >
+                            N° police&nbsp;:
+                            <span class="font-mono">{{
+                                parentContract.policy_number
+                            }}</span
+                            >.
+                        </span>
+                        Indiquez ci‑dessous le type d’avenant et les éventuelles
+                        mises à jour (immatriculation, coordonnées…).
+                    </p>
+                </div>
                 <!-- Wizard : une seule étape visible à la fois -->
                 <!-- Étape 1 : Client, véhicule, période, compagnie -->
                 <div
-                    v-show="step === 1"
+                    v-show="!isEndorsementMode && step === 1"
                     class="rounded-xl border border-slate-200 bg-white p-6 space-y-4"
                 >
                     <h2
@@ -859,6 +1657,13 @@ function submitDraft() {
                         >
                             + Nouveau client
                         </button>
+                        <Link
+                            v-if="isEndorsementMode && form.client_id"
+                            :href="route('clients.edit', form.client_id)"
+                            class="mt-2 ml-3 text-sm font-medium text-sky-700 hover:text-sky-900 inline-flex items-center gap-1"
+                        >
+                            Modifier le client
+                        </Link>
                     </div>
                     <div>
                         <label
@@ -898,6 +1703,13 @@ function submitDraft() {
                         >
                             + Nouveau véhicule
                         </button>
+                        <Link
+                            v-if="isEndorsementMode && form.vehicle_id"
+                            :href="route('vehicles.edit', form.vehicle_id)"
+                            class="mt-2 ml-3 text-sm font-medium text-sky-700 hover:text-sky-900 inline-flex items-center gap-1"
+                        >
+                            Modifier le véhicule
+                        </Link>
                         <p
                             v-if="form.vehicle_id && form.contract_type"
                             class="mt-2 flex items-center gap-2"
@@ -1027,18 +1839,886 @@ function submitDraft() {
 
                 <!-- Étape 2 : Accessoires, garanties et réductions -->
                 <div
-                    v-show="step === 2"
+                    v-show="isEndorsementMode || step === 2"
                     class="rounded-xl border border-slate-200 bg-white p-6 space-y-4"
                 >
                     <h2
                         class="text-sm font-semibold text-slate-800 border-b border-slate-200 pb-2"
                     >
-                        Étape 2 — Accessoires, garanties & réductions
+                        {{
+                            isEndorsementMode
+                                ? "Avenant — Tarification, garanties & réductions"
+                                : "Étape 2 — Accessoires, garanties & réductions"
+                        }}
                     </h2>
+                    <div v-if="isEndorsementMode">
+                        <label
+                            class="block text-sm font-medium text-slate-700 mb-1"
+                        >
+                            Type d'avenant *
+                        </label>
+                        <select
+                            v-model="form.endorsement_type"
+                            :class="[
+                                inputClass,
+                                form.errors.endorsement_type && inputErrorClass,
+                            ]"
+                            required
+                        >
+                            <option value="">Sélectionner un type</option>
+                            <option value="registration_change">
+                                Changement d'immatriculation
+                            </option>
+                            <option value="vehicle_info_update">
+                                Mise à jour infos véhicule
+                            </option>
+                            <option value="client_info_update">
+                                Mise à jour infos client
+                            </option>
+                            <option value="other">Autre</option>
+                        </select>
+                        <p
+                            v-if="form.errors.endorsement_type"
+                            class="mt-1 text-sm text-red-600"
+                        >
+                            {{ form.errors.endorsement_type }}
+                        </p>
+                        <p
+                            v-if="form.errors.endorsement_vehicle"
+                            class="mt-2 text-sm text-red-600"
+                        >
+                            {{ form.errors.endorsement_vehicle }}
+                        </p>
+                        <p
+                            v-if="form.errors.endorsement_client"
+                            class="mt-2 text-sm text-red-600"
+                        >
+                            {{ form.errors.endorsement_client }}
+                        </p>
+                        <div class="mt-3 space-y-3">
+                            <div
+                                v-if="needsVehicleUpdateForEndorsement && form.vehicle_id"
+                                class="rounded border border-slate-200 bg-slate-50 p-4 space-y-3"
+                            >
+                                <h3 class="text-sm font-semibold text-slate-800">
+                                    {{
+                                        form.endorsement_type ===
+                                        "registration_change"
+                                            ? "Mise à jour — immatriculation & carte grise"
+                                            : "Mise à jour — informations véhicule"
+                                    }}
+                                </h3>
+                                <p
+                                    v-if="endorsementVehicleLoading"
+                                    class="text-sm text-slate-600"
+                                >
+                                    Chargement du véhicule…
+                                </p>
+                                <p
+                                    v-else-if="endorsementVehicleErr('general')"
+                                    class="text-sm text-red-600"
+                                >
+                                    {{ endorsementVehicleErr("general") }}
+                                </p>
+                                <div
+                                    v-else
+                                    :key="'ev-' + String(endorsementVehicleLoadedId ?? '')"
+                                    class="space-y-4"
+                                >
+                                    <div
+                                        v-if="
+                                            form.endorsement_type ===
+                                            'registration_change'
+                                        "
+                                        class="grid grid-cols-1 md:grid-cols-2 gap-3"
+                                    >
+                                        <div>
+                                            <label
+                                                class="block text-sm font-medium text-slate-700 mb-1"
+                                                >Immatriculation *</label
+                                            >
+                                            <input
+                                                v-model="
+                                                    endorsementVehicleForm.registration_number
+                                                "
+                                                type="text"
+                                                :class="[
+                                                    inputClass,
+                                                    endorsementVehicleErr(
+                                                        'registration_number',
+                                                    ) && inputErrorClass,
+                                                ]"
+                                            />
+                                            <p
+                                                v-if="
+                                                    endorsementVehicleErr(
+                                                        'registration_number',
+                                                    )
+                                                "
+                                                class="mt-1 text-xs text-red-600"
+                                            >
+                                                {{
+                                                    endorsementVehicleErr(
+                                                        "registration_number",
+                                                    )
+                                                }}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label
+                                                class="block text-sm font-medium text-slate-700 mb-1"
+                                                >N° carte grise</label
+                                            >
+                                            <input
+                                                v-model="
+                                                    endorsementVehicleForm.registration_card_number
+                                                "
+                                                type="text"
+                                                :class="inputClass"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label
+                                                class="block text-sm font-medium text-slate-700 mb-1"
+                                                >N° châssis</label
+                                            >
+                                            <input
+                                                v-model="
+                                                    endorsementVehicleForm.chassis_number
+                                                "
+                                                type="text"
+                                                :class="inputClass"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label
+                                                class="block text-sm font-medium text-slate-700 mb-1"
+                                                >Date 1ère mise en circulation *</label
+                                            >
+                                            <DatePicker
+                                                v-model="
+                                                    endorsementVehicleForm.first_registration_date
+                                                "
+                                                placeholder="Sélectionner une date"
+                                                :input-class="inputClass"
+                                                :year-range="[1990, 2030]"
+                                            />
+                                            <p
+                                                v-if="
+                                                    endorsementVehicleErr(
+                                                        'first_registration_date',
+                                                    )
+                                                "
+                                                class="mt-1 text-xs text-red-600"
+                                            >
+                                                {{
+                                                    endorsementVehicleErr(
+                                                        "first_registration_date",
+                                                    )
+                                                }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div
+                                        v-else-if="
+                                            form.endorsement_type ===
+                                            'vehicle_info_update'
+                                        "
+                                        class="space-y-4"
+                                    >
+                                        <fieldset class="space-y-3">
+                                            <legend
+                                                class="text-xs font-semibold text-slate-700 border-b border-slate-200 pb-1 w-full"
+                                                >Informations générales</legend
+                                            >
+                                            <div
+                                                class="grid grid-cols-1 md:grid-cols-2 gap-3"
+                                            >
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Type *</label
+                                                    >
+                                                    <SearchableSelect
+                                                        v-model="
+                                                            endorsementVehicleForm.pricing_type
+                                                        "
+                                                        :options="pricingTypeOptions"
+                                                        value-key="value"
+                                                        label-key="label"
+                                                        placeholder="Type"
+                                                        :input-class="inputClass"
+                                                        search-placeholder="Rechercher…"
+                                                    />
+                                                    <p
+                                                        v-if="
+                                                            endorsementVehicleErr(
+                                                                'pricing_type',
+                                                            )
+                                                        "
+                                                        class="mt-1 text-xs text-red-600"
+                                                    >
+                                                        {{
+                                                            endorsementVehicleErr(
+                                                                "pricing_type",
+                                                            )
+                                                        }}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Immatriculation *</label
+                                                    >
+                                                    <input
+                                                        v-model="
+                                                            endorsementVehicleForm.registration_number
+                                                        "
+                                                        type="text"
+                                                        :class="inputClass"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Marque *</label
+                                                    >
+                                                    <SearchableSelect
+                                                        v-model="
+                                                            endorsementVehicleForm.vehicle_brand_id
+                                                        "
+                                                        :options="
+                                                            endorsementVehicleBrandsOptions
+                                                        "
+                                                        value-key="id"
+                                                        label-key="name"
+                                                        placeholder="Marque"
+                                                        :input-class="inputClass"
+                                                        search-placeholder="Rechercher…"
+                                                        @change="
+                                                            onEndorsementVehicleBrandChange
+                                                        "
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Modèle *</label
+                                                    >
+                                                    <SearchableSelect
+                                                        v-model="
+                                                            endorsementVehicleForm.vehicle_model_id
+                                                        "
+                                                        :options="
+                                                            modelsForEndorsementVehicle
+                                                        "
+                                                        value-key="id"
+                                                        label-key="name"
+                                                        placeholder="Modèle"
+                                                        :disabled="
+                                                            !endorsementVehicleForm.vehicle_brand_id
+                                                        "
+                                                        :input-class="inputClass"
+                                                        search-placeholder="Rechercher…"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Carrosserie *</label
+                                                    >
+                                                    <input
+                                                        v-model="
+                                                            endorsementVehicleForm.body_type
+                                                        "
+                                                        type="text"
+                                                        :class="inputClass"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Couleur *</label
+                                                    >
+                                                    <SearchableSelect
+                                                        v-model="
+                                                            endorsementVehicleForm.color_id
+                                                        "
+                                                        :options="
+                                                            endorsementVehicleColorsOptions
+                                                        "
+                                                        value-key="id"
+                                                        label-key="name"
+                                                        placeholder="Couleur"
+                                                        :input-class="inputClass"
+                                                        search-placeholder="Rechercher…"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </fieldset>
+                                        <fieldset class="space-y-3">
+                                            <legend
+                                                class="text-xs font-semibold text-slate-700 border-b border-slate-200 pb-1 w-full"
+                                                >Spécifications techniques</legend
+                                            >
+                                            <div
+                                                class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"
+                                            >
+                                                <div
+                                                    v-if="
+                                                        !endorsementVehicleForm.pricing_type ||
+                                                        endorsementVehicleForm.pricing_type ===
+                                                            'TPC' ||
+                                                        endorsementVehicleForm.pricing_type ===
+                                                            'TPM'
+                                                    "
+                                                >
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Charge utile (t)</label
+                                                    >
+                                                    <input
+                                                        v-model.number="
+                                                            endorsementVehicleForm.payload_capacity
+                                                        "
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        :class="inputClass"
+                                                    />
+                                                </div>
+                                                <div
+                                                    v-if="
+                                                        !endorsementVehicleForm.pricing_type ||
+                                                        endorsementVehicleForm.pricing_type ===
+                                                            'VP'
+                                                    "
+                                                >
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Énergie</label
+                                                    >
+                                                    <SearchableSelect
+                                                        v-model="
+                                                            endorsementVehicleForm.energy_source_id
+                                                        "
+                                                        :options="
+                                                            endorsementVehicleEnergySourcesOptions
+                                                        "
+                                                        value-key="id"
+                                                        label-key="name"
+                                                        placeholder="Énergie"
+                                                        :input-class="inputClass"
+                                                        search-placeholder="Rechercher…"
+                                                    />
+                                                </div>
+                                                <div
+                                                    v-if="
+                                                        !endorsementVehicleForm.pricing_type ||
+                                                        endorsementVehicleForm.pricing_type ===
+                                                            'TWO_WHEELER'
+                                                    "
+                                                >
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Cylindrée (cm³)</label
+                                                    >
+                                                    <input
+                                                        v-model.number="
+                                                            endorsementVehicleForm.engine_capacity
+                                                        "
+                                                        type="number"
+                                                        min="0"
+                                                        :class="inputClass"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Places *</label
+                                                    >
+                                                    <input
+                                                        v-model.number="
+                                                            endorsementVehicleForm.seat_count
+                                                        "
+                                                        type="number"
+                                                        min="0"
+                                                        :class="inputClass"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </fieldset>
+                                        <fieldset class="space-y-3">
+                                            <legend
+                                                class="text-xs font-semibold text-slate-700 border-b border-slate-200 pb-1 w-full"
+                                                >Classification</legend
+                                            >
+                                            <div
+                                                class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
+                                            >
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Usage *</label
+                                                    >
+                                                    <SearchableSelect
+                                                        v-model="
+                                                            endorsementVehicleForm.vehicle_usage_id
+                                                        "
+                                                        :options="
+                                                            endorsementVehicleUsagesOptions
+                                                        "
+                                                        value-key="id"
+                                                        label-key="name"
+                                                        placeholder="Usage"
+                                                        :input-class="inputClass"
+                                                        search-placeholder="Rechercher…"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Catégorie *</label
+                                                    >
+                                                    <SearchableSelect
+                                                        v-model="
+                                                            endorsementVehicleForm.vehicle_category_id
+                                                        "
+                                                        :options="
+                                                            endorsementVehicleCategoriesOptions
+                                                        "
+                                                        value-key="id"
+                                                        label-key="name"
+                                                        placeholder="Catégorie"
+                                                        :input-class="inputClass"
+                                                        search-placeholder="Rechercher…"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Genre *</label
+                                                    >
+                                                    <SearchableSelect
+                                                        v-model="
+                                                            endorsementVehicleForm.vehicle_gender_id
+                                                        "
+                                                        :options="
+                                                            endorsementVehicleGendersOptions
+                                                        "
+                                                        value-key="id"
+                                                        label-key="name"
+                                                        placeholder="Genre"
+                                                        :input-class="inputClass"
+                                                        search-placeholder="Rechercher…"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="grid grid-cols-1 md:grid-cols-2 gap-3"
+                                            >
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Type véhicule *</label
+                                                    >
+                                                    <SearchableSelect
+                                                        v-model="
+                                                            endorsementVehicleForm.vehicle_type_id
+                                                        "
+                                                        :options="
+                                                            endorsementVehicleTypesOptions
+                                                        "
+                                                        value-key="id"
+                                                        label-key="name"
+                                                        placeholder="Type"
+                                                        :input-class="inputClass"
+                                                        search-placeholder="Rechercher…"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Zone de circulation</label
+                                                    >
+                                                    <SearchableSelect
+                                                        v-model="
+                                                            endorsementVehicleForm.circulation_zone_id
+                                                        "
+                                                        :options="
+                                                            endorsementVehicleCirculationZonesOptions
+                                                        "
+                                                        value-key="id"
+                                                        label-key="name"
+                                                        placeholder="Zone"
+                                                        :input-class="inputClass"
+                                                        search-placeholder="Rechercher…"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </fieldset>
+                                        <fieldset class="space-y-3">
+                                            <legend
+                                                class="text-xs font-semibold text-slate-700 border-b border-slate-200 pb-1 w-full"
+                                                >Informations techniques</legend
+                                            >
+                                            <div
+                                                class="grid grid-cols-1 md:grid-cols-2 gap-3"
+                                            >
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Date 1ère mise en circulation *</label
+                                                    >
+                                                    <DatePicker
+                                                        v-model="
+                                                            endorsementVehicleForm.first_registration_date
+                                                        "
+                                                        placeholder="Date"
+                                                        :input-class="inputClass"
+                                                        :year-range="[1990, 2030]"
+                                                    />
+                                                </div>
+                                                <div
+                                                    v-if="
+                                                        !endorsementVehicleForm.pricing_type ||
+                                                        endorsementVehicleForm.pricing_type ===
+                                                            'VP'
+                                                    "
+                                                >
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Puissance fiscale (CV)</label
+                                                    >
+                                                    <input
+                                                        v-model.number="
+                                                            endorsementVehicleForm.fiscal_power
+                                                        "
+                                                        type="number"
+                                                        min="0"
+                                                        :class="inputClass"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div
+                                                class="grid grid-cols-1 md:grid-cols-2 gap-3"
+                                            >
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >N° carte grise</label
+                                                    >
+                                                    <input
+                                                        v-model="
+                                                            endorsementVehicleForm.registration_card_number
+                                                        "
+                                                        type="text"
+                                                        :class="inputClass"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >N° châssis</label
+                                                    >
+                                                    <input
+                                                        v-model="
+                                                            endorsementVehicleForm.chassis_number
+                                                        "
+                                                        type="text"
+                                                        :class="inputClass"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </fieldset>
+                                        <fieldset class="space-y-3">
+                                            <legend
+                                                class="text-xs font-semibold text-slate-700 border-b border-slate-200 pb-1 w-full"
+                                                >Valeurs financières</legend
+                                            >
+                                            <div
+                                                class="grid grid-cols-1 md:grid-cols-2 gap-3"
+                                            >
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Valeur neuve</label
+                                                    >
+                                                    <input
+                                                        v-model.number="
+                                                            endorsementVehicleForm.new_value
+                                                        "
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        :class="inputClass"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label
+                                                        class="block text-sm font-medium text-slate-700 mb-1"
+                                                        >Valeur de remplacement</label
+                                                    >
+                                                    <input
+                                                        v-model.number="
+                                                            endorsementVehicleForm.replacement_value
+                                                        "
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        :class="inputClass"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </fieldset>
+                                    </div>
+                                    <div
+                                        class="flex flex-wrap items-center gap-3 pt-3 border-t border-slate-200"
+                                    >
+                                        <button
+                                            type="button"
+                                            class="px-3 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                                            :disabled="
+                                                endorsementVehicleSaving ||
+                                                endorsementVehicleLoading
+                                            "
+                                            @click="saveEndorsementVehicleManual"
+                                        >
+                                            {{
+                                                endorsementVehicleSaving
+                                                    ? "Enregistrement…"
+                                                    : "Enregistrer le véhicule"
+                                            }}
+                                        </button>
+                                    </div>
+                                </div>
+                                <p
+                                    v-if="endorsementVehicleSaving"
+                                    class="text-xs text-slate-500"
+                                >
+                                    Enregistrement du véhicule avant création du contrat…
+                                </p>
+                            </div>
+                            <div
+                                v-if="needsClientUpdateForEndorsement && form.client_id"
+                                class="rounded border border-slate-200 bg-slate-50 p-4 space-y-3"
+                            >
+                                <h3 class="text-sm font-semibold text-slate-800">
+                                    Mise à jour — informations client
+                                </h3>
+                                <p
+                                    v-if="endorsementClientLoading"
+                                    class="text-sm text-slate-600"
+                                >
+                                    Chargement du client…
+                                </p>
+                                <p
+                                    v-else-if="endorsementClientErr('general')"
+                                    class="text-sm text-red-600"
+                                >
+                                    {{ endorsementClientErr("general") }}
+                                </p>
+                                <div
+                                    v-else
+                                    :key="'ec-' + String(endorsementClientLoadedId ?? '')"
+                                    class="space-y-3"
+                                >
+                                    <div
+                                        class="flex flex-wrap gap-4 pb-2 border-b border-slate-200"
+                                    >
+                                        <label class="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                v-model="
+                                                    endorsementClientForm.type_assure
+                                                "
+                                                type="radio"
+                                                :value="TYPE_TAPP"
+                                                class="rounded-full border-slate-300 text-slate-900 focus:ring-slate-400"
+                                            />
+                                            <span class="text-sm text-slate-700"
+                                                >Personne physique (TAPP)</span
+                                            >
+                                        </label>
+                                        <label class="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                v-model="
+                                                    endorsementClientForm.type_assure
+                                                "
+                                                type="radio"
+                                                :value="TYPE_TAPM"
+                                                class="rounded-full border-slate-300 text-slate-900 focus:ring-slate-400"
+                                            />
+                                            <span class="text-sm text-slate-700"
+                                                >Personne morale (TAPM)</span
+                                            >
+                                        </label>
+                                    </div>
+                                    <div>
+                                        <label
+                                            class="block text-sm font-medium text-slate-700 mb-1"
+                                            >{{ endorsementClientNameLabel }}</label
+                                        >
+                                        <input
+                                            v-model="endorsementClientForm.full_name"
+                                            type="text"
+                                            :class="inputClass"
+                                        />
+                                        <p
+                                            v-if="endorsementClientErr('full_name')"
+                                            class="mt-1 text-xs text-red-600"
+                                        >
+                                            {{ endorsementClientErr("full_name") }}
+                                        </p>
+                                    </div>
+                                    <div
+                                        class="grid grid-cols-1 md:grid-cols-2 gap-3"
+                                    >
+                                        <div>
+                                            <label
+                                                class="block text-sm font-medium text-slate-700 mb-1"
+                                                >Email</label
+                                            >
+                                            <input
+                                                v-model="endorsementClientForm.email"
+                                                type="email"
+                                                :class="inputClass"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label
+                                                class="block text-sm font-medium text-slate-700 mb-1"
+                                                >Téléphone</label
+                                            >
+                                            <input
+                                                v-model="endorsementClientForm.phone"
+                                                type="text"
+                                                :class="inputClass"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label
+                                            class="block text-sm font-medium text-slate-700 mb-1"
+                                            >Adresse</label
+                                        >
+                                        <input
+                                            v-model="endorsementClientForm.address"
+                                            type="text"
+                                            :class="inputClass"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label
+                                            class="block text-sm font-medium text-slate-700 mb-1"
+                                            >Code postal</label
+                                        >
+                                        <input
+                                            v-model="
+                                                endorsementClientForm.postal_address
+                                            "
+                                            type="text"
+                                            :class="inputClass"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label
+                                            class="block text-sm font-medium text-slate-700 mb-1"
+                                            >{{ endorsementClientProfessionLabel }}</label
+                                        >
+                                        <input
+                                            v-model="
+                                                endorsementClientForm.profession
+                                            "
+                                            type="text"
+                                            :class="inputClass"
+                                        />
+                                        <p
+                                            v-if="endorsementClientErr('profession')"
+                                            class="mt-1 text-xs text-red-600"
+                                        >
+                                            {{
+                                                endorsementClientErr("profession")
+                                            }}
+                                        </p>
+                                    </div>
+                                    <div
+                                        class="flex flex-wrap items-center gap-3 pt-3 border-t border-slate-200"
+                                    >
+                                        <button
+                                            type="button"
+                                            class="px-3 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                                            :disabled="
+                                                endorsementClientSaving ||
+                                                endorsementClientLoading
+                                            "
+                                            @click="saveEndorsementClientManual"
+                                        >
+                                            {{
+                                                endorsementClientSaving
+                                                    ? "Enregistrement…"
+                                                    : "Enregistrer le client"
+                                            }}
+                                        </button>
+                                    </div>
+                                </div>
+                                <p
+                                    v-if="endorsementClientSaving"
+                                    class="text-xs text-slate-500"
+                                >
+                                    Enregistrement du client avant création du contrat…
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                     <p class="text-xs text-slate-500">
                         Accessoires compagnie et agence (FCFA). Réductions
                         ci‑dessous.
                     </p>
+                    <div
+                        v-if="isEndorsementMode"
+                        class="rounded-lg border border-sky-200 bg-sky-50 p-4 space-y-3"
+                    >
+                        <h3 class="text-sm font-semibold text-sky-900">
+                            Champs tarifaires modifiables (avenant)
+                        </h3>
+                        <p class="text-xs text-sky-700">
+                            Vous pouvez ajuster les montants de base et taxes pour cet avenant.
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Prime de base (FCFA)</label>
+                                <input v-model.number="form.base_amount_override" type="number" min="0" step="1" :class="inputClass" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">RC (FCFA)</label>
+                                <input v-model.number="form.rc_amount_override" type="number" min="0" step="1" :class="inputClass" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Défense recours (FCFA)</label>
+                                <input v-model.number="form.defence_appeal_amount_override" type="number" min="0" step="1" :class="inputClass" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Transport personnes (FCFA)</label>
+                                <input v-model.number="form.person_transport_amount_override" type="number" min="0" step="1" :class="inputClass" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Accessoire (FCFA)</label>
+                                <input v-model.number="form.accessory_amount_override" type="number" min="0" step="1" :class="inputClass" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Taxes (FCFA)</label>
+                                <input v-model.number="form.taxes_amount_override" type="number" min="0" step="1" :class="inputClass" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Taxe FGA (FCFA)</label>
+                                <input v-model.number="form.fga_amount_override" type="number" min="0" step="1" :class="inputClass" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">CEDEAO (FCFA)</label>
+                                <input v-model.number="form.cedeao_amount_override" type="number" min="0" step="1" :class="inputClass" />
+                            </div>
+                        </div>
+                    </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label
@@ -1302,14 +2982,17 @@ function submitDraft() {
                             ← Précédent
                         </button>
                         <button
-                            type="submit"
+                            type="button"
                             class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
                             :disabled="form.processing"
+                            @click.prevent="submitValidate()"
                         >
                             {{
                                 form.processing
                                     ? "Validation…"
-                                    : "Valider le contrat"
+                                    : isEndorsementMode
+                                      ? "Valider l'avenant"
+                                      : "Valider le contrat"
                             }}
                         </button>
                         <button
@@ -1362,10 +3045,37 @@ function submitDraft() {
                                     <dt class="text-slate-600 truncate">
                                         {{ item.label }}
                                     </dt>
-                                    <dd
-                                        class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
-                                    >
-                                        {{ item.amountReduced.toLocaleString("fr-FR") }} FCFA
+                                    <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                        <template v-if="isEndorsementMode && item.key === 'rc'">
+                                            <input
+                                                v-model.number="form.rc_amount_override"
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                class="w-28 rounded border border-slate-200 px-2 py-1 text-right text-xs"
+                                            />
+                                        </template>
+                                        <template v-else-if="isEndorsementMode && item.key === 'dr'">
+                                            <input
+                                                v-model.number="form.defence_appeal_amount_override"
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                class="w-28 rounded border border-slate-200 px-2 py-1 text-right text-xs"
+                                            />
+                                        </template>
+                                        <template v-else-if="isEndorsementMode && item.key === 'tp'">
+                                            <input
+                                                v-model.number="form.person_transport_amount_override"
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                class="w-28 rounded border border-slate-200 px-2 py-1 text-right text-xs"
+                                            />
+                                        </template>
+                                        <template v-else>
+                                            {{ item.amountReduced.toLocaleString("fr-FR") }} FCFA
+                                        </template>
                                     </dd>
                                 </div>
                                 <div
@@ -1409,25 +3119,23 @@ function submitDraft() {
                                 </dd>
                             </div>
                             <div
-                                v-if="
-                                    (recap.amounts?.accessory_amount ??
-                                        recap.accessory_amount ??
-                                        0) > 0
-                                "
+                                v-if="accessoryForTax > 0"
                                 class="flex justify-between gap-2"
                             >
                                 <dt class="text-slate-600">Accessoire</dt>
-                                <dd
-                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
-                                >
-                                    {{
-                                        Number(
-                                            recap.amounts?.accessory_amount ??
-                                                recap.accessory_amount ??
-                                                0,
-                                        ).toLocaleString("fr-FR")
-                                    }}
-                                    FCFA
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    <template v-if="isEndorsementMode">
+                                        <input
+                                            v-model.number="form.accessory_amount_override"
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            class="w-28 rounded border border-slate-200 px-2 py-1 text-right text-xs"
+                                        />
+                                    </template>
+                                    <template v-else>
+                                        {{ Number(accessoryForTax).toLocaleString("fr-FR") }} FCFA
+                                    </template>
                                 </dd>
                             </div>
                             <div
@@ -1435,15 +3143,19 @@ function submitDraft() {
                                 class="flex justify-between gap-2"
                             >
                                 <dt class="text-slate-600">Taxes</dt>
-                                <dd
-                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
-                                >
-                                    {{
-                                        taxesAmountCreate.toLocaleString(
-                                            "fr-FR",
-                                        )
-                                    }}
-                                    FCFA
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    <template v-if="isEndorsementMode">
+                                        <input
+                                            v-model.number="form.taxes_amount_override"
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            class="w-28 rounded border border-slate-200 px-2 py-1 text-right text-xs"
+                                        />
+                                    </template>
+                                    <template v-else>
+                                        {{ taxesAmountCreate.toLocaleString("fr-FR") }} FCFA
+                                    </template>
                                 </dd>
                             </div>
                             <div
@@ -1451,26 +3163,39 @@ function submitDraft() {
                                 class="flex justify-between gap-2"
                             >
                                 <dt class="text-slate-600">Taxe FGA</dt>
-                                <dd
-                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
-                                >
-                                    {{ fgaAmountCreate.toLocaleString("fr-FR") }} FCFA
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    <template v-if="isEndorsementMode">
+                                        <input
+                                            v-model.number="form.fga_amount_override"
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            class="w-28 rounded border border-slate-200 px-2 py-1 text-right text-xs"
+                                        />
+                                    </template>
+                                    <template v-else>
+                                        {{ fgaAmountCreate.toLocaleString("fr-FR") }} FCFA
+                                    </template>
                                 </dd>
                             </div>
                             <div
-                                v-if="(recap.amounts?.cedeao_amount ?? 0) > 0"
+                                v-if="cedeaoAmountCreate > 0"
                                 class="flex justify-between gap-2"
                             >
                                 <dt class="text-slate-600">CEDEAO</dt>
-                                <dd
-                                    class="font-medium text-slate-900 shrink-0 whitespace-nowrap"
-                                >
-                                    {{
-                                        Number(
-                                            recap.amounts.cedeao_amount,
-                                        ).toLocaleString("fr-FR")
-                                    }}
-                                    FCFA
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    <template v-if="isEndorsementMode">
+                                        <input
+                                            v-model.number="form.cedeao_amount_override"
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            class="w-28 rounded border border-slate-200 px-2 py-1 text-right text-xs"
+                                        />
+                                    </template>
+                                    <template v-else>
+                                        {{ Number(cedeaoAmountCreate).toLocaleString("fr-FR") }} FCFA
+                                    </template>
                                 </dd>
                             </div>
                             <div

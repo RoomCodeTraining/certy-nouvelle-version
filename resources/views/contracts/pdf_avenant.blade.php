@@ -30,12 +30,15 @@ function contractTypeLabel($type) {
     $labels = ['VP' => 'VP', 'TPC' => 'Transport pour propre compte', 'TPM' => 'TPM', 'TWO_WHEELER' => 'Deux roues'];
     return $type ? ($labels[$type] ?? $type) : 'N/A';
 }
+$parentReference = ($contract->relationLoaded('parent') && $contract->parent)
+    ? $contract->parent->reference
+    : null;
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Contrat d'assurance</title>
+    <title>Avenant — assurance automobile</title>
     @include('contracts.pdf._shared_styles')
 </head>
 <body>
@@ -75,6 +78,8 @@ function contractTypeLabel($type) {
             <div class="header-meta">
                 <div class="left">
                     <div><span class="fw">Assuré :</span> {{ $client->full_name ?? 'N/A' }}</div>
+                    <div><span class="fw">N° avenant :</span> {{ $contract->reference ?? 'N/A' }}</div>
+                    <div><span class="fw">Réf. contrat d'origine :</span> {{ $parentReference ?? 'N/A' }}</div>
                 </div>
                 <div class="right">
                     <div><span class="fw">N° Document :</span> DOC-{{ date('y') }}-{{ str_pad($contract->id, 6, '0', STR_PAD_LEFT) }}</div>
@@ -83,11 +88,21 @@ function contractTypeLabel($type) {
         </div>
 
         <div class="main-title">
-            <h2>Contrat d'Assurance Automobile</h2>
-            <div class="sub">N° Contrat: CT{{ date('y') }}{{ str_pad($contract->id, 6, '0', STR_PAD_LEFT) }} | Document: DOC-{{ date('y') }}-{{ str_pad($contract->id, 6, '0', STR_PAD_LEFT) }}</div>
+            <h2>Avenant au contrat d'assurance automobile</h2>
+            <div class="sub">
+                N° avenant : {{ $contract->reference ?? 'N/A' }}
+                | Réf. contrat d'origine : {{ $parentReference ?? 'N/A' }}
+                | Document : DOC-{{ date('y') }}-{{ str_pad($contract->id, 6, '0', STR_PAD_LEFT) }}
+            </div>
         </div>
 
         <table class="table-info">
+            <tr>
+                <th>N° avenant</th>
+                <td>{{ $contract->reference ?? 'N/A' }}</td>
+                <th>Réf. contrat d'origine</th>
+                <td colspan="3">{{ $parentReference ?? 'N/A' }}</td>
+            </tr>
             <tr>
                 <th>Date Effet</th>
                 <td>{{ $contract->start_date ? $contract->start_date->format('d/m/Y') : 'N/A' }}</td>
@@ -184,11 +199,17 @@ function contractTypeLabel($type) {
             </div>
             <div class="col-right">
                 @php
-                    $displayAmounts = $contract->getDisplayAmounts();
-                    $guaranteesReduced = $displayAmounts['guarantee_amounts_reduced'];
-                    $primeNettePdf = $displayAmounts['prime_nette'];
-                    $reductionAutre = (int) ($contract->reduction_amount ?? 0);
-                    $montantApresReductionPdf = $displayAmounts['montant_apres_reduction'];
+                    $displayAmountsAvenant = $contract->getDisplayAmounts();
+                    $guaranteesReduced = array_map(static function ($g) {
+                        return [
+                            'code' => $g['code'],
+                            'label' => $g['label'],
+                            'amount' => 0,
+                        ];
+                    }, $displayAmountsAvenant['guarantee_amounts_reduced']);
+                    $primeNettePdf = 0;
+                    $pdfCedeao = \App\Models\Contract::PDF_ENDORSEMENT_CEDEAO_FCFA;
+                    $pdfPrimeTtc = \App\Models\Contract::PDF_ENDORSEMENT_PRIME_TTC_FCFA;
                 @endphp
                 <div class="block">
                     <div class="section-title">Garanties</div>
@@ -217,56 +238,30 @@ function contractTypeLabel($type) {
                 </div>
                 <div class="block">
                     <div class="section-title">Résumé Financier</div>
-                    @php
-                        $taxesAmount = $displayAmounts['taxes_amount'];
-                        $primeTtc = $displayAmounts['total_amount'];
-                    @endphp
                     <table class="section-table">
                         <tr class="row-highlight">
                             <th>Prime nette</th>
                             <td class="text-right">{{ number_format($primeNettePdf, 0, ',', ' ') }}</td>
                         </tr>
-                        @if($reductionAutre > 0)
-                        <tr>
-                            <th>Réduction autre</th>
-                            <td class="text-right" style="color:#dc2626;">− {{ number_format($reductionAutre, 0, ',', ' ') }}</td>
-                        </tr>
-                        <tr>
-                            <th>Montant après réduction</th>
-                            <td class="text-right font-bold">{{ number_format($montantApresReductionPdf, 0, ',', ' ') }}</td>
-                        </tr>
-                        @endif
                         <tr>
                             <th>Accessoire</th>
-                            <td class="text-right">{{ number_format($contract->accessory_amount ?? 0, 0, ',', ' ') }}</td>
+                            <td class="text-right">{{ number_format(0, 0, ',', ' ') }}</td>
                         </tr>
                         <tr>
                             <th>Taxes</th>
-                            <td class="text-right">{{ number_format($taxesAmount ?? 0, 0, ',', ' ') }}</td>
+                            <td class="text-right">{{ number_format(0, 0, ',', ' ') }}</td>
                         </tr>
                         <tr>
                             <th>Taxe FGA</th>
-                            <td class="text-right">{{ number_format($contract->fga_amount ?? 0, 0, ',', ' ') }}</td>
+                            <td class="text-right">{{ number_format(0, 0, ',', ' ') }}</td>
                         </tr>
                         <tr>
                             <th>CEDEAO</th>
-                            <td class="text-right">{{ number_format($contract->cedeao_amount ?? 0, 0, ',', ' ') }}</td>
+                            <td class="text-right">{{ number_format($pdfCedeao, 0, ',', ' ') }}</td>
                         </tr>
-                        @if(($contract->agency_accessory ?? 0) > 0)
-                            <tr>
-                                <th>Accessoire agence</th>
-                                <td class="text-right">{{ number_format($contract->agency_accessory ?? 0, 0, ',', ' ') }}</td>
-                            </tr>
-                        @endif
-                        @if(($contract->company_accessory ?? 0) > 0)
-                            <tr>
-                                <th>Accessoire compagnie</th>
-                                <td class="text-right">{{ number_format($contract->company_accessory ?? 0, 0, ',', ' ') }}</td>
-                            </tr>
-                        @endif
                         <tr class="row-total">
                             <th>Prime TTC</th>
-                            <td class="text-right">{{ number_format($primeTtc ?? 0, 0, ',', ' ') }} FCFA</td>
+                            <td class="text-right">{{ number_format($pdfPrimeTtc, 0, ',', ' ') }} FCFA</td>
                         </tr>
                     </table>
                 </div>

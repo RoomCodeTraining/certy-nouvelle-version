@@ -180,6 +180,8 @@ return [
         'engine_capacity' => 'cylindrée',
         'chassis_number' => 'numéro de châssis',
         'registration_card_number' => 'numéro de carte grise',
+        'endorsement_type' => 'type d\'avenant',
+        'creation_mode' => 'mode de création',
     ],
 
 ];

@@ -13,8 +13,8 @@ use App\Models\Client;
 use App\Models\Color;
 use App\Models\Company;
 use App\Models\Contract;
-use App\Models\OptionalGuarantee;
 use App\Models\EnergySource;
+use App\Models\OptionalGuarantee;
 use App\Models\Vehicle;
 use App\Models\VehicleBrand;
 use App\Models\VehicleCategory;
@@ -31,8 +31,8 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ContractController extends Controller
 {
@@ -49,6 +49,7 @@ class ContractController extends Controller
         if ($user->external_token_expires_at && $user->external_token_expires_at->isPast()) {
             return null;
         }
+
         return $user->external_token;
     }
 
@@ -128,6 +129,7 @@ class ContractController extends Controller
                 'logo_url' => $codeToLogoUrl[$c->code] ?? null,
             ];
         }
+
         return $out;
     }
 
@@ -145,6 +147,7 @@ class ContractController extends Controller
                 'logo_url' => $code ? ($logoByCode[$code] ?? null) : (is_object($c) && $c->logo_path ? asset($c->logo_path) : null),
             ];
         }
+
         return $out;
     }
 
@@ -169,6 +172,12 @@ class ContractController extends Controller
         }
         if ($request->filled('status')) {
             $query->where('status', $request->status);
+        }
+        if ($request->filled('deal_scope') && Schema::hasColumn('contracts', 'parent_id')) {
+            $scope = $request->input('deal_scope');
+            if (in_array($scope, ['new', 'endorsement', 'renewal'], true)) {
+                $query->forDealScope($scope);
+            }
         }
         if ($request->filled('date_from')) {
             $query->where('end_date', '>=', $request->date_from);
@@ -200,7 +209,7 @@ class ContractController extends Controller
 
         return Inertia::render('Contracts/Index', [
             'contracts' => $contracts,
-            'filters' => $request->only(['search', 'status', 'per_page', 'date_from', 'date_to', 'sort', 'order']),
+            'filters' => $request->only(['search', 'status', 'per_page', 'date_from', 'date_to', 'sort', 'order', 'deal_scope']),
             'draft_count' => $draftCount,
         ]);
     }
@@ -234,6 +243,12 @@ class ContractController extends Controller
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
+        if ($request->filled('deal_scope') && Schema::hasColumn('contracts', 'parent_id')) {
+            $scope = $request->input('deal_scope');
+            if (in_array($scope, ['new', 'endorsement', 'renewal'], true)) {
+                $query->forDealScope($scope);
+            }
+        }
         if ($request->filled('date_from')) {
             $query->where('end_date', '>=', $request->date_from);
         }
@@ -259,7 +274,7 @@ class ContractController extends Controller
 
         $hasPolicyNumber = Schema::hasColumn('contracts', 'policy_number');
         $hasAttestation = Schema::hasColumn('contracts', 'attestation_issued_at');
-        $filename = 'export-contrats-' . now()->format('Y-m-d-His') . '.csv';
+        $filename = 'export-contrats-'.now()->format('Y-m-d-His').'.csv';
 
         $headers = [
             'Date création',
@@ -325,8 +340,16 @@ class ContractController extends Controller
                 if ($hasPolicyNumber) {
                     $row[] = $c->policy_number ?? '';
                 }
+                $affaire = 'Nouvelle affaire';
+                if ($c->parent_id) {
+                    $meta = is_array($c->metadata) ? $c->metadata : [];
+                    $isEndorsement = ! empty($c->endorsement_type)
+                        || ! empty($meta['endorsement_type'] ?? null)
+                        || (($meta['creation_mode'] ?? null) === 'endorsement');
+                    $affaire = $isEndorsement ? 'Avenant' : 'Renouvellement';
+                }
                 $row = array_merge($row, [
-                    $c->parent_id ? 'Renouvellement' : 'Nouvelle affaire',
+                    $affaire,
                     $statusLabels[$c->status] ?? $c->status,
                     $c->client?->full_name ?? '',
                     $c->client?->owner?->name ?? '',
@@ -397,12 +420,42 @@ class ContractController extends Controller
             : null;
 
         $parentContract = null;
+        $creationMode = $request->input('mode') === 'endorsement' ? 'endorsement' : 'renewal';
         if ($request->filled('parent_id')) {
             $parent = Contract::find($request->parent_id);
             if ($parent && Contract::accessibleBy($user)->where('id', $parent->id)->exists()) {
                 $parentContract = $parent->only(['id', 'client_id', 'vehicle_id', 'company_id', 'contract_type', 'end_date']);
+                $parentContract['creation_mode'] = $creationMode;
                 if (! empty($parentContract['end_date'])) {
                     $parentContract['end_date'] = $parent->end_date->format('Y-m-d');
+                }
+                // Avenant : reprendre les montants du contrat parent (sinon la grille est recalculée sur une période raccourcie → prime TTC différente).
+                if ($creationMode === 'endorsement') {
+                    $parentContract = array_merge($parentContract, [
+                        'reference' => $parent->reference,
+                        'policy_number' => Schema::hasColumn('contracts', 'policy_number') ? $parent->policy_number : null,
+                        'start_date' => $parent->start_date?->format('Y-m-d'),
+                        'base_amount' => $parent->base_amount,
+                        'rc_amount' => $parent->rc_amount,
+                        'defence_appeal_amount' => $parent->defence_appeal_amount,
+                        'person_transport_amount' => $parent->person_transport_amount,
+                        'accessory_amount' => $parent->accessory_amount,
+                        'taxes_amount' => $parent->taxes_amount,
+                        'fga_amount' => $parent->fga_amount,
+                        'cedeao_amount' => $parent->cedeao_amount,
+                        'optional_guarantees_amount' => $parent->optional_guarantees_amount,
+                        'reduction_amount' => $parent->reduction_amount,
+                        'reduction_bns' => $parent->reduction_bns,
+                        'reduction_on_commission' => $parent->reduction_on_commission,
+                        'reduction_on_profession_percent' => $parent->reduction_on_profession_percent,
+                        'reduction_on_profession_amount' => $parent->reduction_on_profession_amount,
+                        'company_accessory' => $parent->company_accessory,
+                        'agency_accessory' => $parent->agency_accessory,
+                        'commission_amount' => $parent->commission_amount,
+                        'total_amount' => $parent->total_amount,
+                        'prime_ttc' => $parent->prime_ttc,
+                        'metadata' => $parent->metadata,
+                    ]);
                 }
             }
         }
@@ -419,13 +472,13 @@ class ContractController extends Controller
                 ['value' => Client::TYPE_TAPM, 'label' => 'Personne morale (TAPM)'],
             ],
             'vehicleBrands' => VehicleBrand::with('models:id,vehicle_brand_id,name')->get(['id', 'name']),
-            'circulationZones' => CirculationZone::orderBy('name')->get(['id', 'name']),
-            'energySources' => EnergySource::orderBy('name')->get(['id', 'name']),
-            'vehicleUsages' => VehicleUsage::orderBy('name')->get(['id', 'name']),
-            'vehicleTypes' => VehicleType::orderBy('name')->get(['id', 'name']),
-            'vehicleCategories' => VehicleCategory::orderBy('name')->get(['id', 'name']),
-            'vehicleGenders' => VehicleGender::orderBy('name')->get(['id', 'name']),
-            'colors' => Color::orderBy('name')->get(['id', 'name']),
+            'circulationZones' => CirculationZone::orderBy('name')->get(['id', 'name', 'code']),
+            'energySources' => EnergySource::orderBy('name')->get(['id', 'name', 'code']),
+            'vehicleUsages' => VehicleUsage::orderBy('name')->get(['id', 'name', 'code']),
+            'vehicleTypes' => VehicleType::orderBy('name')->get(['id', 'name', 'code']),
+            'vehicleCategories' => VehicleCategory::orderBy('name')->get(['id', 'name', 'code']),
+            'vehicleGenders' => VehicleGender::orderBy('name')->get(['id', 'name', 'code']),
+            'colors' => Color::orderBy('name')->get(['id', 'name', 'code']),
             'optionalGuaranteesConfig' => $optionalGuarantees,
             'optionalGuaranteesEnabled' => $optionalGuaranteesEnabled,
         ]);
@@ -437,7 +490,23 @@ class ContractController extends Controller
     public function renew(Request $request, Contract $contract): RedirectResponse
     {
         $this->authorizeContract($request, $contract);
+
         return redirect()->route('contracts.create', ['parent_id' => $contract->id]);
+    }
+
+    /**
+     * Redirige vers la création d'un avenant (contrat enfant du contrat donné).
+     * L'avenant reprend les infos du parent avec date d'effet = aujourd'hui
+     * et date d'échéance = celle du contrat parent.
+     */
+    public function endorse(Request $request, Contract $contract): RedirectResponse
+    {
+        $this->authorizeContract($request, $contract);
+
+        return redirect()->route('contracts.create', [
+            'parent_id' => $contract->id,
+            'mode' => 'endorsement',
+        ]);
     }
 
     /**
@@ -493,23 +562,62 @@ class ContractController extends Controller
             return redirect()->route('contracts.show', $contract)
                 ->with('success', 'Contrat validé. Vous pouvez générer l\'attestation digitale ou consulter le contrat en PDF.');
         }
+
         return redirect()->route('contracts.index')->with('success', 'Contrat enregistré en brouillon.');
     }
-
 
     public function show(Request $request, Contract $contract): Response|RedirectResponse
     {
         $this->authorizeContract($request, $contract);
         $relations = ['client', 'vehicle.brand', 'vehicle.model', 'company'];
-        if (Schema::hasColumn('contracts', 'parent_id')) {
-            $relations[] = 'parent:id,start_date,end_date,status';
-            $relations[] = 'children:id,parent_id,reference,start_date,end_date,status,total_amount';
-        }
         if (Schema::hasColumn('contracts', 'created_by_id')) {
             $relations[] = 'createdBy:id,name';
             $relations[] = 'updatedBy:id,name';
         }
         $contract->load($relations);
+
+        if (Schema::hasColumn('contracts', 'parent_id')) {
+            $linkedColumns = [
+                'id',
+                'parent_id',
+                'client_id',
+                'vehicle_id',
+                'company_id',
+                'reference',
+                'contract_type',
+                'start_date',
+                'end_date',
+                'status',
+                'total_amount',
+                'metadata',
+                'created_at',
+            ];
+            if (Schema::hasColumn('contracts', 'policy_number')) {
+                $linkedColumns[] = 'policy_number';
+            }
+            if (Schema::hasColumn('contracts', 'endorsement_type')) {
+                $linkedColumns[] = 'endorsement_type';
+            }
+            $nested = [
+                'children' => static function ($query) use ($linkedColumns): void {
+                    $query->select($linkedColumns)
+                        ->with([
+                            'client:id,full_name',
+                            'vehicle:id,registration_number',
+                            'company:id,name',
+                        ]);
+                },
+            ];
+            $nested['parent'] = static function ($query) use ($linkedColumns): void {
+                $query->select($linkedColumns)
+                    ->with([
+                        'client:id,full_name',
+                        'vehicle:id,registration_number',
+                        'company:id,name',
+                    ]);
+            };
+            $contract->load($nested);
+        }
 
         $displayAmounts = $contract->getDisplayAmounts();
         $contract->setAttribute('guarantee_amounts_reduced', $displayAmounts['guarantee_amounts_reduced']);
@@ -545,10 +653,17 @@ class ContractController extends Controller
             'company',
         ]);
 
+        if ($contract->parent_id) {
+            $contract->loadMissing('parent:id,reference');
+        }
+
         $companyLogoBase64 = $this->resolveCompanyLogoForPdf($request, $contract->company);
 
-        $filename = 'contrat-' . ($contract->reference ?? $contract->id) . '.pdf';
-        return Pdf::loadView('contracts.pdf', [
+        $isAvenant = $contract->isEndorsementContract();
+        $view = $isAvenant ? 'contracts.pdf_avenant' : 'contracts.pdf';
+        $filename = ($isAvenant ? 'avenant-' : 'contrat-').($contract->reference ?? $contract->id).'.pdf';
+
+        return Pdf::loadView($view, [
             'contract' => $contract,
             'company_logo_base64' => $companyLogoBase64,
         ])->stream($filename);
@@ -616,7 +731,7 @@ class ContractController extends Controller
             $mime = $detected;
         }
 
-        return 'data:' . $mime . ';base64,' . base64_encode($imageContent);
+        return 'data:'.$mime.';base64,'.base64_encode($imageContent);
     }
 
     public function edit(Request $request, Contract $contract): Response|RedirectResponse
@@ -659,6 +774,7 @@ class ContractController extends Controller
         }
         $this->authorizeClientVehicle($request, $request->validated('client_id'), $request->validated('vehicle_id'));
         $action->execute($contract, $request->validated(), $request->user());
+
         return redirect()->route('contracts.show', $contract)->with('success', 'Contrat mis à jour.');
     }
 
@@ -672,7 +788,6 @@ class ContractController extends Controller
         if (! $request->user() || ! $request->user()->isRoot()) {
             abort(403);
         }
-
 
         $data = $request->only([
             'reduction_bns',
@@ -764,6 +879,7 @@ class ContractController extends Controller
 
         if (! ($result['success'] ?? false)) {
             $message = $result['errors'][0]['title'] ?? 'Impossible de générer l\'attestation.';
+
             return redirect()->route('contracts.show', $contract)->with('error', $message);
         }
 

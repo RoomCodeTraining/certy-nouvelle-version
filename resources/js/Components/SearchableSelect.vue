@@ -2,7 +2,8 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 
 const props = defineProps({
-    modelValue: { type: [String, Number], default: '' },
+    /** Chaîne ou nombre ; éviter un typage trop strict qui rejette des valeurs issues du JSON. */
+    modelValue: { default: '' },
     options: { type: Array, default: () => [] },
     valueKey: { type: String, default: 'id' },
     labelKey: { type: String, default: 'name' },
@@ -33,6 +34,17 @@ const getOptionValue = (opt) => {
     return typeof opt === 'object' ? opt[props.valueKey] : opt;
 };
 
+/** Correspondance id (valueKey) ou code métier (référentiels tarifaires / véhicule). */
+function optionMatchesModelValue(opt, modelValue) {
+    if (modelValue === '' || modelValue == null) return false;
+    const mv = String(modelValue).trim();
+    if (opt == null || typeof opt !== 'object') return false;
+    const vk = opt[props.valueKey];
+    if (vk != null && String(vk).trim() === mv) return true;
+    if ('code' in opt && opt.code != null && String(opt.code).trim() === mv) return true;
+    return false;
+}
+
 const getOptionLabel = (opt) => {
     if (opt == null) return '';
     if (typeof opt === 'object' && props.labelKey in opt) return String(opt[props.labelKey]);
@@ -55,7 +67,9 @@ const filteredOptions = computed(() => {
 
 const selectedOption = computed(() => {
     if (props.modelValue === '' || props.modelValue == null) return null;
-    return normalizedOptions.value.find((opt) => String(getOptionValue(opt)) === String(props.modelValue)) ?? null;
+    return (
+        normalizedOptions.value.find((opt) => optionMatchesModelValue(opt, props.modelValue)) ?? null
+    );
 });
 
 const displayLabel = computed(() => {
@@ -153,10 +167,10 @@ watch(isOpen, (open) => {
                 </button>
                 <button
                     v-for="opt in filteredOptions"
-                    :key="getOptionValue(opt)"
+                    :key="`${getOptionValue(opt)}-${typeof opt === 'object' && opt?.code != null ? opt.code : ''}`"
                     type="button"
                     class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-start gap-2"
-                    :class="String(getOptionValue(opt)) === String(modelValue) ? 'bg-slate-100 text-slate-900 font-medium' : 'text-slate-700'"
+                    :class="optionMatchesModelValue(opt, modelValue) ? 'bg-slate-100 text-slate-900 font-medium' : 'text-slate-700'"
                     @click="select(opt)"
                 >
                     <img

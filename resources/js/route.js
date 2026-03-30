@@ -28,6 +28,7 @@ export function route(name, ...params) {
         'contracts.show': (id) => `/contracts/${id}`,
         'contracts.pdf': (id) => `/contracts/${id}/pdf`,
         'contracts.renew': (id) => `/contracts/${id}/renew`,
+        'contracts.endorse': (id) => `/contracts/${id}/endorse`,
         'contracts.edit': (id) => `/contracts/${id}/edit`,
         'contracts.update': (id) => `/contracts/${id}`,
         'contracts.update-reductions': (id) => `/contracts/${id}/reductions`,

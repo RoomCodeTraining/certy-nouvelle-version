@@ -56,9 +56,6 @@ function vehicleLabel(v) {
     return [brand, model].filter(Boolean).join(' ') + (reg ? ` — ${reg}` : '');
 }
 
-function dealTypeLabel(c) {
-    return c.parent_id ? 'Renouvellement' : 'Nouvelle affaire';
-}
 </script>
 
 <template>

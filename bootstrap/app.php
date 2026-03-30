@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'ensure.organization' => \App\Http\Middleware\EnsureUserHasOrganization::class,
             'root' => \App\Http\Middleware\EnsureUserIsRoot::class,
             'can.manage.utilisateurs' => \App\Http\Middleware\EnsureUserCanManageUtilisateurs::class,
+            'can.manage.pricing_grids' => \App\Http\Middleware\EnsureUserCanManagePricingGrids::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

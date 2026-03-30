@@ -87,6 +87,9 @@ onMounted(() => {
     if (referentialItems.some((item) => page.url.startsWith(item.href))) {
         referentialOpen.value = true;
     }
+    if (isProductionMenuActive()) {
+        productionOpen.value = true;
+    }
 });
 onUnmounted(() => {
     document.removeEventListener("click", closeMenus);
@@ -105,6 +108,9 @@ const isRoot = computed(() => !!auth?.user?.is_root);
 const canManageUtilisateurs = computed(
     () => !!auth?.user?.can_manage_utilisateurs,
 );
+const canManagePricingGrids = computed(
+    () => !!auth?.user?.can_manage_pricing_grids,
+);
 
 const certyIa = computed(() => page.props.certy_ia ?? null);
 
@@ -113,7 +119,6 @@ const navItems = computed(() => {
         { href: "/dashboard", label: "Tableau de bord", icon: "home" },
         { href: "/clients", label: "Clients", icon: "folder" },
         { href: "/vehicles", label: "Véhicules", icon: "sparkles" },
-        { href: "/contracts", label: "Contrats", icon: "credit" },
     ];
     if (isRoot.value) {
         items.push(
@@ -121,11 +126,6 @@ const navItems = computed(() => {
                 href: "/bordereaux",
                 label: "Bordereaux",
                 icon: "documentText",
-            },
-            {
-                href: "/reports/production",
-                label: "Production",
-                icon: "chart",
             },
             {
                 href: "/settings/guarantees",
@@ -144,6 +144,7 @@ const navItems = computed(() => {
     return items;
 });
 
+const productionOpen = ref(false);
 const digitalOpen = ref(false);
 const digitalItems = computed(() => {
     const items = [
@@ -191,18 +192,18 @@ const settingsItems = computed(() => {
         { href: "/settings/config", label: "Config courtier", icon: "cog" },
     ];
     if (isRoot.value) {
-        items.push(
-            {
-                href: "/settings/report-period",
-                label: "Export production",
-                icon: "documentText",
-            },
-            {
-                href: "/settings/pricing-grids",
-                label: "Grille tarifaire",
-                icon: "table",
-            },
-        );
+        items.push({
+            href: "/settings/report-period",
+            label: "Export production",
+            icon: "documentText",
+        });
+    }
+    if (canManagePricingGrids.value) {
+        items.push({
+            href: "/settings/pricing-grids",
+            label: "Grille tarifaire",
+            icon: "table",
+        });
     }
     if (certyIa.value?.enabled && isRoot.value) {
         items.push({
@@ -213,6 +214,63 @@ const settingsItems = computed(() => {
     }
     return items;
 });
+
+const productionItems = computed(() => [
+    {
+        href: "/contracts",
+        label: "Tous les contrats",
+        icon: "credit",
+    },
+    {
+        href: "/contracts?deal_scope=new",
+        label: "Nouvelles affaires",
+        icon: "documentText",
+    },
+    {
+        href: "/contracts?deal_scope=endorsement",
+        label: "Avenants",
+        icon: "documentText",
+    },
+    {
+        href: "/contracts?deal_scope=renewal",
+        label: "Renouvellements",
+        icon: "chart",
+    },
+]);
+
+function isProductionMenuActive() {
+    const path = page.url.split("?")[0];
+    return path === "/contracts" || path.startsWith("/contracts/");
+}
+
+function isProductionSubItemActive(item) {
+    if (item.href === "/contracts") {
+        const path = page.url.split("?")[0];
+        if (path !== "/contracts") {
+            return false;
+        }
+        const qs = page.url.includes("?") ? page.url.split("?")[1] : "";
+        const ds = new URLSearchParams(qs).get("deal_scope");
+        return ds == null || ds === "";
+    }
+    const matchScope = (scope) => {
+        const qs = page.url.includes("?") ? page.url.split("?")[1] : "";
+        return (
+            page.url.split("?")[0] === "/contracts" &&
+            new URLSearchParams(qs).get("deal_scope") === scope
+        );
+    };
+    if (item.href.includes("deal_scope=new")) {
+        return matchScope("new");
+    }
+    if (item.href.includes("deal_scope=endorsement")) {
+        return matchScope("endorsement");
+    }
+    if (item.href.includes("deal_scope=renewal")) {
+        return matchScope("renewal");
+    }
+    return false;
+}
 
 const isDigitalActive = () =>
     digitalItems.value.some((item) => page.url.startsWith(item.href));
@@ -384,6 +442,91 @@ const iconPaths = {
                             {{ item.label }}
                         </span>
                     </template>
+                    <!-- Production : accès aux listes de contrats par type -->
+                    <div class="pt-1">
+                        <button
+                            type="button"
+                            class="flex items-center gap-2.5 px-3 py-2.5 text-sm w-full text-left rounded-lg transition-colors"
+                            :class="
+                                productionOpen || isProductionMenuActive()
+                                    ? 'text-slate-900 bg-slate-100 font-medium'
+                                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                            "
+                            @click="productionOpen = !productionOpen"
+                        >
+                            <svg
+                                class="w-4 h-4 shrink-0 opacity-70"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    :d="iconPaths.chart"
+                                />
+                            </svg>
+                            Production
+                            <svg
+                                class="w-4 h-4 ml-auto shrink-0 transition-transform"
+                                :class="productionOpen ? 'rotate-90' : ''"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    :d="iconPaths.chevronRight"
+                                />
+                            </svg>
+                        </button>
+                        <Transition
+                            enter-active-class="transition ease-out duration-100"
+                            enter-from-class="opacity-0 -translate-y-1"
+                            enter-to-class="opacity-100 translate-y-0"
+                            leave-active-class="transition ease-in duration-75"
+                            leave-from-class="opacity-100 translate-y-0"
+                            leave-to-class="opacity-0 -translate-y-1"
+                        >
+                            <div
+                                v-show="productionOpen || isProductionMenuActive()"
+                                class="pl-6 pr-2 pb-1 space-y-0.5"
+                            >
+                                <Link
+                                    v-for="p in productionItems"
+                                    :key="p.href"
+                                    :href="p.href"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
+                                    :class="
+                                        isProductionSubItemActive(p)
+                                            ? 'text-brand-primary bg-brand-primary/10 font-medium'
+                                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                    "
+                                >
+                                    <svg
+                                        class="w-4 h-4 shrink-0 opacity-70"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            :d="
+                                                iconPaths[p.icon] ||
+                                                iconPaths.chart
+                                            "
+                                        />
+                                    </svg>
+                                    {{ p.label }}
+                                </Link>
+                            </div>
+                        </Transition>
+                    </div>
                     <!-- Digital (service externe ASACI) -->
                     <div class="pt-1">
                         <button
@@ -1038,6 +1181,45 @@ const iconPaths = {
                                     {{ item.label }}
                                 </Link>
                             </template>
+                            <div
+                                class="pt-3 mt-3 border-t border-slate-200 space-y-0.5"
+                            >
+                                <p
+                                    class="px-3 py-1.5 text-xs font-medium text-slate-400 uppercase tracking-wider"
+                                >
+                                    Production
+                                </p>
+                                <Link
+                                    v-for="p in productionItems"
+                                    :key="'m-' + p.href"
+                                    :href="p.href"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg"
+                                    :class="
+                                        isProductionSubItemActive(p)
+                                            ? 'text-brand-primary bg-brand-primary/10 font-medium'
+                                            : 'text-slate-600 hover:bg-slate-100'
+                                    "
+                                    @click="mobileMenuOpen = false"
+                                >
+                                    <svg
+                                        class="w-4 h-4 shrink-0"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            :d="
+                                                iconPaths[p.icon] ||
+                                                iconPaths.chart
+                                            "
+                                        />
+                                    </svg>
+                                    {{ p.label }}
+                                </Link>
+                            </div>
                             <div
                                 class="pt-3 mt-3 border-t border-slate-200 space-y-0.5"
                             >

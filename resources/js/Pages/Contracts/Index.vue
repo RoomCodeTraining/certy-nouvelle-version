@@ -9,7 +9,11 @@ import TableFilters from '@/Components/TableFilters.vue';
 import Paginator from '@/Components/Paginator.vue';
 import EmptyState from '@/Components/EmptyState.vue';
 import { route } from '@/route';
-import { contractTypeLabel } from '@/utils/contractTypes';
+import {
+    contractTypeLabel,
+    contractDealTypeLabel,
+    contractDealTypeBadgeClass,
+} from '@/utils/contractTypes';
 import { contractStatusLabel, contractStatusBadgeClass } from '@/utils/contractStatus';
 import { formatDate } from '@/utils/formatDate';
 import { expiresSoon } from '@/utils/expiresSoon';
@@ -29,14 +33,6 @@ const breadcrumbs = [
 /** Référence contrat : CA- + 11 caractères alphanumériques majuscules. */
 function contractReference(row) {
     return row.reference ?? '—';
-}
-
-/** Badge Affaire : Nouvelle affaire (pas de parent) ou Renouvellement (parent_id présent). */
-function dealTypeLabel(row) {
-    return row.parent_id ? 'Renouvellement' : 'Nouvelle affaire';
-}
-function dealTypeBadgeClass(row) {
-    return row.parent_id ? 'bg-violet-100 text-violet-800' : 'bg-emerald-100 text-emerald-800';
 }
 
 /** Montants par garantie (rc, dr, tp, optionnelles) */
@@ -115,8 +111,8 @@ const columns = [
         key: 'deal_type',
         label: 'Affaire',
         type: 'badge',
-        getValue: (row) => dealTypeLabel(row),
-        getBadgeClass: (row) => dealTypeBadgeClass(row),
+        getValue: (row) => contractDealTypeLabel(row),
+        getBadgeClass: (row) => contractDealTypeBadgeClass(row),
         cellClass: 'whitespace-nowrap',
     },
     {
@@ -161,15 +157,74 @@ const columns = [
     },
 ];
 
-const queryParams = computed(() => ({
-    search: props.filters?.search ?? '',
-    status: props.filters?.status ?? '',
-    per_page: props.contracts?.per_page ?? 25,
-    date_from: props.filters?.date_from ?? '',
-    date_to: props.filters?.date_to ?? '',
-    sort: props.filters?.sort ?? 'created_at',
-    order: props.filters?.order ?? 'desc',
-}));
+const dealScope = computed(() => props.filters?.deal_scope ?? '');
+
+const scopedDealScopes = ['new', 'endorsement', 'renewal'];
+
+const listTitle = computed(() => {
+    if (dealScope.value === 'new') {
+        return 'Contrats · Nouvelles affaires';
+    }
+    if (dealScope.value === 'endorsement') {
+        return 'Contrats · Avenants';
+    }
+    if (dealScope.value === 'renewal') {
+        return 'Contrats · Renouvellements';
+    }
+    return 'Contrats';
+});
+
+/** Onglets : préserve tri / pagination courants. */
+function scopeTabHref(scope) {
+    const p = new URLSearchParams();
+    if (scope === 'new' || scope === 'endorsement' || scope === 'renewal') {
+        p.set('deal_scope', scope);
+    }
+    if (props.filters?.sort) {
+        p.set('sort', props.filters.sort);
+    }
+    if (props.filters?.order) {
+        p.set('order', props.filters.order);
+    }
+    if (props.contracts?.per_page) {
+        p.set('per_page', String(props.contracts.per_page));
+    }
+    const qs = p.toString();
+    return qs ? `/contracts?${qs}` : '/contracts';
+}
+
+const filtersResetHref = computed(() => {
+    const ds = dealScope.value;
+    if (scopedDealScopes.includes(ds)) {
+        return `/contracts?deal_scope=${ds}`;
+    }
+    return '/contracts';
+});
+
+const draftContractsHref = computed(() => {
+    const p = new URLSearchParams();
+    p.set('status', 'draft');
+    if (scopedDealScopes.includes(dealScope.value)) {
+        p.set('deal_scope', dealScope.value);
+    }
+    return `${route('contracts.index')}?${p.toString()}`;
+});
+
+const queryParams = computed(() => {
+    const q = {
+        search: props.filters?.search ?? '',
+        status: props.filters?.status ?? '',
+        per_page: props.contracts?.per_page ?? 25,
+        date_from: props.filters?.date_from ?? '',
+        date_to: props.filters?.date_to ?? '',
+        sort: props.filters?.sort ?? 'created_at',
+        order: props.filters?.order ?? 'desc',
+    };
+    if (scopedDealScopes.includes(dealScope.value)) {
+        q.deal_scope = dealScope.value;
+    }
+    return q;
+});
 
 /** URL d'export Excel avec les filtres courants (sans per_page). */
 const exportExcelUrl = computed(() => {
@@ -177,6 +232,7 @@ const exportExcelUrl = computed(() => {
     const params = new URLSearchParams();
     if (props.filters?.search) params.set('search', props.filters.search);
     if (props.filters?.status) params.set('status', props.filters.status);
+    if (props.filters?.deal_scope) params.set('deal_scope', props.filters.deal_scope);
     if (props.filters?.date_from) params.set('date_from', props.filters.date_from);
     if (props.filters?.date_to) params.set('date_to', props.filters.date_to);
     const qs = params.toString();
@@ -212,7 +268,7 @@ function cancel(contract, label) {
 <template>
     <DashboardLayout>
         <template #header>
-            <PageHeader :breadcrumbs="breadcrumbs" title="Contrats">
+            <PageHeader :breadcrumbs="breadcrumbs" :title="listTitle">
                 <template #actions>
                     <a
                         :href="exportExcelUrl"
@@ -233,9 +289,56 @@ function cancel(contract, label) {
             </PageHeader>
         </template>
 
+        <div class="flex flex-wrap gap-2 mb-4">
+            <Link
+                :href="scopeTabHref('')"
+                class="inline-flex items-center justify-center min-h-[40px] px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                :class="
+                    dealScope === ''
+                        ? 'bg-slate-900 text-white'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                "
+            >
+                Tous les contrats
+            </Link>
+            <Link
+                :href="scopeTabHref('new')"
+                class="inline-flex items-center justify-center min-h-[40px] px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                :class="
+                    dealScope === 'new'
+                        ? 'bg-slate-900 text-white'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                "
+            >
+                Nouvelles affaires
+            </Link>
+            <Link
+                :href="scopeTabHref('endorsement')"
+                class="inline-flex items-center justify-center min-h-[40px] px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                :class="
+                    dealScope === 'endorsement'
+                        ? 'bg-slate-900 text-white'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                "
+            >
+                Avenants
+            </Link>
+            <Link
+                :href="scopeTabHref('renewal')"
+                class="inline-flex items-center justify-center min-h-[40px] px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                :class="
+                    dealScope === 'renewal'
+                        ? 'bg-slate-900 text-white'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                "
+            >
+                Renouvellements
+            </Link>
+        </div>
+
         <TableFilters
             action="/contracts"
-            reset-href="/contracts"
+            :reset-href="filtersResetHref"
             :has-active-filters="hasActiveFilters"
         >
             <input
@@ -247,7 +350,7 @@ function cancel(contract, label) {
             />
             <Link
                 v-if="draft_count > 0"
-                :href="`${route('contracts.index')}?status=draft`"
+                :href="draftContractsHref"
                 class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm font-medium hover:bg-amber-100"
             >
                 Brouillons ({{ draft_count }})
@@ -283,6 +386,12 @@ function cancel(contract, label) {
             <input type="hidden" name="per_page" :value="contracts?.per_page ?? 25" />
             <input type="hidden" name="sort" :value="filters?.sort ?? 'created_at'" />
             <input type="hidden" name="order" :value="filters?.order ?? 'desc'" />
+            <input
+                v-if="scopedDealScopes.includes(dealScope)"
+                type="hidden"
+                name="deal_scope"
+                :value="dealScope"
+            />
         </TableFilters>
 
         <div class="rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -298,9 +407,9 @@ function cancel(contract, label) {
                             <p class="font-mono text-sm font-medium text-slate-900">{{ contractReference(row) }}</p>
                             <span
                                 class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
-                                :class="dealTypeBadgeClass(row)"
+                                :class="contractDealTypeBadgeClass(row)"
                             >
-                                {{ dealTypeLabel(row) }}
+                                {{ contractDealTypeLabel(row) }}
                             </span>
                         </div>
                         <p class="text-sm text-slate-700 mt-0.5">{{ contractTypeLabel(row.contract_type) }}</p>

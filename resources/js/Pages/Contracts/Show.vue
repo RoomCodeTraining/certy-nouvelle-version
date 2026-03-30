@@ -8,6 +8,9 @@ import {
     contractTypeLabel,
     attestationColorLabel,
     attestationColorClasses,
+    contractIsEndorsement,
+    contractDealTypeLabel,
+    contractDealTypeBadgeClass,
 } from "@/utils/contractTypes";
 import { CONTRACT_STATUS_LABELS } from "@/utils/contractStatus";
 import { formatDate } from "@/utils/formatDate";
@@ -221,6 +224,9 @@ const canCancel = computed(() =>
 const canRenew = computed(
     () => !canEdit.value && props.contract?.status !== "cancelled",
 );
+const canEndorse = computed(
+    () => !canEdit.value && props.contract?.status !== "cancelled",
+);
 
 const showPostValidateRecap = computed(() =>
     ["validated", "active"].includes(props.contract?.status),
@@ -229,8 +235,64 @@ const showPostValidateRecap = computed(() =>
 const isActive = computed(() => props.contract?.status === "active");
 
 const isNewBusiness = computed(() => !props.contract?.parent_id);
+const isEndorsementContract = computed(() =>
+    contractIsEndorsement(props.contract),
+);
 const parentContract = computed(() => props.contract?.parent ?? null);
 const childContracts = computed(() => props.contract?.children ?? []);
+
+/** Libellés types d'avenant (alignés sur Create.vue). */
+const ENDORSEMENT_TYPE_LABELS = {
+    registration_change: "Changement d'immatriculation",
+    vehicle_info_update: "Mise à jour infos véhicule",
+    client_info_update: "Mise à jour infos client",
+    other: "Autre",
+};
+
+const childContractsSorted = computed(() => {
+    const list = [...(props.contract?.children ?? [])];
+    return list.sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return tb - ta;
+    });
+});
+
+const childCountsSummary = computed(() => {
+    const list = props.contract?.children ?? [];
+    const renewals = list.filter((c) => !contractIsEndorsement(c)).length;
+    const endorsements = list.filter((c) => contractIsEndorsement(c)).length;
+    const parts = [];
+    if (renewals > 0) {
+        parts.push(
+            `${renewals} renouvellement${renewals > 1 ? "s" : ""}`,
+        );
+    }
+    if (endorsements > 0) {
+        parts.push(`${endorsements} avenant${endorsements > 1 ? "s" : ""}`);
+    }
+    return parts.join(" · ");
+});
+
+function childEndorsementTypeLabel(child) {
+    const code =
+        child?.endorsement_type ?? child?.metadata?.endorsement_type;
+    if (!code) return "";
+    return ENDORSEMENT_TYPE_LABELS[code] ?? code;
+}
+
+function childKindBadgeClass(child) {
+    return contractDealTypeBadgeClass(child);
+}
+
+/** Libellé du type d'avenant sur la fiche courante (colonne ou metadata). */
+const currentEndorsementTypeLabel = computed(() => {
+    const c = props.contract;
+    if (!contractIsEndorsement(c)) return "";
+    const code = c?.endorsement_type ?? c?.metadata?.endorsement_type;
+    if (!code) return "";
+    return ENDORSEMENT_TYPE_LABELS[code] ?? code;
+});
 
 const page = usePage();
 const isRoot = computed(() => page.props.auth?.user?.is_root === true);
@@ -285,10 +347,12 @@ function cancel(contract) {
 }
 
 function validateContract(contract) {
+    const isAvenant = contractIsEndorsement(contract);
     confirmDialog({
-        title: "Valider le contrat",
-        message:
-            "Voulez-vous valider ce contrat ? Il passera au statut « Validé » et ne pourra plus être modifié en brouillon.",
+        title: isAvenant ? "Valider l'avenant" : "Valider le contrat",
+        message: isAvenant
+            ? "Voulez-vous valider cet avenant ? Il passera au statut « Validé » et ne pourra plus être modifié en brouillon."
+            : "Voulez-vous valider ce contrat ? Il passera au statut « Validé » et ne pourra plus être modifié en brouillon.",
         confirmLabel: "Valider",
         variant: "default",
     }).then((ok) => {
@@ -335,7 +399,11 @@ function markAttestationIssued(contract) {
                         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
                         @click="validateContract(contract)"
                     >
-                        Valider le contrat
+                        {{
+                            isEndorsementContract
+                                ? "Valider l'avenant"
+                                : "Valider le contrat"
+                        }}
                     </button>
                     <Link
                         v-if="canRenew"
@@ -343,6 +411,13 @@ function markAttestationIssued(contract) {
                         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors"
                     >
                         Renouveler
+                    </Link>
+                    <Link
+                        v-if="canEndorse"
+                        :href="route('contracts.endorse', contract.id)"
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-sky-200 bg-sky-50 text-sky-700 text-sm font-medium hover:bg-sky-100 transition-colors"
+                    >
+                        Créer un avenant
                     </Link>
                     <button
                         v-if="canCancel"
@@ -365,27 +440,17 @@ function markAttestationIssued(contract) {
                             'inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap',
                             isNewBusiness
                                 ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-violet-100 text-violet-800',
+                                : contractDealTypeBadgeClass(contract),
                         ]"
                     >
                         {{
                             isNewBusiness
                                 ? "Nouvelle affaire"
-                                : "Renouvellement"
+                                : isEndorsementContract
+                                  ? "Avenant"
+                                  : "Renouvellement"
                         }}
                     </span>
-                    <template v-if="parentContract">
-                        <span class="text-slate-400">|</span>
-                        <Link
-                            :href="route('contracts.show', parentContract.id)"
-                            class="text-sm font-medium text-slate-600 hover:text-slate-900"
-                        >
-                            Contrat de base ({{
-                                formatDate(parentContract.start_date)
-                            }}
-                            → {{ formatDate(parentContract.end_date) }})
-                        </Link>
-                    </template>
                     <template
                         v-if="
                             contract.created_by ||
@@ -433,56 +498,326 @@ function markAttestationIssued(contract) {
                         </span>
                     </template>
                 </div>
+                <p
+                    v-if="currentEndorsementTypeLabel"
+                    class="mt-3 text-sm text-slate-600"
+                >
+                    Type d'avenant&nbsp;:
+                    <strong>{{ currentEndorsementTypeLabel }}</strong>
+                </p>
                 <div
-                    v-if="childContracts.length > 0"
+                    v-if="parentContract"
                     class="mt-4 pt-4 border-t border-slate-200"
                 >
-                    <h3 class="text-sm font-semibold text-slate-800 mb-3">
-                        Renouvellements de ce contrat ({{ childContracts.length }})
+                    <h3 class="text-sm font-semibold text-slate-800">
+                        Contrat parent
                     </h3>
-                    <div class="rounded-lg border border-slate-200 bg-slate-50/50 overflow-hidden">
+                    <p class="text-xs text-slate-500 mt-1 mb-3">
+                        Contrat dont dépend ce renouvellement ou cet avenant
+                    </p>
+                    <div
+                        class="rounded-lg border border-slate-200 bg-slate-50/50 overflow-hidden"
+                    >
                         <ul class="divide-y divide-slate-200">
-                            <li
-                                v-for="child in childContracts"
-                                :key="child.id"
-                                class="flex flex-wrap sm:flex-nowrap sm:items-center justify-between gap-3 px-4 py-3 hover:bg-slate-100/50"
-                            >
+                            <li>
                                 <Link
-                                    :href="route('contracts.show', child.id)"
-                                    class="flex-1 min-w-0 group"
+                                    :href="
+                                        route('contracts.show', parentContract.id)
+                                    "
+                                    class="flex flex-wrap sm:flex-nowrap sm:items-start justify-between gap-3 px-4 py-3 hover:bg-slate-100/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 transition-colors"
+                                    :aria-label="`Voir le détail du contrat ${parentContract.reference ?? parentContract.id}`"
                                 >
-                                    <span class="font-mono text-sm font-medium text-slate-900 group-hover:text-sky-700 group-hover:underline">
-                                        {{ child.reference ?? '—' }}
-                                    </span>
-                                    <span class="block sm:inline sm:ml-2 text-sm text-slate-600">
-                                        {{ formatDate(child.start_date) }} → {{ formatDate(child.end_date) }}
-                                    </span>
+                                    <div class="flex-1 min-w-0 space-y-1">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span
+                                                class="font-mono text-sm font-medium text-slate-900"
+                                            >
+                                                {{
+                                                    parentContract.reference ??
+                                                    "—"
+                                                }}
+                                            </span>
+                                            <span
+                                                :class="[
+                                                    'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
+                                                    contractDealTypeBadgeClass(
+                                                        parentContract,
+                                                    ),
+                                                ]"
+                                            >
+                                                {{
+                                                    contractDealTypeLabel(
+                                                        parentContract,
+                                                    )
+                                                }}
+                                            </span>
+                                            <span
+                                                v-if="
+                                                    contractIsEndorsement(
+                                                        parentContract,
+                                                    )
+                                                "
+                                                class="text-xs text-slate-600"
+                                            >
+                                                {{
+                                                    childEndorsementTypeLabel(
+                                                        parentContract,
+                                                    )
+                                                }}
+                                            </span>
+                                        </div>
+                                        <p class="text-sm text-slate-600">
+                                            {{
+                                                formatDate(
+                                                    parentContract.start_date,
+                                                )
+                                            }}
+                                            →
+                                            {{
+                                                formatDate(
+                                                    parentContract.end_date,
+                                                )
+                                            }}
+                                        </p>
+                                        <p class="text-sm text-slate-600">
+                                            <span
+                                                class="font-medium text-slate-700"
+                                                >{{
+                                                    parentContract.client
+                                                        ?.full_name ?? "—"
+                                                }}</span
+                                            >
+                                            <span class="text-slate-400 mx-1.5"
+                                                >·</span
+                                            >
+                                            <span class="font-mono text-slate-700">{{
+                                                parentContract.vehicle
+                                                    ?.registration_number ??
+                                                    "—"
+                                            }}</span>
+                                        </p>
+                                        <p class="text-xs text-slate-500">
+                                            {{
+                                                parentContract.company?.name ??
+                                                "—"
+                                            }}
+                                            <span
+                                                v-if="parentContract.contract_type"
+                                                class="text-slate-400"
+                                            >
+                                                ·
+                                                {{
+                                                    contractTypeLabel(
+                                                        parentContract.contract_type,
+                                                    )
+                                                }}
+                                            </span>
+                                        </p>
+                                        <p
+                                            v-if="parentContract.policy_number"
+                                            class="text-xs text-slate-500"
+                                        >
+                                            N° police&nbsp;:
+                                            <span class="font-mono">{{
+                                                parentContract.policy_number
+                                            }}</span>
+                                        </p>
+                                    </div>
+                                    <div
+                                        class="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0 w-full sm:w-auto justify-between sm:justify-end"
+                                    >
+                                        <span
+                                            class="text-sm font-medium text-slate-900 tabular-nums"
+                                        >
+                                            {{
+                                                parentContract.total_amount !=
+                                                null
+                                                    ? Number(
+                                                          parentContract.total_amount,
+                                                      ).toLocaleString(
+                                                          "fr-FR",
+                                                      ) + " F CFA"
+                                                    : "—"
+                                            }}
+                                        </span>
+                                        <span
+                                            :class="[
+                                                'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium',
+                                                parentContract.status ===
+                                                    'active' ||
+                                                parentContract.status ===
+                                                    'validated'
+                                                    ? 'bg-emerald-100 text-emerald-800'
+                                                    : 'bg-slate-100 text-slate-600',
+                                            ]"
+                                        >
+                                            {{
+                                                CONTRACT_STATUS_LABELS[
+                                                    parentContract.status
+                                                ] ?? parentContract.status
+                                            }}
+                                        </span>
+                                        <span
+                                            class="text-sm font-medium text-sky-600"
+                                        >
+                                            Voir le détail →
+                                        </span>
+                                    </div>
                                 </Link>
-                                <div class="flex items-center gap-3 shrink-0">
-                                    <span class="text-sm font-medium text-slate-900 tabular-nums">
-                                        {{ child.total_amount != null ? Number(child.total_amount).toLocaleString('fr-FR') + ' F CFA' : '—' }}
-                                    </span>
-                                    <span
-                                        :class="[
-                                            'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium',
-                                            child.status === 'active' || child.status === 'validated'
-                                                ? 'bg-emerald-100 text-emerald-800'
-                                                : 'bg-slate-100 text-slate-600',
-                                        ]"
-                                    >
-                                        {{ CONTRACT_STATUS_LABELS[child.status] ?? child.status }}
-                                    </span>
-                                    <Link
-                                        :href="route('contracts.show', child.id)"
-                                        class="text-sm font-medium text-sky-600 hover:text-sky-700"
-                                    >
-                                        Voir →
-                                    </Link>
-                                </div>
                             </li>
                         </ul>
                     </div>
                 </div>
+                <div
+                    v-if="childContracts.length > 0"
+                    class="mt-4 pt-4 border-t border-slate-200"
+                >
+                    <h3 class="text-sm font-semibold text-slate-800">
+                        Contrats liés (renouvellements et avenants)
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-1 mb-3">
+                        {{ childCountsSummary }}
+                    </p>
+                    <div class="rounded-lg border border-slate-200 bg-slate-50/50 overflow-hidden">
+                        <ul class="divide-y divide-slate-200">
+                            <li
+                                v-for="child in childContractsSorted"
+                                :key="child.id"
+                            >
+                                <Link
+                                    :href="route('contracts.show', child.id)"
+                                    class="flex flex-wrap sm:flex-nowrap sm:items-start justify-between gap-3 px-4 py-3 hover:bg-slate-100/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-500 transition-colors"
+                                    :aria-label="`Voir le détail du contrat ${child.reference ?? child.id}`"
+                                >
+                                    <div class="flex-1 min-w-0 space-y-1">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span
+                                                class="font-mono text-sm font-medium text-slate-900"
+                                            >
+                                                {{ child.reference ?? "—" }}
+                                            </span>
+                                            <span
+                                                :class="[
+                                                    'inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
+                                                    childKindBadgeClass(child),
+                                                ]"
+                                            >
+                                                {{
+                                                    contractDealTypeLabel(
+                                                        child,
+                                                    )
+                                                }}
+                                            </span>
+                                            <span
+                                                v-if="contractIsEndorsement(child)"
+                                                class="text-xs text-slate-600"
+                                            >
+                                                {{
+                                                    childEndorsementTypeLabel(
+                                                        child,
+                                                    )
+                                                }}
+                                            </span>
+                                        </div>
+                                        <p
+                                            class="text-sm text-slate-600"
+                                        >
+                                            {{
+                                                formatDate(child.start_date)
+                                            }}
+                                            →
+                                            {{ formatDate(child.end_date) }}
+                                        </p>
+                                        <p
+                                            class="text-sm text-slate-600"
+                                        >
+                                            <span class="font-medium text-slate-700">{{
+                                                child.client?.full_name ?? "—"
+                                            }}</span>
+                                            <span class="text-slate-400 mx-1.5"
+                                                >·</span
+                                            >
+                                            <span class="font-mono text-slate-700">{{
+                                                child.vehicle
+                                                    ?.registration_number ??
+                                                    "—"
+                                            }}</span>
+                                        </p>
+                                        <p class="text-xs text-slate-500">
+                                            {{
+                                                child.company?.name ?? "—"
+                                            }}
+                                            <span
+                                                v-if="child.contract_type"
+                                                class="text-slate-400"
+                                            >
+                                                ·
+                                                {{
+                                                    contractTypeLabel(
+                                                        child.contract_type,
+                                                    )
+                                                }}
+                                            </span>
+                                        </p>
+                                        <p
+                                            v-if="child.policy_number"
+                                            class="text-xs text-slate-500"
+                                        >
+                                            N° police&nbsp;:
+                                            <span class="font-mono">{{
+                                                child.policy_number
+                                            }}</span>
+                                        </p>
+                                    </div>
+                                    <div
+                                        class="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0 w-full sm:w-auto justify-between sm:justify-end"
+                                    >
+                                        <span
+                                            class="text-sm font-medium text-slate-900 tabular-nums"
+                                        >
+                                            {{
+                                                child.total_amount != null
+                                                    ? Number(
+                                                          child.total_amount,
+                                                      ).toLocaleString(
+                                                          "fr-FR",
+                                                      ) + " F CFA"
+                                                    : "—"
+                                            }}
+                                        </span>
+                                        <span
+                                            :class="[
+                                                'inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium',
+                                                child.status === 'active' ||
+                                                child.status === 'validated'
+                                                    ? 'bg-emerald-100 text-emerald-800'
+                                                    : 'bg-slate-100 text-slate-600',
+                                            ]"
+                                        >
+                                            {{
+                                                CONTRACT_STATUS_LABELS[
+                                                    child.status
+                                                ] ?? child.status
+                                            }}
+                                        </span>
+                                        <span
+                                            class="text-sm font-medium text-sky-600"
+                                        >
+                                            Voir le détail →
+                                        </span>
+                                    </div>
+                                </Link>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <p
+                    v-else-if="isNewBusiness"
+                    class="mt-4 pt-4 border-t border-slate-200 text-sm text-slate-500"
+                >
+                    Aucun renouvellement ni avenant lié à ce contrat pour
+                    l’instant.
+                </p>
             </section>
 
             <!-- Récap après validation ; pour contrat actif : édition d'attestation si pas encore faite -->

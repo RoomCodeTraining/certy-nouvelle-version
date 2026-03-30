@@ -99,7 +99,7 @@ class PricingGridController extends Controller
     public function index(Request $request): Response|JsonResponse
     {
         $user = $request->user();
-        if (! $user || ! $user->isRoot()) {
+        if (! $user || (! $user->isRoot() && ! $user->isOfficeAdmin())) {
             if ($request->wantsJson()) {
                 return response()->json(['error' => 'Unauthorized'], 403);
             }
@@ -126,7 +126,7 @@ class PricingGridController extends Controller
     public function update(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (! $user || ! $user->isRoot()) {
+        if (! $user || (! $user->isRoot() && ! $user->isOfficeAdmin())) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
