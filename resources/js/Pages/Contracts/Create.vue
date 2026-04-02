@@ -13,6 +13,9 @@ import {
     attestationColorClasses,
 } from "@/utils/contractTypes";
 
+/** Aligné sur Contract::PDF_ENDORSEMENT_CEDEAO_FCFA : seul montant tarifaire pour l’avenant. */
+const ENDORSEMENT_CEDEAO_FIXED_FCFA = 1000;
+
 const props = defineProps({
     clients: Array,
     initialVehicleId: { type: [Number, String], default: null },
@@ -206,6 +209,25 @@ const isTwoWheeler = computed(() => form.contract_type === "TWO_WHEELER");
 const isEndorsementMode = computed(
     () => props.parentContract?.creation_mode === "endorsement",
 );
+/** Avenant : pas avant aujourd'hui, pas après l'échéance du contrat parent. */
+const endorsementStartDateMax = computed(() => {
+    if (!isEndorsementMode.value || !props.parentContract?.end_date) {
+        return undefined;
+    }
+    return String(props.parentContract.end_date).slice(0, 10);
+});
+const endorsementDatePickerYearRange = computed(() => {
+    const startY = new Date().getFullYear();
+    let endY = startY + 1;
+    const max = endorsementStartDateMax.value;
+    if (max && max.length >= 4) {
+        const y = parseInt(max.slice(0, 4), 10);
+        if (!Number.isNaN(y)) {
+            endY = Math.max(endY, y);
+        }
+    }
+    return [startY, endY];
+});
 const needsVehicleUpdateForEndorsement = computed(() =>
     ["registration_change", "vehicle_info_update"].includes(
         form.endorsement_type,
@@ -1032,15 +1054,6 @@ function seedEndorsementOverridesFromRecap() {
     });
 }
 
-function parentHasPremiumSnapshot(parent) {
-    return (
-        parent &&
-        (parent.total_amount != null ||
-            parent.rc_amount != null ||
-            parent.base_amount != null)
-    );
-}
-
 /** Reprend les montants du contrat parent (évite un recalcul grille sur période raccourcie). */
 function applyOptionalGuaranteesFromParentMetadata(list) {
     if (!props.optionalGuaranteesEnabled) {
@@ -1065,7 +1078,7 @@ function applyOptionalGuaranteesFromParentMetadata(list) {
                 amount: amt,
             });
         } else {
-            next[def.code] = next[def.code] ?? { enabled: false, amount: 0 };
+            next[def.code] = { enabled: false, amount: 0 };
         }
     });
     optionalGuarantees.value = next;
@@ -1081,57 +1094,40 @@ function seedEndorsementFromParent() {
     if (!p || !isEndorsementMode.value) return;
     const num = (v) =>
         v != null && v !== "" && !Number.isNaN(Number(v)) ? Number(v) : 0;
-    const amounts = {
-        base_amount: num(p.base_amount),
-        rc_amount: num(p.rc_amount),
-        defence_appeal_amount: num(p.defence_appeal_amount),
-        person_transport_amount: num(p.person_transport_amount),
-        accessory_amount: num(p.accessory_amount),
-        taxes_amount: num(p.taxes_amount),
-        fga_amount: num(p.fga_amount),
-        cedeao_amount: num(p.cedeao_amount),
-    };
-    const total =
-        num(p.total_amount) ||
-        num(p.prime_ttc) ||
-        null;
+    const z = 0;
+    const cedeao = ENDORSEMENT_CEDEAO_FIXED_FCFA;
     recap.value = {
         prime_amount: null,
-        accessory_amount: amounts.accessory_amount,
-        total_premium: total,
-        amounts,
+        accessory_amount: z,
+        total_premium: cedeao,
+        amounts: {
+            base_amount: z,
+            rc_amount: z,
+            defence_appeal_amount: z,
+            person_transport_amount: z,
+            accessory_amount: z,
+            taxes_amount: z,
+            fga_amount: z,
+            cedeao_amount: cedeao,
+        },
     };
-    form.base_amount_override = amounts.base_amount;
-    form.rc_amount_override = amounts.rc_amount;
-    form.defence_appeal_amount_override = amounts.defence_appeal_amount;
-    form.person_transport_amount_override = amounts.person_transport_amount;
-    form.accessory_amount_override = amounts.accessory_amount;
-    form.taxes_amount_override = amounts.taxes_amount;
-    form.fga_amount_override = amounts.fga_amount;
-    form.cedeao_amount_override = amounts.cedeao_amount;
-    form.reduction_amount = num(p.reduction_amount);
-    form.reduction_bns =
-        p.reduction_bns != null && p.reduction_bns !== ""
-            ? Number(p.reduction_bns)
-            : null;
-    form.reduction_on_commission =
-        p.reduction_on_commission != null && p.reduction_on_commission !== ""
-            ? Number(p.reduction_on_commission)
-            : null;
-    form.reduction_on_profession_percent =
-        p.reduction_on_profession_percent != null &&
-        p.reduction_on_profession_percent !== ""
-            ? Number(p.reduction_on_profession_percent)
-            : null;
-    form.reduction_on_profession_amount =
-        p.reduction_on_profession_amount != null &&
-        p.reduction_on_profession_amount !== ""
-            ? Number(p.reduction_on_profession_amount)
-            : null;
-    form.company_accessory = num(p.company_accessory);
-    form.agency_accessory = num(p.agency_accessory);
+    form.base_amount_override = z;
+    form.rc_amount_override = z;
+    form.defence_appeal_amount_override = z;
+    form.person_transport_amount_override = z;
+    form.accessory_amount_override = z;
+    form.taxes_amount_override = z;
+    form.fga_amount_override = z;
+    form.cedeao_amount_override = cedeao;
+    form.reduction_amount = z;
+    form.reduction_bns = null;
+    form.reduction_on_commission = null;
+    form.reduction_on_profession_percent = null;
+    form.reduction_on_profession_amount = null;
+    form.company_accessory = z;
+    form.agency_accessory = z;
     form.commission_amount = num(p.commission_amount);
-    applyOptionalGuaranteesFromParentMetadata(p.metadata?.optional_guarantees);
+    applyOptionalGuaranteesFromParentMetadata([]);
 }
 
 /** Champs minimaux pour enregistrer en brouillon (étape 1 ou 2). */
@@ -1233,19 +1229,9 @@ async function fetchPreview() {
         };
         return;
     }
-    if (isEndorsementMode.value && parentHasPremiumSnapshot(props.parentContract)) {
-        previewLoading.value = true;
-        const startAt = Date.now();
+    if (isEndorsementMode.value) {
         seedEndorsementFromParent();
-        const elapsed = Date.now() - startAt;
-        const remaining = Math.max(0, PREVIEW_LOADER_MIN_MS - elapsed);
-        if (remaining > 0) {
-            setTimeout(() => {
-                previewLoading.value = false;
-            }, remaining);
-        } else {
-            previewLoading.value = false;
-        }
+        previewLoading.value = false;
         return;
     }
     previewLoading.value = true;
@@ -1513,6 +1499,21 @@ watch(
 );
 
 watch(
+    () => form.start_date,
+    () => {
+        if (
+            !isEndorsementMode.value ||
+            !props.parentContract?.end_date
+        ) {
+            return;
+        }
+        form.end_date = formatDateForEndorsement(
+            props.parentContract.end_date,
+        );
+    },
+);
+
+watch(
     () => [
         vehicleNewValue.value,
         vehicleVenaleValue.value,
@@ -1586,36 +1587,6 @@ function onFormSubmit() {
                 :novalidate="isEndorsementMode"
                 @submit.prevent="onFormSubmit"
             >
-                <div
-                    v-if="isEndorsementMode && parentContract"
-                    class="rounded-xl border border-sky-200 bg-sky-50/90 p-4 text-sm text-sky-950"
-                >
-                    <p class="font-semibold text-sky-900">
-                        Avenant — reprise des informations du contrat parent
-                    </p>
-                    <p class="mt-1.5 text-sky-900/90 leading-relaxed">
-                        Client, véhicule, compagnie, période jusqu’à
-                        l’échéance, montants et garanties (y compris
-                        réductions et accessoires) sont alignés sur le contrat
-                        <span
-                            v-if="parentContract.reference"
-                            class="font-mono font-medium text-sky-950"
-                            >{{ parentContract.reference }}</span
-                        ><template v-else>parent</template>.
-                        <span
-                            v-if="parentContract.policy_number"
-                            class="block sm:inline sm:ml-1 mt-1 sm:mt-0"
-                        >
-                            N° police&nbsp;:
-                            <span class="font-mono">{{
-                                parentContract.policy_number
-                            }}</span
-                            >.
-                        </span>
-                        Indiquez ci‑dessous le type d’avenant et les éventuelles
-                        mises à jour (immatriculation, coordonnées…).
-                    </p>
-                </div>
                 <!-- Wizard : une seule étape visible à la fois -->
                 <!-- Étape 1 : Client, véhicule, période, compagnie -->
                 <div
@@ -1847,10 +1818,59 @@ function onFormSubmit() {
                     >
                         {{
                             isEndorsementMode
-                                ? "Avenant — Tarification, garanties & réductions"
+                                ? "Avenant — Type & informations"
                                 : "Étape 2 — Accessoires, garanties & réductions"
                         }}
                     </h2>
+                    <div
+                        v-if="isEndorsementMode && parentContract"
+                        class="rounded-lg border border-slate-200 bg-slate-50/80 p-4 grid grid-cols-1 md:grid-cols-2 gap-4"
+                    >
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-slate-700 mb-1"
+                                >Date d'effet de l'avenant *</label
+                            >
+                            <DatePicker
+                                v-model="form.start_date"
+                                placeholder="À partir d'aujourd'hui"
+                                :error="!!form.errors.start_date"
+                                :input-class="inputClass"
+                                :year-range="endorsementDatePickerYearRange"
+                                :min="todayYMD"
+                                :max="endorsementStartDateMax"
+                            />
+                            <p
+                                v-if="form.errors.start_date"
+                                class="mt-1 text-sm text-red-600"
+                            >
+                                {{ form.errors.start_date }}
+                            </p>
+                            <p class="mt-1 text-xs text-slate-500">
+                                À partir de la date du jour, jusqu’à
+                                l’échéance du contrat de base.
+                            </p>
+                        </div>
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-slate-700 mb-1"
+                                >Date d'échéance (contrat de base)</label
+                            >
+                            <p
+                                class="text-sm font-semibold text-slate-900 py-2"
+                            >
+                                {{
+                                    form.end_date
+                                        ? form.end_date
+                                        : parentContract.end_date ?? "—"
+                                }}
+                            </p>
+                            <p class="text-xs text-slate-500">
+                                Alignée sur le contrat parent ; aucune période
+                                (1 mois, 12 mois…) pour un avenant.
+                            </p>
+                        </div>
+                    </div>
                     <div v-if="isEndorsementMode">
                         <label
                             class="block text-sm font-medium text-slate-700 mb-1"
@@ -2670,56 +2690,14 @@ function onFormSubmit() {
                             </div>
                         </div>
                     </div>
-                    <p class="text-xs text-slate-500">
+                    <p v-if="!isEndorsementMode" class="text-xs text-slate-500">
                         Accessoires compagnie et agence (FCFA). Réductions
                         ci‑dessous.
                     </p>
                     <div
-                        v-if="isEndorsementMode"
-                        class="rounded-lg border border-sky-200 bg-sky-50 p-4 space-y-3"
+                        v-if="!isEndorsementMode"
+                        class="grid grid-cols-1 md:grid-cols-2 gap-4"
                     >
-                        <h3 class="text-sm font-semibold text-sky-900">
-                            Champs tarifaires modifiables (avenant)
-                        </h3>
-                        <p class="text-xs text-sky-700">
-                            Vous pouvez ajuster les montants de base et taxes pour cet avenant.
-                        </p>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Prime de base (FCFA)</label>
-                                <input v-model.number="form.base_amount_override" type="number" min="0" step="1" :class="inputClass" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">RC (FCFA)</label>
-                                <input v-model.number="form.rc_amount_override" type="number" min="0" step="1" :class="inputClass" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Défense recours (FCFA)</label>
-                                <input v-model.number="form.defence_appeal_amount_override" type="number" min="0" step="1" :class="inputClass" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Transport personnes (FCFA)</label>
-                                <input v-model.number="form.person_transport_amount_override" type="number" min="0" step="1" :class="inputClass" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Accessoire (FCFA)</label>
-                                <input v-model.number="form.accessory_amount_override" type="number" min="0" step="1" :class="inputClass" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Taxes (FCFA)</label>
-                                <input v-model.number="form.taxes_amount_override" type="number" min="0" step="1" :class="inputClass" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Taxe FGA (FCFA)</label>
-                                <input v-model.number="form.fga_amount_override" type="number" min="0" step="1" :class="inputClass" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">CEDEAO (FCFA)</label>
-                                <input v-model.number="form.cedeao_amount_override" type="number" min="0" step="1" :class="inputClass" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label
                                 class="block text-sm font-medium text-slate-700 mb-1"
@@ -2767,7 +2745,10 @@ function onFormSubmit() {
                             </p>
                         </div>
                     </div>
-                    <div class="pt-2 border-t border-slate-200 space-y-3">
+                    <div
+                        v-if="!isEndorsementMode"
+                        class="pt-2 border-t border-slate-200 space-y-3"
+                    >
                         <h3 class="text-sm font-medium text-slate-700">
                             Garanties
                         </h3>
@@ -2886,10 +2867,11 @@ function onFormSubmit() {
                             </p>
                         </div>
                     </div>
-                    <h3 class="text-sm font-medium text-slate-700 pt-2">
-                        Réductions
-                    </h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <template v-if="!isEndorsementMode">
+                        <h3 class="text-sm font-medium text-slate-700 pt-2">
+                            Réductions
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label
                                 class="block text-sm font-medium text-slate-700 mb-1"
@@ -2973,8 +2955,10 @@ function onFormSubmit() {
                             </p>
                         </div>
                     </div>
+                    </template>
                     <div class="flex flex-wrap gap-3 pt-2">
                         <button
+                            v-if="!isEndorsementMode"
                             type="button"
                             class="px-4 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50"
                             @click="step = 1"
@@ -3013,9 +2997,13 @@ function onFormSubmit() {
                     class="rounded-xl border border-slate-200 bg-slate-50 p-5 sticky top-4 space-y-4"
                 >
                     <h3 class="text-sm font-semibold text-slate-800">
-                        Récapitulatif prime
+                        {{
+                            isEndorsementMode
+                                ? "Montant — Avenant"
+                                : "Récapitulatif prime"
+                        }}
                     </h3>
-                    <template v-if="previewLoading">
+                    <template v-if="previewLoading && !isEndorsementMode">
                         <div
                             class="flex flex-col items-center justify-center py-8 gap-3"
                         >
@@ -3028,7 +3016,35 @@ function onFormSubmit() {
                             </p>
                         </div>
                     </template>
-                    <template v-else-if="recap.total_premium != null">
+                    <template v-else-if="isEndorsementMode && canPreview">
+                        <p class="text-xs text-slate-600">
+                            Seule la CEDEAO est facturée sur cet avenant.
+                        </p>
+                        <dl class="space-y-2 text-sm pt-2">
+                            <div
+                                class="flex justify-between gap-2 pt-2 border-t-2 border-slate-200"
+                            >
+                                <dt class="font-semibold text-slate-800">
+                                    CEDEAO
+                                </dt>
+                                <dd
+                                    class="font-semibold text-slate-900 shrink-0 whitespace-nowrap"
+                                >
+                                    {{
+                                        ENDORSEMENT_CEDEAO_FIXED_FCFA.toLocaleString(
+                                            "fr-FR",
+                                        )
+                                    }}
+                                    FCFA
+                                </dd>
+                            </div>
+                        </dl>
+                    </template>
+                    <template
+                        v-else-if="
+                            !isEndorsementMode && recap.total_premium != null
+                        "
+                    >
                         <!-- Garanties (comme sur le PDF) -->
                         <div v-if="primeNetteCreate > 0" class="space-y-2">
                             <h4
@@ -3279,7 +3295,16 @@ function onFormSubmit() {
                         </dl>
                     </template>
                     <template v-else>
-                        <p class="text-sm text-slate-500">
+                        <p
+                            v-if="
+                                isEndorsementMode && !canPreview
+                            "
+                            class="text-sm text-slate-500"
+                        >
+                            Indiquez la date d’effet et le type d’avenant pour
+                            afficher le montant.
+                        </p>
+                        <p v-else class="text-sm text-slate-500">
                             Sélectionnez un client, un véhicule, la période et
                             les dates pour voir le montant.
                         </p>

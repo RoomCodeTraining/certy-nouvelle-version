@@ -10,10 +10,8 @@ use Illuminate\Support\Str;
 
 class Contract extends Model
 {
-    /** Affichage PDF avenant : CEDEAO et prime TTC (autres lignes à 0). */
+    /** Affichage PDF avenant : seule la ligne CEDEAO (FCFA). */
     public const PDF_ENDORSEMENT_CEDEAO_FCFA = 1000;
-
-    public const PDF_ENDORSEMENT_PRIME_TTC_FCFA = 1000;
 
     protected $fillable = [
         'reference',

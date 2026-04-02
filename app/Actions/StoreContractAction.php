@@ -20,6 +20,14 @@ class StoreContractAction
 
     public function execute(User $user, array $validated, $accessoryAmountOverride = null): Contract
     {
+        $creationModeEarly = $validated['creation_mode'] ?? null;
+        if ($creationModeEarly === 'endorsement' && ! empty($validated['parent_id'])) {
+            $parent = Contract::find($validated['parent_id']);
+            if ($parent && $parent->end_date) {
+                $validated['end_date'] = $parent->end_date->format('Y-m-d');
+            }
+        }
+
         $amountOverrides = [
             'base_amount' => $validated['base_amount_override'] ?? null,
             'rc_amount' => $validated['rc_amount_override'] ?? null,

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreContractRequest extends FormRequest
 {
@@ -33,7 +34,11 @@ class StoreContractRequest extends FormRequest
             'creation_mode' => ['nullable', 'string', 'in:renewal,endorsement'],
             'endorsement_type' => ['nullable', 'string', 'required_if:creation_mode,endorsement', 'in:registration_change,vehicle_info_update,client_info_update,other'],
             'status' => ['nullable', 'string', 'in:draft,validated,active,cancelled,expired'],
-            'start_date' => ['required', 'date'],
+            'start_date' => [
+                'required',
+                'date',
+                Rule::when($this->input('creation_mode') === 'endorsement', ['after_or_equal:today']),
+            ],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'duration' => ['nullable', 'string', 'in:1_month,3_months,6_months,12_months'],
             'reduction_amount' => ['nullable', 'integer', 'min:0'],
@@ -69,6 +74,7 @@ class StoreContractRequest extends FormRequest
     {
         return [
             'endorsement_type.required_if' => 'Le type d\'avenant est obligatoire lorsque le mode de création est « avenant ».',
+            'start_date.after_or_equal' => 'La date d\'effet de l\'avenant ne peut pas être antérieure à la date du jour.',
         ];
     }
 }

@@ -199,69 +199,14 @@ $parentReference = ($contract->relationLoaded('parent') && $contract->parent)
             </div>
             <div class="col-right">
                 @php
-                    $displayAmountsAvenant = $contract->getDisplayAmounts();
-                    $guaranteesReduced = array_map(static function ($g) {
-                        return [
-                            'code' => $g['code'],
-                            'label' => $g['label'],
-                            'amount' => 0,
-                        ];
-                    }, $displayAmountsAvenant['guarantee_amounts_reduced']);
-                    $primeNettePdf = 0;
                     $pdfCedeao = \App\Models\Contract::PDF_ENDORSEMENT_CEDEAO_FCFA;
-                    $pdfPrimeTtc = \App\Models\Contract::PDF_ENDORSEMENT_PRIME_TTC_FCFA;
                 @endphp
                 <div class="block">
-                    <div class="section-title">Garanties</div>
+                    <div class="section-title">Montant — Avenant</div>
                     <table class="section-table">
-                        <thead>
-                            <tr>
-                                <th style="background:{{ $greenColor }};color:#fff;">Code</th>
-                                <th style="background:{{ $greenColor }};color:#fff;">Désignation</th>
-                                <th class="text-right" style="background:{{ $greenColor }};color:#fff;">Primes (FCFA)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($guaranteesReduced as $g)
-                                <tr>
-                                    <td>{{ $g['code'] }}</td>
-                                    <td>{{ $g['label'] }}</td>
-                                    <td class="text-right font-bold">{{ number_format($g['amount'], 0, ',', ' ') }}</td>
-                                </tr>
-                            @endforeach
-                            <tr class="font-bold">
-                                <td colspan="2" class="text-right">Prime nette</td>
-                                <td class="text-right">{{ number_format($primeNettePdf, 0, ',', ' ') }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="block">
-                    <div class="section-title">Résumé Financier</div>
-                    <table class="section-table">
-                        <tr class="row-highlight">
-                            <th>Prime nette</th>
-                            <td class="text-right">{{ number_format($primeNettePdf, 0, ',', ' ') }}</td>
-                        </tr>
-                        <tr>
-                            <th>Accessoire</th>
-                            <td class="text-right">{{ number_format(0, 0, ',', ' ') }}</td>
-                        </tr>
-                        <tr>
-                            <th>Taxes</th>
-                            <td class="text-right">{{ number_format(0, 0, ',', ' ') }}</td>
-                        </tr>
-                        <tr>
-                            <th>Taxe FGA</th>
-                            <td class="text-right">{{ number_format(0, 0, ',', ' ') }}</td>
-                        </tr>
-                        <tr>
-                            <th>CEDEAO</th>
-                            <td class="text-right">{{ number_format($pdfCedeao, 0, ',', ' ') }}</td>
-                        </tr>
                         <tr class="row-total">
-                            <th>Prime TTC</th>
-                            <td class="text-right">{{ number_format($pdfPrimeTtc, 0, ',', ' ') }} FCFA</td>
+                            <th>CEDEAO</th>
+                            <td class="text-right">{{ number_format($pdfCedeao, 0, ',', ' ') }} FCFA</td>
                         </tr>
                     </table>
                 </div>
