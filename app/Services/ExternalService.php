@@ -80,7 +80,7 @@ class ExternalService
      */
     public function createProduction(Contract $contract, string $token, ?\App\Models\User $user = null): array
     {
-        $contract->load([
+        $relationsToLoad = [
             'client',
             'vehicle.brand',
             'vehicle.model',
@@ -90,7 +90,19 @@ class ExternalService
             'vehicle.vehicleGender',
             'vehicle.vehicleCategory',
             'company',
-        ]);
+        ];
+        if ($contract->is_double_cabine) {
+            $relationsToLoad = array_merge($relationsToLoad, [
+                'secondVehicle.brand',
+                'secondVehicle.model',
+                'secondVehicle.energySource',
+                'secondVehicle.vehicleUsage',
+                'secondVehicle.vehicleType',
+                'secondVehicle.vehicleGender',
+                'secondVehicle.vehicleCategory',
+            ]);
+        }
+        $contract->load($relationsToLoad);
 
         $vehicle = $contract->vehicle;
         $client = $contract->client;
@@ -109,9 +121,28 @@ class ExternalService
         $primeRc = (int) ($contract->rc_amount ?? 0);
         $primeNet = (int) ($contract->base_amount ?? 0) + $primeRc + (int) ($contract->defence_appeal_amount ?? 0) + (int) ($contract->person_transport_amount ?? 0) + (int) ($contract->accessory_amount ?? 0);
 
+        $couleur = $this->couleurAttestationForContract($contract);
+        $commonFields = [
+            'TYPE_DE_SOUSCRIPTEUR' => $typeSouscripteur,
+            'NOM_DU_SOUSCRIPTEUR' => $client ? ($client->full_name ?? '') : '',
+            'ADRESSE_EMAIL_DU_SOUSCRIPTEUR' => $client ? ($client->email ?? '') : '',
+            'NUMERO_DE_TELEPHONE_DU_SOUSCRIPTEUR' => $client ? ($client->phone ?? '') : '',
+            'BOITE_POSTALE_DU_SOUSCRIPTEUR' => $client ? ($client->postal_address ?? $client->address ?? '') : '',
+            'NOM_DE_L_ASSURE' => $client ? ($client->full_name ?? '') : '',
+            'ADRESSE_EMAIL_DE_L_ASSURE' => $client ? ($client->email ?? '') : '',
+            'TELEPHONE_MOBILE_DE_L_ASSURE' => $client ? ($client->phone ?? '') : '',
+            'BOITE_POSTALE_DE_L_ASSURE' => $client ? ($client->postal_address ?? $client->address ?? '') : '',
+            'PRIME_RC' => $primeRc,
+            'PRIME_NET' => $primeNet,
+            'PRIME_TTC' => $primeTtc,
+            'NUMERO_DE_POLICE' => $numeroPolice,
+            'DATE_D_EFFET_DU_CONTRAT' => $contract->start_date ? $contract->start_date->format('Y-m-d') : '',
+            'DATE_D_ECHEANCE_DU_CONTRAT' => $contract->end_date ? $contract->end_date->format('Y-m-d') : '',
+        ];
+
         $productions = [
-            [
-                'COULEUR_D_ATTESTATION_A_EDITER' => $this->couleurAttestationForContract($contract),
+            array_merge($commonFields, [
+                'COULEUR_D_ATTESTATION_A_EDITER' => $couleur,
                 'IMMATRICULATION_DU_VEHICULE' => $vehicle ? ($vehicle->registration_number ?? '') : '',
                 'NUMERO_DE_CHASSIS_DU_VEHICULE' => $vehicle ? ($vehicle->chassis_number ?? '') : '',
                 'GENRE_DU_VEHICULE' => $vehicle && $vehicle->vehicleGender && $vehicle->vehicleGender->code ? $vehicle->vehicleGender->code : 'GV01',
@@ -122,25 +153,30 @@ class ExternalService
                 'ENERGIE_DU_VEHICULE' => $vehicle && $vehicle->energySource && $vehicle->energySource->code ? $vehicle->energySource->code : 'SEES',
                 'NOMBRE_DE_PLACE_DU_VEHICULE' => (string) ($vehicle->seat_count ?? 5),
                 'USAGE_DU_VEHICULE' => $vehicle && $vehicle->vehicleUsage && $vehicle->vehicleUsage->code ? $vehicle->vehicleUsage->code : 'UV05',
-                'TYPE_DE_SOUSCRIPTEUR' => $typeSouscripteur,
-                'NOM_DU_SOUSCRIPTEUR' => $client ? ($client->full_name ?? '') : '',
-                'ADRESSE_EMAIL_DU_SOUSCRIPTEUR' => $client ? ($client->email ?? '') : '',
-                'NUMERO_DE_TELEPHONE_DU_SOUSCRIPTEUR' => $client ? ($client->phone ?? '') : '',
-                'BOITE_POSTALE_DU_SOUSCRIPTEUR' => $client ? ($client->postal_address ?? $client->address ?? '') : '',
-                'NOM_DE_L_ASSURE' => $client ? ($client->full_name ?? '') : '',
-                'ADRESSE_EMAIL_DE_L_ASSURE' => $client ? ($client->email ?? '') : '',
-                'TELEPHONE_MOBILE_DE_L_ASSURE' => $client ? ($client->phone ?? '') : '',
-                'BOITE_POSTALE_DE_L_ASSURE' => $client ? ($client->postal_address ?? $client->address ?? '') : '',
-                'PRIME_RC' => $primeRc,
-                'PRIME_NET' => $primeNet,
-                'PRIME_TTC' => $primeTtc,
                 'FISCAL_POWER' => (int) ($vehicle->fiscal_power ?? 0),
                 'CYLENDER' => (string) ($vehicle->engine_capacity ?? ''),
-                'NUMERO_DE_POLICE' => $numeroPolice,
-                'DATE_D_EFFET_DU_CONTRAT' => $contract->start_date ? $contract->start_date->format('Y-m-d') : '',
-                'DATE_D_ECHEANCE_DU_CONTRAT' => $contract->end_date ? $contract->end_date->format('Y-m-d') : '',
-            ],
+            ]),
         ];
+
+        // Double cabine : ajouter une seconde production pour le véhicule cabine
+        if ($contract->is_double_cabine && $contract->secondVehicle) {
+            $sv = $contract->secondVehicle;
+            $productions[] = array_merge($commonFields, [
+                'COULEUR_D_ATTESTATION_A_EDITER' => $couleur,
+                'IMMATRICULATION_DU_VEHICULE' => $sv->registration_number ?? '',
+                'NUMERO_DE_CHASSIS_DU_VEHICULE' => $sv->chassis_number ?? '',
+                'GENRE_DU_VEHICULE' => $sv->vehicleGender?->code ?? 'GV01',
+                'MARQUE_DU_VEHICULE' => $sv->brand ? substr(str_replace(' ', '', $sv->brand->name ?? ''), 0, 50) : '',
+                'MODELE_DU_VEHICULE' => $sv->model ? substr(str_replace(' ', '', $sv->model->name ?? ''), 0, 50) : '',
+                'CATEGORIE_DU_VEHICULE' => $sv->vehicleCategory?->code ?? '01',
+                'TYPE_DU_VEHICULE' => $sv->vehicleType?->code ?? 'TV06',
+                'ENERGIE_DU_VEHICULE' => $sv->energySource?->code ?? 'SEES',
+                'NOMBRE_DE_PLACE_DU_VEHICULE' => (string) ($sv->seat_count ?? 5),
+                'USAGE_DU_VEHICULE' => $sv->vehicleUsage?->code ?? 'UV05',
+                'FISCAL_POWER' => (int) ($sv->fiscal_power ?? 0),
+                'CYLENDER' => (string) ($sv->engine_capacity ?? ''),
+            ]);
+        }
 
         $officeCode = $user?->office_code
             ?: config('app.asaci_office_code', '')
@@ -210,6 +246,7 @@ class ExternalService
         $responseData = $data['data'] ?? [];
         $certificates = $responseData['certificates'] ?? [];
         $firstCert = is_array($certificates) && isset($certificates[0]) ? $certificates[0] : null;
+        $secondCert = is_array($certificates) && isset($certificates[1]) ? $certificates[1] : null;
         $numeroAttestation = $firstCert['reference'] ?? $responseData['reference'] ?? null;
         $lienPdf = $firstCert['download_link'] ?? $responseData['download_link'] ?? null;
 
@@ -224,11 +261,18 @@ class ExternalService
             ];
         }
 
-        return [
+        $result = [
             'success' => true,
             'numero_attestation' => $numeroAttestation,
             'lien_pdf' => $lienPdf,
         ];
+
+        if ($contract->is_double_cabine && $secondCert) {
+            $result['second_numero_attestation'] = $secondCert['reference'] ?? null;
+            $result['second_lien_pdf'] = $secondCert['download_link'] ?? null;
+        }
+
+        return $result;
     }
 
     /**

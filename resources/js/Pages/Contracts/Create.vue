@@ -160,6 +160,8 @@ const guaranteeKeys = Object.keys(guaranteeLabels);
 const form = useForm({
     client_id: "",
     vehicle_id: "",
+    is_double_cabine: false,
+    second_vehicle_id: "",
     company_id: "",
     contract_type: "VP",
     parent_id: "",
@@ -203,9 +205,27 @@ const vehiclesForSelect = computed(() =>
 function onClientChange() {
     form.vehicle_id = "";
     form.contract_type = "VP";
+    form.is_double_cabine = false;
+    form.second_vehicle_id = "";
 }
 
 const isTwoWheeler = computed(() => form.contract_type === "TWO_WHEELER");
+const isTPM = computed(() => form.contract_type === "TPM");
+
+const vehiclesForSecondSelect = computed(() =>
+    vehiclesForClient.value
+        .filter(
+            (v) =>
+                v.pricing_type === "TPM" &&
+                String(v.id) !== String(form.vehicle_id),
+        )
+        .map((v) => ({
+            ...v,
+            name:
+                (v.registration_number || `Sans immat (id ${v.id})`) +
+                (v.payload_capacity ? ` — ${v.payload_capacity} t` : ""),
+        })),
+);
 const isEndorsementMode = computed(
     () => props.parentContract?.creation_mode === "endorsement",
 );
@@ -757,6 +777,10 @@ function onVehicleChange() {
         (vh) => String(vh.id) === String(form.vehicle_id),
     );
     form.contract_type = v?.pricing_type ?? "VP";
+    // Réinitialiser le 2e véhicule si on change le principal
+    if (String(form.second_vehicle_id) === String(form.vehicle_id)) {
+        form.second_vehicle_id = "";
+    }
     if (form.contract_type === "TWO_WHEELER") {
         form.duration = "12_months";
     }
@@ -1495,6 +1519,10 @@ watch(
             form.duration = "12_months";
             applyDuration();
         }
+        if (type !== "TPM") {
+            form.is_double_cabine = false;
+            form.second_vehicle_id = "";
+        }
     },
 );
 
@@ -1700,6 +1728,53 @@ function onFormSubmit() {
                             </span>
                         </p>
                     </div>
+
+                    <!-- Double cabine (TPM uniquement) -->
+                    <div v-if="isTPM">
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                v-model="form.is_double_cabine"
+                                class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                            />
+                            <span class="text-sm font-medium text-slate-700">Double cabine</span>
+                        </label>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Cocher si le véhicule est une double cabine : vous pouvez alors associer un second véhicule TPM. La prime est calculée sur le véhicule principal (avec charge utile).
+                        </p>
+                    </div>
+
+                    <!-- Second véhicule (double cabine activée) -->
+                    <div v-if="isTPM && form.is_double_cabine">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                            Second véhicule TPM *
+                        </label>
+                        <SearchableSelect
+                            v-model="form.second_vehicle_id"
+                            :options="vehiclesForSecondSelect"
+                            value-key="id"
+                            label-key="name"
+                            placeholder="Choisir le second véhicule TPM"
+                            :required="true"
+                            :error="!!form.errors.second_vehicle_id"
+                            :input-class="inputClass"
+                            :disabled="!form.client_id"
+                            search-placeholder="Rechercher…"
+                        />
+                        <p
+                            v-if="form.errors.second_vehicle_id"
+                            class="mt-1 text-sm text-red-600"
+                        >
+                            {{ form.errors.second_vehicle_id }}
+                        </p>
+                        <p
+                            v-if="vehiclesForSecondSelect.length === 0 && form.vehicle_id"
+                            class="mt-1 text-xs text-amber-600"
+                        >
+                            Aucun autre véhicule TPM disponible pour ce client.
+                        </p>
+                    </div>
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label

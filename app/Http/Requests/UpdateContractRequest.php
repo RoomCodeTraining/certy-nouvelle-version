@@ -16,6 +16,10 @@ class UpdateContractRequest extends FormRequest
         return [
             'client_id' => ['required', 'exists:clients,id'],
             'vehicle_id' => ['required', 'exists:vehicles,id'],
+            'is_double_cabine' => ['nullable', 'boolean'],
+            'second_vehicle_id' => $this->boolean('is_double_cabine')
+                ? ['required', 'exists:vehicles,id', 'different:vehicle_id']
+                : ['nullable', 'exists:vehicles,id'],
             'company_id' => ['required', 'exists:companies,id'],
             'contract_type' => ['required', 'string', 'in:VP,TPC,TPM,TWO_WHEELER'],
             'status' => ['nullable', 'string', 'in:draft,validated,active,cancelled,expired'],

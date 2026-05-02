@@ -5,6 +5,7 @@ if (!$contract) {
     return;
 }
 $vehicle = $contract->vehicle;
+$secondVehicle = $contract->is_double_cabine ? $contract->secondVehicle : null;
 $client = $contract->client;
 $company = $contract->company;
 
@@ -108,7 +109,7 @@ function contractTypeLabel($type) {
             <div class="section-title">Récapitulatif</div>
             <table class="section-table">
                 <tr>
-                    <th style="width: 12%;">Véhicule</th>
+                    <th style="width: 12%;">Véhicule{{ $secondVehicle ? ' 1 (charge utile)' : '' }}</th>
                     <td colspan="3">
                         <strong>Immat. :</strong> {{ $vehicle->registration_number ?? 'N/A' }}
                         | <strong>Type :</strong> {{ contractTypeLabel($contract->contract_type) }}
@@ -117,6 +118,16 @@ function contractTypeLabel($type) {
                         | <strong>Modèle :</strong> {{ $vehicle && $vehicle->model ? $vehicle->model->name : 'N/A' }}
                     </td>
                 </tr>
+                @if($secondVehicle)
+                <tr>
+                    <th>Véhicule 2 (cabine)</th>
+                    <td colspan="3">
+                        <strong>Immat. :</strong> {{ $secondVehicle->registration_number ?? 'N/A' }}
+                        | <strong>Marque :</strong> {{ $secondVehicle->brand ? $secondVehicle->brand->name : 'N/A' }}
+                        | <strong>Modèle :</strong> {{ $secondVehicle->model ? $secondVehicle->model->name : 'N/A' }}
+                    </td>
+                </tr>
+                @endif
                 <tr>
                     <th>Client</th>
                     <td colspan="3">

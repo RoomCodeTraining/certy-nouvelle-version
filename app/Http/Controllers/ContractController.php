@@ -404,7 +404,7 @@ class ContractController extends Controller
     {
         $user = $request->user();
         $clients = Client::accessibleBy($user)
-            ->with('vehicles:id,client_id,registration_number,pricing_type,new_value,replacement_value')
+            ->with('vehicles:id,client_id,registration_number,pricing_type,payload_capacity,new_value,replacement_value')
             ->orderBy('full_name')
             ->get(['id', 'full_name']);
         $optionalGuaranteesEnabled = (bool) config('app.optional_guarantees_enabled', true);
@@ -555,6 +555,9 @@ class ContractController extends Controller
     {
         $validated = $request->validated();
         $this->authorizeClientVehicle($request, $validated['client_id'], $validated['vehicle_id']);
+        if (! empty($validated['second_vehicle_id'])) {
+            $this->authorizeClientVehicle($request, $validated['client_id'], $validated['second_vehicle_id']);
+        }
         $override = $request->input('accessory_amount_override');
         $contract = $action->execute($request->user(), $validated, $override);
 
@@ -573,6 +576,10 @@ class ContractController extends Controller
         if (Schema::hasColumn('contracts', 'created_by_id')) {
             $relations[] = 'createdBy:id,name';
             $relations[] = 'updatedBy:id,name';
+        }
+        if (Schema::hasColumn('contracts', 'second_vehicle_id')) {
+            $relations[] = 'secondVehicle.brand';
+            $relations[] = 'secondVehicle.model';
         }
         $contract->load($relations);
 
@@ -643,7 +650,7 @@ class ContractController extends Controller
     {
         $this->authorizeContract($request, $contract);
 
-        $contract->load([
+        $relations = [
             'client.profession',
             'vehicle.brand',
             'vehicle.model',
@@ -651,7 +658,12 @@ class ContractController extends Controller
             'vehicle.vehicleUsage',
             'vehicle.circulationZone',
             'company',
-        ]);
+        ];
+        if (Schema::hasColumn('contracts', 'second_vehicle_id')) {
+            $relations[] = 'secondVehicle.brand';
+            $relations[] = 'secondVehicle.model';
+        }
+        $contract->load($relations);
 
         if ($contract->parent_id) {
             $contract->loadMissing('parent:id,reference');
@@ -883,11 +895,20 @@ class ContractController extends Controller
             return redirect()->route('contracts.show', $contract)->with('error', $message);
         }
 
-        $contract->update([
+        $attestationUpdate = [
             'attestation_issued_at' => now(),
             'attestation_number' => $result['numero_attestation'] ?? null,
             'attestation_link' => $result['lien_pdf'] ?? null,
-        ]);
+        ];
+        // Double cabine : stocker la 2e attestation dans metadata
+        if (! empty($result['second_numero_attestation']) || ! empty($result['second_lien_pdf'])) {
+            $existingMeta = is_array($contract->metadata) ? $contract->metadata : [];
+            $attestationUpdate['metadata'] = array_merge($existingMeta, [
+                'second_attestation_number' => $result['second_numero_attestation'] ?? null,
+                'second_attestation_link' => $result['second_lien_pdf'] ?? null,
+            ]);
+        }
+        $contract->update($attestationUpdate);
 
         return redirect()->route('contracts.show', $contract)
             ->with('success', 'Attestation générée avec succès.');

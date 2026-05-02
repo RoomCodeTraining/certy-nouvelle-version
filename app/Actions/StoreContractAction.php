@@ -59,6 +59,21 @@ class StoreContractAction
         $optionalDetail = $validated['optional_guarantees_detail'] ?? null;
         $creationMode = $validated['creation_mode'] ?? null;
         $endorsementType = $validated['endorsement_type'] ?? null;
+        // Double cabine : si la colonne n'existe pas encore (avant migration), on ignore silencieusement.
+        if (! Schema::hasColumn('contracts', 'is_double_cabine')) {
+            unset($validated['is_double_cabine'], $validated['second_vehicle_id']);
+        } else {
+            $validated['is_double_cabine'] = (bool) ($validated['is_double_cabine'] ?? false);
+            $isDoubleCabine = $validated['is_double_cabine'];
+            if (! $isDoubleCabine) {
+                $validated['second_vehicle_id'] = null;
+            } else {
+                $validated['second_vehicle_id'] = isset($validated['second_vehicle_id']) && $validated['second_vehicle_id'] !== ''
+                    ? (int) $validated['second_vehicle_id']
+                    : null;
+            }
+        }
+
         unset(
             $validated['duration'],
             $validated['accessory_amount_override'],

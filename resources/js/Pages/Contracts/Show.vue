@@ -241,6 +241,16 @@ const isEndorsementContract = computed(() =>
 const parentContract = computed(() => props.contract?.parent ?? null);
 const childContracts = computed(() => props.contract?.children ?? []);
 
+const secondAttestationNumber = computed(
+    () => props.contract?.metadata?.second_attestation_number ?? null,
+);
+const secondAttestationLink = computed(
+    () => props.contract?.metadata?.second_attestation_link ?? null,
+);
+const hasSecondAttestation = computed(
+    () => !!(secondAttestationNumber.value || secondAttestationLink.value),
+);
+
 /** Libellés types d'avenant (alignés sur Create.vue). */
 const ENDORSEMENT_TYPE_LABELS = {
     registration_change: "Changement d'immatriculation",
@@ -896,21 +906,42 @@ function markAttestationIssued(contract) {
                                 contract.attestation_link
                             "
                         >
-                            <span
-                                v-if="contract.attestation_number"
-                                class="text-sm font-medium text-emerald-800"
-                            >
-                                N° {{ contract.attestation_number }}
-                            </span>
-                            <a
-                                v-if="contract.attestation_link"
-                                :href="contract.attestation_link"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
-                            >
-                                Télécharger l'attestation (PDF)
-                            </a>
+                            <!-- Véhicule 1 (ou unique) -->
+                            <div class="flex items-center gap-3">
+                                <span
+                                    v-if="contract.attestation_number"
+                                    class="text-sm font-medium text-emerald-800"
+                                >
+                                    <template v-if="contract.is_double_cabine">Véh. 1 —&nbsp;</template>N° {{ contract.attestation_number }}
+                                </span>
+                                <a
+                                    v-if="contract.attestation_link"
+                                    :href="contract.attestation_link"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
+                                >
+                                    {{ contract.is_double_cabine ? 'Attestation véhicule 1 (PDF)' : 'Télécharger l\'attestation (PDF)' }}
+                                </a>
+                            </div>
+                            <!-- Véhicule 2 (double cabine) -->
+                            <div v-if="contract.is_double_cabine && hasSecondAttestation" class="flex items-center gap-3">
+                                <span
+                                    v-if="secondAttestationNumber"
+                                    class="text-sm font-medium text-emerald-800"
+                                >
+                                    Véh. 2 — N° {{ secondAttestationNumber }}
+                                </span>
+                                <a
+                                    v-if="secondAttestationLink"
+                                    :href="secondAttestationLink"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
+                                >
+                                    Attestation véhicule 2 (PDF)
+                                </a>
+                            </div>
                         </template>
                         <Link
                             v-else
@@ -1076,46 +1107,51 @@ function markAttestationIssued(contract) {
                                         <dt
                                             class="text-slate-500 font-medium mb-2"
                                         >
-                                            Attestation
+                                            {{ contract.is_double_cabine ? 'Attestations' : 'Attestation' }}
                                         </dt>
-                                        <dd
-                                            class="flex flex-wrap items-center gap-3"
-                                        >
-                                            <span
-                                                v-if="
-                                                    contract.attestation_number
-                                                "
-                                                class="font-semibold text-slate-900"
-                                            >
-                                                N°
-                                                {{
-                                                    contract.attestation_number
-                                                }}
-                                            </span>
-                                            <a
-                                                v-if="contract.attestation_link"
-                                                :href="
-                                                    contract.attestation_link
-                                                "
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
-                                            >
-                                                <svg
-                                                    class="w-4 h-4"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
+                                        <dd class="flex flex-col gap-2">
+                                            <!-- Véhicule 1 (ou unique) -->
+                                            <div class="flex flex-wrap items-center gap-3">
+                                                <span
+                                                    v-if="contract.attestation_number"
+                                                    class="font-semibold text-slate-900"
                                                 >
-                                                    <path
-                                                        stroke-linecap="round"
-                                                        stroke-linejoin="round"
-                                                        stroke-width="2"
-                                                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                                    />
-                                                </svg>
-                                                Télécharger l'attestation (PDF)
-                                            </a>
+                                                    <template v-if="contract.is_double_cabine">Véh. 1 — </template>N° {{ contract.attestation_number }}
+                                                </span>
+                                                <a
+                                                    v-if="contract.attestation_link"
+                                                    :href="contract.attestation_link"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
+                                                >
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                    {{ contract.is_double_cabine ? 'Attestation véhicule 1 (PDF)' : 'Télécharger l\'attestation (PDF)' }}
+                                                </a>
+                                            </div>
+                                            <!-- Véhicule 2 (double cabine) -->
+                                            <div v-if="contract.is_double_cabine && hasSecondAttestation" class="flex flex-wrap items-center gap-3">
+                                                <span
+                                                    v-if="secondAttestationNumber"
+                                                    class="font-semibold text-slate-900"
+                                                >
+                                                    Véh. 2 — N° {{ secondAttestationNumber }}
+                                                </span>
+                                                <a
+                                                    v-if="secondAttestationLink"
+                                                    :href="secondAttestationLink"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
+                                                >
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                    Attestation véhicule 2 (PDF)
+                                                </a>
+                                            </div>
                                         </dd>
                                     </div>
                                 </template>
@@ -1211,7 +1247,7 @@ function markAttestationIssued(contract) {
                                         <p
                                             class="text-xs font-medium text-slate-500 uppercase tracking-wide"
                                         >
-                                            Véhicule
+                                            Véhicule{{ contract.is_double_cabine ? ' 1 (charge utile)' : '' }}
                                         </p>
                                         <Link
                                             :href="
@@ -1257,6 +1293,36 @@ function markAttestationIssued(contract) {
                                             </span>
                                         </Link>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- Second véhicule (double cabine) -->
+                            <div
+                                v-if="contract.is_double_cabine && contract.second_vehicle"
+                                class="flex items-start gap-3"
+                            >
+                                <div class="shrink-0 w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center mt-0.5">
+                                    <svg class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0M13 6h3l3 7H4l3-7h3" />
+                                    </svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                                        Véhicule 2 (cabine)
+                                    </p>
+                                    <Link
+                                        :href="route('vehicles.show', contract.second_vehicle?.id)"
+                                        class="font-semibold text-slate-900 hover:text-slate-700 hover:underline block"
+                                    >
+                                        <span v-if="contract.second_vehicle?.brand?.name || contract.second_vehicle?.model?.name">
+                                            {{ contract.second_vehicle?.brand?.name }}
+                                            {{ contract.second_vehicle?.model?.name }}
+                                        </span>
+                                        <span v-else class="text-slate-500">—</span>
+                                        <span v-if="contract.second_vehicle?.registration_number" class="text-slate-600 font-normal">
+                                            · {{ contract.second_vehicle.registration_number }}
+                                        </span>
+                                    </Link>
                                 </div>
                             </div>
                         </div>

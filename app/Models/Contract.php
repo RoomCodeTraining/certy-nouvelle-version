@@ -21,9 +21,11 @@ class Contract extends Model
         'updated_by_id',
         'client_id',
         'vehicle_id',
+        'second_vehicle_id',
         'company_id',
         'parent_id',
         'endorsement_type',
+        'is_double_cabine',
         'contract_type',
         'status',
         'attestation_issued_at',
@@ -63,6 +65,7 @@ class Contract extends Model
             'start_date' => 'date',
             'end_date' => 'date',
             'attestation_issued_at' => 'datetime',
+            'is_double_cabine' => 'boolean',
             'metadata' => 'array',
             'base_amount' => 'integer',
             'rc_amount' => 'integer',
@@ -156,6 +159,11 @@ class Contract extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
+    }
+
+    public function secondVehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class, 'second_vehicle_id');
     }
 
     public function company(): BelongsTo
