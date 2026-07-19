@@ -25,6 +25,7 @@ const amountCols = [
     { key: "accessory_amount", label: "Accessoire" },
     { key: "taxes_amount", label: "Taxes" },
     { key: "cedeao_amount", label: "CEDEAO" },
+    { key: "cp_amount", label: "Prime ASACI" },
     { key: "fga_amount", label: "FGA" },
 ];
 const savingCell = ref(null);

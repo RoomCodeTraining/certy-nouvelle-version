@@ -94,7 +94,8 @@ function primeTtc(row) {
         + (row.accessory_amount ?? 0)
         + taxesAmount
         + (row.fga_amount ?? 0)
-        + (row.cedeao_amount ?? 0);
+        + (row.cedeao_amount ?? 0)
+        + (row.cp_amount ?? 0);
 }
 
 const columns = [

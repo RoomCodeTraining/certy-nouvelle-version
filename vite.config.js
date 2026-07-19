@@ -26,6 +26,16 @@ export default defineConfig({
         tailwindcss(),
     ],
     server: {
+        host: '127.0.0.1',
+        port: 5173,
+        strictPort: true,
+        // Autorise le front servi par DDEV (https://*.ddev.site) à charger les assets Vite
+        cors: {
+            origin: /https?:\/\/([a-z0-9-]+\.)*ddev\.site(:\d+)?$/i,
+        },
+        hmr: {
+            host: '127.0.0.1',
+        },
         watch: {
             ignored: ['**/storage/framework/views/**'],
         },

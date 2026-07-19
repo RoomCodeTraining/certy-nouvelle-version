@@ -1,4 +1,4 @@
-name: saas-docs-mcp
+name: kissaapp
 type: laravel
 docroot: public
 php_version: "8.3"

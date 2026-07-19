@@ -18,6 +18,7 @@ class TwoWheelerPricingGrid extends Model
         'accessory_amount',
         'taxes_amount',
         'cedeao_amount',
+        'cp_amount',
         'fga_amount',
         'is_active',
     ];

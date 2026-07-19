@@ -159,6 +159,7 @@ class DemoDataSeeder extends Seeder
                     'accessory_amount' => rand(5000, 15000),
                     'taxes_amount' => $taxes,
                     'cedeao_amount' => 0,
+                    'cp_amount' => 0,
                     'fga_amount' => 0,
                     'total_amount' => $totalAmount,
                     'created_by_id' => $user->id,

@@ -153,6 +153,7 @@ const guaranteeLabels = {
     accessory_amount: "Accessoires",
     taxes_amount: "Taxes",
     cedeao_amount: "CEDEAO",
+    cp_amount: "Prime ASACI",
     fga_amount: "FGA",
 };
 const guaranteeKeys = Object.keys(guaranteeLabels);
@@ -179,6 +180,7 @@ const form = useForm({
     person_transport_amount_override: null,
     taxes_amount_override: null,
     cedeao_amount_override: null,
+    cp_amount_override: null,
     fga_amount_override: null,
     reduction_bns: null,
     reduction_on_commission: null,
@@ -1068,6 +1070,7 @@ function seedEndorsementOverridesFromRecap() {
             amounts.accessory_amount ?? recap.value?.accessory_amount ?? 0,
         taxes_amount_override: amounts.taxes_amount ?? 0,
         cedeao_amount_override: amounts.cedeao_amount ?? 0,
+        cp_amount_override: amounts.cp_amount ?? 0,
         fga_amount_override: amounts.fga_amount ?? 0,
     };
 
@@ -1133,6 +1136,7 @@ function seedEndorsementFromParent() {
             taxes_amount: z,
             fga_amount: z,
             cedeao_amount: cedeao,
+            cp_amount: z,
         },
     };
     form.base_amount_override = z;
@@ -1143,6 +1147,7 @@ function seedEndorsementFromParent() {
     form.taxes_amount_override = z;
     form.fga_amount_override = z;
     form.cedeao_amount_override = cedeao;
+    form.cp_amount_override = z;
     form.reduction_amount = z;
     form.reduction_bns = null;
     form.reduction_on_commission = null;
@@ -1486,14 +1491,22 @@ const cedeaoAmountCreate = computed(() =>
     ),
 );
 
-/** Prime TTC = Montant après réduction + Accessoire + Taxes + FGA + CEDEAO */
+const cpAmountCreate = computed(() =>
+    overrideOrFallback(
+        form.cp_amount_override,
+        recap.value.amounts?.cp_amount ?? 0,
+    ),
+);
+
+/** Prime TTC = Montant après réduction + Accessoire + Taxes + FGA + CEDEAO + Prime ASACI */
 const displayTotal = computed(
     () =>
         montantApresReductionCreate.value +
         accessoryForTax.value +
         taxesAmountCreate.value +
         fgaAmountCreate.value +
-        cedeaoAmountCreate.value,
+        cedeaoAmountCreate.value +
+        cpAmountCreate.value,
 );
 
 watch(
@@ -3286,6 +3299,26 @@ function onFormSubmit() {
                                     </template>
                                     <template v-else>
                                         {{ Number(cedeaoAmountCreate).toLocaleString("fr-FR") }} FCFA
+                                    </template>
+                                </dd>
+                            </div>
+                            <div
+                                v-if="cpAmountCreate > 0"
+                                class="flex justify-between gap-2"
+                            >
+                                <dt class="text-slate-600">Prime ASACI</dt>
+                                <dd class="font-medium text-slate-900 shrink-0 whitespace-nowrap">
+                                    <template v-if="isEndorsementMode">
+                                        <input
+                                            v-model.number="form.cp_amount_override"
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            class="w-28 rounded border border-slate-200 px-2 py-1 text-right text-xs"
+                                        />
+                                    </template>
+                                    <template v-else>
+                                        {{ Number(cpAmountCreate).toLocaleString("fr-FR") }} FCFA
                                     </template>
                                 </dd>
                             </div>

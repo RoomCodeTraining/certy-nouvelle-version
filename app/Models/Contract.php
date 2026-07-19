@@ -41,6 +41,7 @@ class Contract extends Model
         'accessory_amount',
         'taxes_amount',
         'cedeao_amount',
+        'cp_amount',
         'fga_amount',
         'reduction_amount',
         'reduction_bns',
@@ -74,6 +75,7 @@ class Contract extends Model
             'accessory_amount' => 'integer',
             'taxes_amount' => 'integer',
             'cedeao_amount' => 'integer',
+            'cp_amount' => 'integer',
             'fga_amount' => 'integer',
             'reduction_amount' => 'integer',
             'reduction_bns' => 'decimal:2',
@@ -257,6 +259,7 @@ class Contract extends Model
             'accessory_amount',
             'taxes_amount',
             'cedeao_amount',
+            'cp_amount',
             'fga_amount',
             'optional_guarantees_amount',
         ];
@@ -316,7 +319,7 @@ class Contract extends Model
 
     /**
      * Prime nette (base pour calcul commission bordereau) = RC + DR + TP + optional - réductions + accessoire.
-     * Montant avant taxes, FGA, CEDEAO. En FCFA.
+     * Montant avant taxes, FGA, CEDEAO, CP. En FCFA.
      */
     public function getPrimeNetteForCommissionAttribute(): ?int
     {
@@ -331,7 +334,7 @@ class Contract extends Model
     }
 
     /**
-     * Montant total final (Prime TTC) = montant_apres_reduction + accessory + taxes + fga + cedao.
+     * Montant total final (Prime TTC) = montant_apres_reduction + accessory + taxes + fga + cedao + cp.
      * Utilise la valeur stockée total_amount si présente, sinon calcule.
      */
     public function getTotalAfterReductionAttribute(): ?int
@@ -407,7 +410,8 @@ class Contract extends Model
             + $accessoryForTax
             + $taxesAmount
             + $fgaAmount
-            + (int) ($this->cedeao_amount ?? 0);
+            + (int) ($this->cedeao_amount ?? 0)
+            + (int) ($this->cp_amount ?? 0);
 
         $this->forceFill([
             'prime_ttc' => $totalAmount,
@@ -543,6 +547,7 @@ class Contract extends Model
             'taxes_amount' => (int) ($this->taxes_amount ?? 0),
             'fga_amount' => (int) ($this->fga_amount ?? 0),
             'cedeao_amount' => (int) ($this->cedeao_amount ?? 0),
+            'cp_amount' => (int) ($this->cp_amount ?? 0),
             'accessory_amount' => (int) ($this->accessory_amount ?? 0),
             'total_amount' => (int) ($this->total_amount ?? $this->prime_ttc ?? 0),
         ];

@@ -192,7 +192,8 @@ const totalDisplay = computed(() => {
         (props.contract?.accessory_amount ?? 0) +
         taxesAmount.value +
         (props.contract?.fga_amount ?? 0) +
-        (props.contract?.cedeao_amount ?? 0)
+        (props.contract?.cedeao_amount ?? 0) +
+        (props.contract?.cp_amount ?? 0)
     );
 });
 
@@ -1618,6 +1619,18 @@ function markAttestationIssued(contract) {
                                         {{
                                             Number(
                                                 contract.cedeao_amount ?? 0,
+                                            ).toLocaleString("fr-FR")
+                                        }}
+                                    </dd>
+                                </div>
+                                <div class="flex justify-between gap-2">
+                                    <dt class="text-slate-600">Prime ASACI</dt>
+                                    <dd
+                                        class="font-medium text-slate-900 tabular-nums text-right"
+                                    >
+                                        {{
+                                            Number(
+                                                contract.cp_amount ?? 0,
                                             ).toLocaleString("fr-FR")
                                         }}
                                     </dd>

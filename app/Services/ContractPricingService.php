@@ -120,6 +120,7 @@ class ContractPricingService
             'accessory_amount' => $row->accessory_amount,
             'taxes_amount' => $taxesAmount,
             'cedeao_amount' => $row->cedeao_amount,
+            'cp_amount' => (int) ($row->cp_amount ?? 0),
             'fga_amount' => $row->fga_amount,
         ];
     }
@@ -191,6 +192,7 @@ class ContractPricingService
             'accessory_amount' => $row->accessory_amount,
             'taxes_amount' => $taxesAmount,
             'cedeao_amount' => $row->cedeao_amount,
+            'cp_amount' => (int) ($row->cp_amount ?? 0),
             'fga_amount' => $row->fga_amount,
         ];
     }
@@ -250,6 +252,7 @@ class ContractPricingService
             'accessory_amount' => $row->accessory_amount,
             'taxes_amount' => $taxesAmount,
             'cedeao_amount' => $row->cedeao_amount,
+            'cp_amount' => (int) ($row->cp_amount ?? 0),
             'fga_amount' => $row->fga_amount,
         ];
     }
@@ -303,6 +306,7 @@ class ContractPricingService
             'accessory_amount' => $row->accessory_amount,
             'taxes_amount' => $taxesAmount,
             'cedeao_amount' => $row->cedeao_amount,
+            'cp_amount' => (int) ($row->cp_amount ?? 0),
             'fga_amount' => $row->fga_amount,
         ];
     }

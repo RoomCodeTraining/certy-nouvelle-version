@@ -300,6 +300,7 @@ class ContractController extends Controller
             'Accessoires (FCFA)',
             'Taxes (FCFA)',
             'CEDEAO (FCFA)',
+            'Prime ASACI (FCFA)',
             'FGA (FCFA)',
             'Accessoire compagnie (FCFA)',
             'Accessoire agence (FCFA)',
@@ -365,6 +366,7 @@ class ContractController extends Controller
                     (string) ($c->accessory_amount ?? ''),
                     (string) ($c->taxes_amount ?? ''),
                     (string) ($c->cedeao_amount ?? ''),
+                    (string) ($c->cp_amount ?? ''),
                     (string) ($c->fga_amount ?? ''),
                     (string) ($c->company_accessory ?? ''),
                     (string) ($c->agency_accessory ?? ''),
@@ -443,6 +445,7 @@ class ContractController extends Controller
                         'taxes_amount' => $parent->taxes_amount,
                         'fga_amount' => $parent->fga_amount,
                         'cedeao_amount' => $parent->cedeao_amount,
+                        'cp_amount' => $parent->cp_amount,
                         'optional_guarantees_amount' => $parent->optional_guarantees_amount,
                         'reduction_amount' => $parent->reduction_amount,
                         'reduction_bns' => $parent->reduction_bns,
@@ -540,7 +543,8 @@ class ContractController extends Controller
         }
 
         $primeWithoutAccessory = $amounts['base_amount'] + $amounts['rc_amount'] + $amounts['defence_appeal_amount']
-            + $amounts['person_transport_amount'] + $amounts['taxes_amount'] + $amounts['cedeao_amount'] + $amounts['fga_amount'];
+            + $amounts['person_transport_amount'] + $amounts['taxes_amount'] + $amounts['cedeao_amount']
+            + ($amounts['cp_amount'] ?? 0) + $amounts['fga_amount'];
         $totalPremium = $primeWithoutAccessory + $amounts['accessory_amount'];
 
         return response()->json([

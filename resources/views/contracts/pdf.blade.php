@@ -263,6 +263,10 @@ function contractTypeLabel($type) {
                             <th>CEDEAO</th>
                             <td class="text-right">{{ number_format($contract->cedeao_amount ?? 0, 0, ',', ' ') }}</td>
                         </tr>
+                        <tr>
+                            <th>Prime ASACI</th>
+                            <td class="text-right">{{ number_format($contract->cp_amount ?? 0, 0, ',', ' ') }}</td>
+                        </tr>
                         @if(($contract->agency_accessory ?? 0) > 0)
                             <tr>
                                 <th>Accessoire agence</th>

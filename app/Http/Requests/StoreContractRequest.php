@@ -53,6 +53,7 @@ class StoreContractRequest extends FormRequest
             'person_transport_amount_override' => ['nullable', 'integer', 'min:0'],
             'taxes_amount_override' => ['nullable', 'integer', 'min:0'],
             'cedeao_amount_override' => ['nullable', 'integer', 'min:0'],
+            'cp_amount_override' => ['nullable', 'integer', 'min:0'],
             'fga_amount_override' => ['nullable', 'integer', 'min:0'],
             'reduction_bns' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'reduction_on_commission' => ['nullable', 'numeric', 'min:0', 'max:100'],

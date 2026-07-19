@@ -36,6 +36,7 @@ class StoreContractAction
             'accessory_amount' => $accessoryAmountOverride ?? ($validated['accessory_amount_override'] ?? null),
             'taxes_amount' => $validated['taxes_amount_override'] ?? null,
             'cedeao_amount' => $validated['cedeao_amount_override'] ?? null,
+            'cp_amount' => $validated['cp_amount_override'] ?? null,
             'fga_amount' => $validated['fga_amount_override'] ?? null,
         ];
 
@@ -83,6 +84,7 @@ class StoreContractAction
             $validated['person_transport_amount_override'],
             $validated['taxes_amount_override'],
             $validated['cedeao_amount_override'],
+            $validated['cp_amount_override'],
             $validated['fga_amount_override'],
             $validated['creation_mode'],
             $validated['endorsement_type'],

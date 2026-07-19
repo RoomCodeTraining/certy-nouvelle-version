@@ -22,7 +22,7 @@ class TwoWheelerPricingGridSeeder extends Seeder
                 'person_transport_amount' => 0,
                 'accessory_amount' => 500,
                 'taxes_amount' => 1914,
-                'cedeao_amount' => 0,
+                'cedeao_amount' => 0, 'cp_amount' => 0,
                 'fga_amount' => 233,
             ],
             [
@@ -33,7 +33,7 @@ class TwoWheelerPricingGridSeeder extends Seeder
                 'person_transport_amount' => 0,
                 'accessory_amount' => 500,
                 'taxes_amount' => 2589,
-                'cedeao_amount' => 0,
+                'cedeao_amount' => 0, 'cp_amount' => 0,
                 'fga_amount' => 326,
             ],
             [
@@ -44,7 +44,7 @@ class TwoWheelerPricingGridSeeder extends Seeder
                 'person_transport_amount' => 0,
                 'accessory_amount' => 500,
                 'taxes_amount' => 3684,
-                'cedeao_amount' => 0,
+                'cedeao_amount' => 0, 'cp_amount' => 0,
                 'fga_amount' => 477,
             ],
             [
@@ -55,7 +55,7 @@ class TwoWheelerPricingGridSeeder extends Seeder
                 'person_transport_amount' => 0,
                 'accessory_amount' => 500,
                 'taxes_amount' => 4673,
-                'cedeao_amount' => 0,
+                'cedeao_amount' => 0, 'cp_amount' => 0,
                 'fga_amount' => 613,
             ],
             [
@@ -66,7 +66,7 @@ class TwoWheelerPricingGridSeeder extends Seeder
                 'person_transport_amount' => 0,
                 'accessory_amount' => 500,
                 'taxes_amount' => 6154,
-                'cedeao_amount' => 0,
+                'cedeao_amount' => 0, 'cp_amount' => 0,
                 'fga_amount' => 818,
             ],
         ];
@@ -81,7 +81,7 @@ class TwoWheelerPricingGridSeeder extends Seeder
                     'person_transport_amount' => $row['person_transport_amount'],
                     'accessory_amount' => $row['accessory_amount'],
                     'taxes_amount' => $row['taxes_amount'],
-                    'cedeao_amount' => $row['cedeao_amount'],
+                    'cedeao_amount' => $row['cedeao_amount'], 'cp_amount' => $row['cp_amount'] ?? 0,
                     'fga_amount' => $row['fga_amount'],
                     'is_active' => true,
                 ]

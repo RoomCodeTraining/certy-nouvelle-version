@@ -49,6 +49,7 @@ class PricingGridController extends Controller
                     'accessory_amount' => (int) $r->accessory_amount,
                     'taxes_amount' => (int) $r->taxes_amount,
                     'cedeao_amount' => (int) $r->cedeao_amount,
+                    'cp_amount' => (int) ($r->cp_amount ?? 0),
                     'fga_amount' => (int) $r->fga_amount,
                     'is_active' => (bool) $r->is_active,
                 ])->values()->all();
@@ -61,7 +62,7 @@ class PricingGridController extends Controller
                     'base_amount' => (int) $r->base_amount, 'rc_amount' => (int) $r->rc_amount,
                     'defence_appeal_amount' => (int) $r->defence_appeal_amount, 'person_transport_amount' => (int) $r->person_transport_amount,
                     'accessory_amount' => (int) $r->accessory_amount, 'taxes_amount' => (int) $r->taxes_amount,
-                    'cedeao_amount' => (int) $r->cedeao_amount, 'fga_amount' => (int) $r->fga_amount,
+                    'cedeao_amount' => (int) $r->cedeao_amount, 'cp_amount' => (int) ($r->cp_amount ?? 0), 'fga_amount' => (int) $r->fga_amount,
                     'is_active' => (bool) $r->is_active,
                 ])->values()->all();
         }
@@ -73,7 +74,7 @@ class PricingGridController extends Controller
                     'base_amount' => (int) $r->base_amount, 'rc_amount' => (int) $r->rc_amount,
                     'defence_appeal_amount' => (int) $r->defence_appeal_amount, 'person_transport_amount' => (int) $r->person_transport_amount,
                     'accessory_amount' => (int) $r->accessory_amount, 'taxes_amount' => (int) $r->taxes_amount,
-                    'cedeao_amount' => (int) $r->cedeao_amount, 'fga_amount' => (int) $r->fga_amount,
+                    'cedeao_amount' => (int) $r->cedeao_amount, 'cp_amount' => (int) ($r->cp_amount ?? 0), 'fga_amount' => (int) $r->fga_amount,
                     'is_active' => (bool) $r->is_active,
                 ])->values()->all();
         }
@@ -85,7 +86,7 @@ class PricingGridController extends Controller
                     'base_amount' => (int) $r->base_amount, 'rc_amount' => (int) $r->rc_amount,
                     'defence_appeal_amount' => (int) $r->defence_appeal_amount, 'person_transport_amount' => (int) $r->person_transport_amount,
                     'accessory_amount' => (int) $r->accessory_amount, 'taxes_amount' => (int) $r->taxes_amount,
-                    'cedeao_amount' => (int) $r->cedeao_amount, 'fga_amount' => (int) $r->fga_amount,
+                    'cedeao_amount' => (int) $r->cedeao_amount, 'cp_amount' => (int) ($r->cp_amount ?? 0), 'fga_amount' => (int) $r->fga_amount,
                     'is_active' => (bool) $r->is_active,
                 ])->values()->all();
         }
@@ -140,6 +141,7 @@ class PricingGridController extends Controller
             'accessory_amount' => ['nullable', 'integer', 'min:0'],
             'taxes_amount' => ['nullable', 'integer', 'min:0'],
             'cedeao_amount' => ['nullable', 'integer', 'min:0'],
+            'cp_amount' => ['nullable', 'integer', 'min:0'],
             'fga_amount' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
         ]);
@@ -149,7 +151,7 @@ class PricingGridController extends Controller
 
         $amountFields = [
             'base_amount', 'rc_amount', 'defence_appeal_amount', 'person_transport_amount',
-            'accessory_amount', 'taxes_amount', 'cedeao_amount', 'fga_amount',
+            'accessory_amount', 'taxes_amount', 'cedeao_amount', 'cp_amount', 'fga_amount',
         ];
 
         $data = [];
