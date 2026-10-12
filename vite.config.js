@@ -27,7 +27,8 @@ export default defineConfig({
     ],
     server: {
         host: '127.0.0.1',
-        port: 5173,
+        // 5172-5174 sont réservés par ddev-router pour d'autres projets DDEV
+        port: 5180,
         strictPort: true,
         // Autorise le front servi par DDEV (https://*.ddev.site) à charger les assets Vite
         cors: {
