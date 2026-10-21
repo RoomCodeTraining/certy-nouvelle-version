@@ -359,10 +359,11 @@ class DigitalController extends Controller
                         }
                     }
                 }
-                // Réponse binaire (PDF), on renvoie le corps
-                return response($res->body(), $res->status())
-                    ->header('Content-Type', $res->header('Content-Type') ?: 'application/pdf')
-                    ->header('Content-Disposition', 'attachment; filename="attestation-'.$reference.'.pdf"');
+                return $this->attestationDownloadResponse(
+                    $res->body(),
+                    $res->header('Content-Type') ?: '',
+                    $reference
+                );
             }
             $message = is_array($cedeao) && isset($cedeao['message']) ? $cedeao['message'] : 'Téléchargement indisponible pour cette source.';
             return redirect()
@@ -375,6 +376,16 @@ class DigitalController extends Controller
             return $token;
         }
 
+        // Même document que la visualisation (printed_certificate), souvent une image CIMA.
+        $printed = $this->externalService->getCertificatePrintedPdf($reference, $token);
+        if (! isset($printed['errors'])) {
+            return $this->attestationDownloadResponse(
+                $printed['body'],
+                $printed['content_type'] ?? '',
+                $reference
+            );
+        }
+
         $result = $this->externalService->downloadCertificate($reference, $token);
         if (is_array($result) && isset($result['errors'])) {
             return redirect()
@@ -382,8 +393,11 @@ class DigitalController extends Controller
                 ->with('error', $result['errors'][0]['title'] ?? 'Téléchargement impossible.');
         }
 
-        return response($result->body(), $result->status(), $result->headers())
-            ->header('Content-Disposition', 'attachment; filename="attestation-'.$reference.'.pdf"');
+        return $this->attestationDownloadResponse(
+            $result->body(),
+            $result->headers()->get('Content-Type') ?? '',
+            $reference
+        );
     }
 
     /**
@@ -454,11 +468,7 @@ class DigitalController extends Controller
                     }
                 }
 
-                // PDF ou autre binaire : renvoyer tel quel
-                return response($body, 200, [
-                    'Content-Type' => $contentType ?: 'application/pdf',
-                    'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.pdf"',
-                ]);
+                return $this->attestationInlineResponse($body, $contentType ?: 'application/pdf', $reference);
             }
             $message = is_array($cedeao) && isset($cedeao['message']) ? $cedeao['message'] : 'Visualisation indisponible pour cette source.';
             return redirect()
@@ -476,35 +486,144 @@ class DigitalController extends Controller
             // Dernier recours : utiliser l'endpoint download pour la visualisation
             $download = $this->externalService->downloadCertificate($reference, $token);
             if (! is_array($download) || ! isset($download['errors'])) {
-                return response($download->body(), 200, [
-                    'Content-Type' => $download->headers()->get('Content-Type') ?? 'application/pdf',
-                    'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.pdf"',
-                ]);
+                return $this->attestationInlineResponse(
+                    $download->body(),
+                    $download->headers()->get('Content-Type') ?? 'application/pdf',
+                    $reference
+                );
             }
             return redirect()
                 ->route('digital.attestations')
                 ->with('error', $result['errors'][0]['title'] ?? 'Visualisation impossible.');
         }
 
-        $contentType = $result['content_type'] ?? 'application/pdf';
-        $body = $result['body'];
+        return $this->attestationInlineResponse(
+            $result['body'],
+            $result['content_type'] ?? 'application/pdf',
+            $reference
+        );
+    }
 
-        // Pour les images : renvoyer une page HTML qui affiche l'image sans espace blanc à droite
+    /**
+     * Affiche l'attestation dans l'iframe. Si le fichier est une image (cas CIMA ASACI)
+     * même déclaré en PDF, on l'affiche en <img> pour éviter l'erreur Chrome
+     * « Échec de chargement du document PDF ».
+     */
+    private function attestationDownloadResponse(string $body, string $declaredContentType, string $reference): HttpResponse|RedirectResponse
+    {
+        $body = $this->unwrapAttestationPayload($body);
+        $contentType = ExternalService::detectDocumentContentType($body, $declaredContentType);
+
+        if (str_starts_with($body, '%PDF')) {
+            $mime = 'application/pdf';
+            $ext = 'pdf';
+        } elseif (str_starts_with($contentType, 'image/png') || str_starts_with($body, "\x89PNG")) {
+            $mime = 'image/png';
+            $ext = 'png';
+        } elseif (str_starts_with($contentType, 'image/') || str_starts_with($body, "\xFF\xD8\xFF")) {
+            $mime = str_starts_with($contentType, 'image/') ? $contentType : 'image/jpeg';
+            $ext = str_contains($mime, 'png') ? 'png' : 'jpg';
+        } else {
+            return redirect()
+                ->route('digital.attestations')
+                ->with('error', 'Téléchargement impossible : le document n\'est pas un PDF ni une image valide.');
+        }
+
+        return response($body, 200, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'attachment; filename="attestation-'.$reference.'.'.$ext.'"',
+        ]);
+    }
+
+    private function attestationInlineResponse(string $body, string $declaredContentType, string $reference): HttpResponse
+    {
+        $body = $this->unwrapAttestationPayload($body);
+        $contentType = ExternalService::detectDocumentContentType($body, $declaredContentType);
+
         if (str_starts_with($contentType, 'image/')) {
             $dataUrl = 'data:'.$contentType.';base64,'.base64_encode($body);
             $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
                 .'<style>html,body{margin:0;padding:0;background:#f1f5f9;}img{display:block;max-width:100%;height:auto;margin:0 auto;}</style></head>'
                 .'<body><img src="'.htmlspecialchars($dataUrl, ENT_QUOTES, 'UTF-8').'" alt="Attestation"></body></html>';
+
             return response($html, 200, [
                 'Content-Type' => 'text/html; charset=utf-8',
                 'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.html"',
             ]);
         }
 
-        return response($body, 200, [
-            'Content-Type' => $contentType,
-            'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.pdf"',
+        if (str_starts_with($body, '%PDF')) {
+            return response($body, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.pdf"',
+            ]);
+        }
+
+        if (str_starts_with(ltrim($body), '<')) {
+            return response($body, 200, [
+                'Content-Type' => 'text/html; charset=utf-8',
+                'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.html"',
+            ]);
+        }
+
+        $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Attestation</title></head>'
+            .'<body style="font-family:sans-serif;padding:2rem;color:#334155;"><p>Impossible d\'afficher cette attestation. Vous pouvez la télécharger.</p></body></html>';
+
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=utf-8',
+            'Content-Disposition' => 'inline; filename="attestation-'.$reference.'.html"',
         ]);
+    }
+
+    /**
+     * Si l'API a renvoyé du JSON ou du base64 (souvent avec Content-Type PDF),
+     * extraire le vrai document avant affichage.
+     */
+    private function unwrapAttestationPayload(string $body): string
+    {
+        $trimmed = ltrim($body);
+        if ($trimmed !== '' && ($trimmed[0] === '{' || $trimmed[0] === '[')) {
+            $json = json_decode($trimmed, true);
+            if (is_array($json)) {
+                $printed = $json['data']['printed_certificate']
+                    ?? $json['printed_certificate']
+                    ?? $json['data']['data']['printed_certificate']
+                    ?? $json['data']['attributes']['printed_certificate']
+                    ?? null;
+                if (is_array($printed)) {
+                    $printed = $printed['url'] ?? $printed['content'] ?? $printed['data'] ?? $printed['base64'] ?? null;
+                }
+                if (is_string($printed) && $printed !== '') {
+                    return $this->decodePrintedPayload($printed);
+                }
+            }
+        }
+
+        return $this->decodePrintedPayload($trimmed);
+    }
+
+    private function decodePrintedPayload(string $printed): string
+    {
+        $printed = trim($printed);
+        if (preg_match('#^data:([^;]+);base64,(.+)$#s', $printed, $m)) {
+            $decoded = base64_decode(preg_replace('#\s+#', '', $m[2]), true);
+
+            return ($decoded !== false && $decoded !== '') ? $decoded : $printed;
+        }
+
+        $compact = preg_replace('#\s+#', '', $printed) ?? '';
+        if (strlen($compact) > 80 && preg_match('#^[A-Za-z0-9+/]+=*$#', $compact)) {
+            $decoded = base64_decode($compact, true);
+            if ($decoded !== false && $decoded !== '') {
+                $sniffed = ExternalService::detectDocumentContentType($decoded);
+
+                if (str_starts_with($sniffed, 'image/') || str_starts_with($decoded, '%PDF')) {
+                    return $decoded;
+                }
+            }
+        }
+
+        return $printed;
     }
 
     /**

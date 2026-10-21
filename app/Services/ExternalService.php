@@ -708,6 +708,41 @@ class ExternalService
     }
 
     /**
+     * Type réel du document (magic bytes). Les attestations CIMA sont souvent un JPEG
+     * déclaré en application/pdf, ce qui fait échouer le viewer Chrome.
+     */
+    public static function detectDocumentContentType(string $body, ?string $declared = null): string
+    {
+        if (str_starts_with($body, "\xEF\xBB\xBF")) {
+            $body = substr($body, 3);
+        }
+        if (str_starts_with($body, '%PDF')) {
+            return 'application/pdf';
+        }
+        if (str_starts_with($body, "\xFF\xD8\xFF")) {
+            return 'image/jpeg';
+        }
+        if (str_starts_with($body, "\x89PNG\r\n\x1A\n")) {
+            return 'image/png';
+        }
+        if (str_starts_with($body, 'GIF87a') || str_starts_with($body, 'GIF89a')) {
+            return 'image/gif';
+        }
+        if (str_starts_with($body, 'RIFF') && substr($body, 8, 4) === 'WEBP') {
+            return 'image/webp';
+        }
+
+        $declared = strtolower(trim(explode(';', (string) $declared)[0]));
+        if (str_starts_with($declared, 'image/')) {
+            return $declared;
+        }
+
+        // Ne jamais faire confiance à application/pdf sans magic bytes %PDF :
+        // Chrome affiche alors « Échec de chargement du document PDF ».
+        return 'application/octet-stream';
+    }
+
+    /**
      * Récupère le PDF d'une attestation CEDEAO via l'API EATCI BNICB.
      * GET {eatci_cedeao_api_url}/api/v1/certificates/related/{reference}
      *

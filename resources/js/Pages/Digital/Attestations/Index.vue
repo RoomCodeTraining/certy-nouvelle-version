@@ -7,6 +7,7 @@ import DataTable from "@/Components/DataTable.vue";
 import DataTableAction from "@/Components/DataTableAction.vue";
 import { formatDate } from "@/utils/formatDate";
 import { route } from "@/route";
+import { prepareAttestationPreview } from "@/utils/attestationPreview";
 
 const props = defineProps({
     attestations: [Array, Object],
@@ -83,7 +84,16 @@ const viewRow = ref(null);
 const viewSource = ref(null); // 'cima' | 'autres'
 const viewLoading = ref(true);
 const viewError = ref(false);
+const viewKind = ref(null);
+const viewObjectUrl = ref(null);
 let viewLoadTimeoutId = null;
+
+function revokeViewObjectUrl() {
+    if (viewObjectUrl.value) {
+        URL.revokeObjectURL(viewObjectUrl.value);
+        viewObjectUrl.value = null;
+    }
+}
 
 function viewUrlFor(ref, source) {
     if (!ref) return null;
@@ -159,12 +169,30 @@ async function handleDownload(ref, source) {
             method: "GET",
         });
         if (!res.ok) throw new Error(res.statusText);
-        const blob = await res.blob();
+        const buffer = await res.arrayBuffer();
+        const preview = prepareAttestationPreview(buffer);
+        const blob =
+            preview?.blob ??
+            new Blob([buffer], {
+                type: res.headers.get("Content-Type") || "application/octet-stream",
+            });
         const disposition = res.headers.get("Content-Disposition");
         const match =
             disposition &&
             disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"'\s;]+)["']?/i);
-        const filename = match ? match[1].trim() : `attestation-${ref}.pdf`;
+        const sniffedExt =
+            preview?.kind === "image"
+                ? preview.mime?.includes("png")
+                    ? "png"
+                    : "jpg"
+                : preview?.kind === "pdf"
+                  ? "pdf"
+                  : null;
+        const filename = sniffedExt
+            ? `attestation-${ref}.${sniffedExt}`
+            : match
+              ? decodeURIComponent(match[1].trim())
+              : `attestation-${ref}.pdf`;
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = filename;
@@ -177,6 +205,38 @@ async function handleDownload(ref, source) {
     }
 }
 
+async function loadViewDocument() {
+    const url = viewUrl.value;
+    if (!url) return;
+    viewLoading.value = true;
+    viewError.value = false;
+    viewKind.value = null;
+    revokeViewObjectUrl();
+    try {
+        const res = await fetch(url, {
+            credentials: "same-origin",
+            method: "GET",
+            headers: { Accept: "*/*" },
+        });
+        if (!res.ok) throw new Error(res.statusText);
+        const preview = prepareAttestationPreview(await res.arrayBuffer());
+        if (!preview?.blob || preview.kind === "error") {
+            viewError.value = true;
+            return;
+        }
+        viewKind.value = preview.kind;
+        viewObjectUrl.value = URL.createObjectURL(preview.blob);
+    } catch (_) {
+        viewError.value = true;
+    } finally {
+        viewLoading.value = false;
+        if (viewLoadTimeoutId) {
+            clearTimeout(viewLoadTimeoutId);
+            viewLoadTimeoutId = null;
+        }
+    }
+}
+
 function openViewModal(row, source) {
     const ref = getAttestationRef(row);
     if (ref) {
@@ -185,6 +245,8 @@ function openViewModal(row, source) {
         viewSource.value = source || null;
         viewLoading.value = true;
         viewError.value = false;
+        viewKind.value = null;
+        revokeViewObjectUrl();
         showViewModal.value = true;
         if (viewLoadTimeoutId) clearTimeout(viewLoadTimeoutId);
         viewLoadTimeoutId = setTimeout(() => {
@@ -194,6 +256,7 @@ function openViewModal(row, source) {
             }
             viewLoadTimeoutId = null;
         }, 25000);
+        loadViewDocument();
     }
 }
 
@@ -267,10 +330,12 @@ function closeViewModal() {
         clearTimeout(viewLoadTimeoutId);
         viewLoadTimeoutId = null;
     }
+    revokeViewObjectUrl();
     showViewModal.value = false;
     viewReference.value = null;
     viewRow.value = null;
     viewSource.value = null;
+    viewKind.value = null;
     viewLoading.value = true;
     viewError.value = false;
 }
@@ -287,23 +352,6 @@ onMounted(() => document.addEventListener("click", onActionMenuClickOutside));
 onUnmounted(() =>
     document.removeEventListener("click", onActionMenuClickOutside),
 );
-
-function onViewIframeLoad() {
-    if (viewLoadTimeoutId) {
-        clearTimeout(viewLoadTimeoutId);
-        viewLoadTimeoutId = null;
-    }
-    viewLoading.value = false;
-}
-
-function onViewIframeError() {
-    if (viewLoadTimeoutId) {
-        clearTimeout(viewLoadTimeoutId);
-        viewLoadTimeoutId = null;
-    }
-    viewLoading.value = false;
-    viewError.value = true;
-}
 
 // Fermer au Escape et bloquer le scroll du body quand le modal est ouvert
 watch(showViewModal, (open) => {
@@ -1406,13 +1454,26 @@ const columns = [
                                     }}
                                 </button>
                             </div>
-                            <iframe
-                                v-if="viewUrl && !viewError"
-                                :src="viewUrl"
+                            <img
+                                v-else-if="
+                                    viewKind === 'image' && viewObjectUrl
+                                "
+                                :src="viewObjectUrl"
+                                alt="Attestation"
+                                class="max-w-full h-auto mx-auto rounded-lg bg-white border border-slate-200"
+                            />
+                            <embed
+                                v-else-if="viewKind === 'pdf' && viewObjectUrl"
+                                :src="viewObjectUrl"
+                                type="application/pdf"
                                 class="w-full h-[75vh] min-h-[400px] rounded-lg bg-white border border-slate-200"
                                 title="Visualisation de l'attestation"
-                                @load="onViewIframeLoad"
-                                @error="onViewIframeError"
+                            />
+                            <iframe
+                                v-else-if="viewKind === 'html' && viewObjectUrl"
+                                :src="viewObjectUrl"
+                                class="w-full h-[75vh] min-h-[400px] rounded-lg bg-white border border-slate-200"
+                                title="Visualisation de l'attestation"
                             />
                         </div>
                     </div>
